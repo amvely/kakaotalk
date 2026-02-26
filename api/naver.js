@@ -38,7 +38,7 @@ async function apiRequest(cid, lic, sec, method, pathWithQuery, payload) {
     opts.body = JSON.stringify(payload);
   }
 
-  const url = BASE_URL + pathWithQuery;
+  const url = API_BASE + pathWithQuery;
   const r = await fetch(url, opts);
   const txt = await r.text();
   let data;
