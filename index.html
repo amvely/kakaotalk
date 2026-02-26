@@ -336,16 +336,16 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
     <!-- 기간 선택 -->
     <div class="period-bar" id="period-bar">
       <div class="period-left">
-        <button class="period-btn" id="btn-p-d1" onclick="setPeriod('D1')">어제</button>
-        <button class="period-btn" id="btn-p-d7" onclick="setPeriod('D7')">최근 7일</button>
-        <button class="period-btn" id="btn-p-pm" onclick="setPeriod('PM')">전월</button>
-        <button class="period-btn" id="btn-p-tm" onclick="setPeriod('TM')">당월(누계)</button>
+        <button class="period-btn" id="btn-p-d1" onclick="setReportPeriod('D1')">어제</button>
+        <button class="period-btn" id="btn-p-d7" onclick="setReportPeriod('D7')">최근 7일</button>
+        <button class="period-btn" id="btn-p-pm" onclick="setReportPeriod('PM')">전월</button>
+        <button class="period-btn" id="btn-p-tm" onclick="setReportPeriod('TM')">당월(누계)</button>
       </div>
       <div class="period-right">
         <input class="period-date" id="custom-start" type="date">
         <span class="period-sep">~</span>
         <input class="period-date" id="custom-end" type="date">
-        <button class="period-apply" onclick="applyCustomRange()">조회</button>
+        <button class="period-apply" onclick="applyReportCustomRange()">조회</button>
       </div>
     </div>
 
@@ -482,7 +482,29 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 
   <!-- ─── 탭: 카카오톡 보고서 ─── -->
   <div class="tab-panel" id="tab-kakao">
-    <!-- 입력 패널 -->
+    
+    <!-- 기간 선택 (카카오톡 보고서 전용) -->
+    <div class="kk-input-panel" style="margin-bottom:14px">
+      <div class="kk-panel-hd">📅 기간 선택 <span style="margin-left:auto;font-size:10px;color:var(--text3);font-weight:600" id="kakao-period-label"></span></div>
+      <div class="kk-panel-body" style="gap:10px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="camp-settings-btn" id="btn-k-d1" onclick="setKakaoPeriod('D1')">어제</button>
+          <button class="camp-settings-btn" id="btn-k-d7" onclick="setKakaoPeriod('D7')">최근 7일</button>
+          <button class="camp-settings-btn" id="btn-k-pm" onclick="setKakaoPeriod('PM')">전월</button>
+          <button class="camp-settings-btn" id="btn-k-tm" onclick="setKakaoPeriod('TM')">당월(누계)</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input class="kk-inp" id="kakao-start" type="date" style="max-width:190px">
+          <span style="color:var(--text3);font-size:12px">~</span>
+          <input class="kk-inp" id="kakao-end" type="date" style="max-width:190px">
+          <button class="btn-save" style="padding:9px 14px;border-radius:8px" onclick="applyKakaoCustomRange()">조회</button>
+        </div>
+        <div style="font-size:10px;color:var(--text3);line-height:1.4">
+          비교 기준: <b>선택 시작일 이전 동일기간</b> (예: 2/10~2/15 선택 → 2/4~2/9 비교)
+        </div>
+      </div>
+    </div>
+<!-- 입력 패널 -->
     <div class="kk-input-panel">
       <div class="kk-panel-hd">✏️ 보고서 내용 입력</div>
       <div class="kk-panel-body">
@@ -606,8 +628,15 @@ function saveAdv2(list){localStorage.setItem(STORE_KEY,btoa(unescape(encodeURICo
 let advertisers=loadAdv();
 
 // ══ STATE ══
-let currentAdv=null, currentPeriod='D1', reportData=null, currentPeriodMeta=null;
-let customRange=null; // {start:Date,end:Date} 사용자 지정 기간
+let currentAdv=null;
+
+// ✅ 성과리포트(탭1) 기간 상태
+let reportPeriod='D1', reportData=null, reportPeriodMeta=null;
+let reportCustomRange=null; // {start:Date,end:Date}
+
+// ✅ 카카오톡 보고서(탭2) 기간 상태
+let kakaoPeriod='D1', kakaoData=null, kakaoPeriodMeta=null;
+let kakaoCustomRange=null; // {start:Date,end:Date}
 let selectedCamps=null, selectedGroups=null, campModalType='camp', tempCampSel=[], filterZeroImp=true;
 let brandExcludeTerms='', selectedKws=new Set();
 
@@ -638,7 +667,7 @@ function hideLoading(){document.getElementById('loading').classList.remove('show
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
 
 function aggDays(days){
-  if(!days||!days.length) return{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0};
+  if(!days||!days.length) return{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
   const cost=sum(days,'cost'),imp=sum(days,'imp'),click=sum(days,'click'),conv=sum(days,'conv'),revenue=sum(days,'revenue');
   return{cost,imp,click,conv,revenue,
     ctr:imp?click/imp*100:0, cvr:click?conv/click*100:0,
@@ -648,13 +677,13 @@ function aggDays(days){
 
 // ══ PERIOD ══
 
-function getPeriodDates(period){
+function getPeriodDates(period, range){
   const today=new Date(), yest=addDays(today,-1);
   let curS,curE,ps,pe,periodLabel,dateStr2,compareStr,curLabel,prevLabel;
 
   // 사용자 지정 기간
-  if(period==='CUSTOM' && customRange?.start && customRange?.end){
-    curS=new Date(customRange.start); curE=new Date(customRange.end);
+  if(period==='CUSTOM' && range?.start && customRange?.end){
+    curS=new Date(range.start); curE=new Date(range.end);
     curS.setHours(0,0,0,0); curE.setHours(0,0,0,0);
     if(curE < curS){ const t=curS; curS=curE; curE=t; }
 
@@ -718,15 +747,15 @@ function getPeriodDates(period){
 }
 
 // ══ PERIOD CONTROLS ══
-function syncPeriodButtons(){
+function syncReportPeriodButtons(){
   const ids=[['D1','btn-p-d1'],['D7','btn-p-d7'],['PM','btn-p-pm'],['TM','btn-p-tm']];
   ids.forEach(([p,id])=>{
     const el=document.getElementById(id);
     if(!el) return;
-    el.classList.toggle('active', currentPeriod===p);
+    el.classList.toggle('active', reportPeriod===p);
   });
   // CUSTOM이면 버튼 전체 비활성 느낌
-  if(currentPeriod==='CUSTOM'){
+  if(reportPeriod==='CUSTOM'){
     ids.forEach(([p,id])=>{
       const el=document.getElementById(id);
       if(el) el.classList.remove('active');
@@ -734,22 +763,57 @@ function syncPeriodButtons(){
   }
 }
 
-function setPeriod(p){
-  currentPeriod=p;
-  customRange=null;
-  syncPeriodButtons();
+function setReportPeriod(p){
+  reportPeriod=p;
+  reportCustomRange=null;
+  syncReportPeriodButtons();
   loadReportData();
 }
 
-function applyCustomRange(){
+function applyReportCustomRange(){
   const s=document.getElementById('custom-start')?.value;
   const e=document.getElementById('custom-end')?.value;
   if(!s||!e){ showToast('기간을 선택해주세요'); return; }
   const sd=new Date(s+'T00:00:00'); const ed=new Date(e+'T00:00:00');
-  customRange={start:sd,end:ed};
-  currentPeriod='CUSTOM';
-  syncPeriodButtons();
+  reportCustomRange={start:sd,end:ed};
+  reportPeriod='CUSTOM';
+  syncReportPeriodButtons();
   loadReportData();
+}
+
+
+// ══ KAKAO PERIOD CONTROLS (탭2 전용) ══
+function syncKakaoPeriodButtons(){
+  const ids=[['D1','btn-k-d1'],['D7','btn-k-d7'],['PM','btn-k-pm'],['TM','btn-k-tm']];
+  ids.forEach(([p,id])=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.classList.toggle('active', kakaoPeriod===p);
+  });
+  if(kakaoPeriod==='CUSTOM'){
+    ids.forEach(([p,id])=>{
+      const el=document.getElementById(id);
+      if(el) el.classList.remove('active');
+    });
+  }
+}
+
+function setKakaoPeriod(p){
+  kakaoPeriod=p;
+  kakaoCustomRange=null;
+  syncKakaoPeriodButtons();
+  loadKakaoData();
+}
+
+function applyKakaoCustomRange(){
+  const s=document.getElementById('kakao-start')?.value;
+  const e=document.getElementById('kakao-end')?.value;
+  if(!s||!e){ showToast('기간을 선택해주세요'); return; }
+  const sd=new Date(s+'T00:00:00'); const ed=new Date(e+'T00:00:00');
+  kakaoCustomRange={start:sd,end:ed};
+  kakaoPeriod='CUSTOM';
+  syncKakaoPeriodButtons();
+  loadKakaoData();
 }
 
 
@@ -759,12 +823,21 @@ function switchTab(name, btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
-  if(name==='kakao'&&reportData&&currentPeriodMeta){
-    const cur=aggDays(reportData.days);
-    const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
-    updateKakaoPreview(cur,prev);
+
+  // ✅ 탭별로 기간/데이터를 독립적으로 관리
+  if(name==='kakao'){
+    syncKakaoPeriodButtons();
+    // 아직 데이터가 없으면 기본(어제)로 최초 1회 로드
+    if(currentAdv && !kakaoData){
+      loadKakaoData();
+      return;
+    }
+    if(kakaoData && kakaoPeriodMeta){
+      renderKakaoFromData();
+    }
   }
 }
+
 
 // ══ SCREEN SELECT ══
 function renderAdvGrid(filter=''){
@@ -796,14 +869,14 @@ async function selectAdv(id){
   document.getElementById('screen-report').style.display='block';
   document.getElementById('ctrl-adv-name').innerHTML=`${currentAdv.emoji} ${currentAdv.name}<em>${currentAdv.cat||''}</em>`;
   // 기본 기간: 어제
-  currentPeriod='D1';
+  reportPeriod='D1';
   // 날짜 입력 기본값 세팅
   const y=new Date();
   const ys=addDays(y,-1);
   const toISO=d=>d.toISOString().slice(0,10);
   const cs=document.getElementById('custom-start'); const ce=document.getElementById('custom-end');
   if(cs&&ce){ cs.value=toISO(ys); ce.value=toISO(ys); }
-  syncPeriodButtons();
+  syncReportPeriodButtons();
   await loadReportData();
 }
 function goBack(){
@@ -828,8 +901,8 @@ async function fetchNaverData(adv,startDate,endDate){
 async function loadReportData(){
   showLoading();
   try{
-    currentPeriodMeta=getPeriodDates(currentPeriod);
-    const{curS,curE}=currentPeriodMeta;
+    reportPeriodMeta=getPeriodDates(reportPeriod, reportCustomRange);
+    const{curS,curE}=reportPeriodMeta;
     const data=await fetchNaverData(currentAdv,dateYMD(curS),dateYMD(curE));
     const hasData=(data.allCamps?.length>0)||(data.days?.length>0)||(data.recentDays?.length>0);
     if(hasData){
@@ -849,11 +922,72 @@ async function loadReportData(){
   } finally{hideLoading();}
 }
 
+
+async function loadKakaoData(){
+  if(!currentAdv) return;
+  showLoading();
+  try{
+    kakaoPeriodMeta=getPeriodDates(kakaoPeriod, kakaoCustomRange);
+    const{curS,curE,ps,pe,dateStr2,compareStr}=kakaoPeriodMeta;
+
+    // 라벨 갱신(카카오 기간 패널)
+    const lbl=document.getElementById('kakao-period-label');
+    if(lbl) lbl.textContent = dateStr2 + ' / ' + compareStr;
+
+    const data=await fetchNaverData(currentAdv,dateYMD(curS),dateYMD(curE));
+    const hasData=(data.allCamps?.length>0)||(data.days?.length>0)||(data.recentDays?.length>0);
+    if(!hasData){
+      kakaoData=null;
+      showToast('⚠ 해당 기간에 광고 데이터가 없습니다');
+      document.getElementById('kakao-preview').textContent='해당 기간에 데이터가 없습니다. 다른 기간을 선택해주세요.';
+      document.getElementById('kw-chips-wrap').style.display='none';
+      return;
+    }
+
+    kakaoData={
+      days:data.days||[],
+      prevAgg:data.prevAgg||{},
+      convKws:data.convKws||[],
+    };
+    renderKakaoFromData();
+
+  } catch(e){
+    console.error(e);
+    kakaoData=null;
+    showToast('❌ '+e.message);
+    document.getElementById('kakao-preview').textContent='API 오류: '+e.message;
+  } finally{
+    hideLoading();
+  }
+}
+
+function renderKakaoFromData(){
+  if(!kakaoData || !currentAdv) return;
+
+  const cur=aggDays(kakaoData.days);
+  const prev=kakaoData.prevAgg?.cost!==undefined?kakaoData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
+
+  // ✅ 키워드 칩은 카카오 데이터 기준으로 렌더
+  selectedKws.clear();
+  const topKws=(kakaoData.convKws||[]).slice(0,15);
+  const kwWrap=document.getElementById('kw-chips-wrap');
+  if(topKws.length){
+    kwWrap.style.display='flex';
+    document.getElementById('kw-chips').innerHTML=topKws.map(k=>
+      `<span class="kw-chip" onclick="toggleKwChip(this,'${k.name.replace(/'/g,"\\'")}')">${k.name} <small style="opacity:.6">${k.conv}건</small></span>`
+    ).join('');
+  } else {
+    kwWrap.style.display='none';
+  }
+
+  updateKakaoPreview(cur,prev);
+}
+
 // ══ RENDER REPORT ══
 function renderReport(){
   if(!reportData||!currentAdv) return;
   const{days,recentDays,prevAgg,convKws,spendKws,clickKws,allCamps,allGroups}=reportData;
-  const pm=currentPeriodMeta||getPeriodDates(currentPeriod);
+  const pm=reportPeriodMeta||getPeriodDates(reportPeriod, reportCustomRange);
   const{periodLabel,dateStr2,compareStr,curLabel,prevLabel}=pm;
 
   document.getElementById('rh-title').innerHTML=`${currentAdv.emoji} ${currentAdv.name} <em>${currentAdv.cat||''}</em>`;
@@ -884,23 +1018,6 @@ function renderReport(){
   renderConvKw(convKws);
   renderSpendTop(applyBrandFilter(spendKws));
   renderClickTop(applyBrandFilter(clickKws));
-
-  // 키워드 칩 렌더
-  selectedKws.clear();
-  const topKws=(convKws||[]).slice(0,15);
-  const kwWrap=document.getElementById('kw-chips-wrap');
-  if(topKws.length){
-    kwWrap.style.display='flex';
-    document.getElementById('kw-chips').innerHTML=topKws.map(k=>
-      `<span class="kw-chip" onclick="toggleKwChip(this,'${k.name.replace(/'/g,"\\'")}')">${k.name} <small style="opacity:.6">${k.conv}건</small></span>`
-    ).join('');
-  } else {
-    kwWrap.style.display='none';
-  }
-
-  // 카카오 미리보기 (탭이 열려있으면 갱신)
-  updateKakaoPreview(cur,prev);
-
   const now=new Date();
   document.getElementById('rf-ts').textContent=now.getFullYear()+'.'+pad(now.getMonth()+1)+'.'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes())+' 기준';
 }
@@ -1182,7 +1299,7 @@ function renderClickTop(list){
 function toggleKwChip(el,name){
   if(selectedKws.has(name)){selectedKws.delete(name);el.classList.remove('selected');}
   else{selectedKws.add(name);el.classList.add('selected');}
-  if(reportData&&currentPeriodMeta){
+  if(reportData&&reportPeriodMeta){
     const cur=aggDays(reportData.days);
     const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
     updateKakaoPreview(cur,prev);
@@ -1196,14 +1313,29 @@ function updateKakaoPreview(cur,prev){
   const comment =document.getElementById('comment').value.trim()     ||'성과 분석 내용이 없습니다.';
   const plan    =document.getElementById('plan').value.trim()        ||'상시 모니터링 및 입찰가 최적화 진행 예정입니다.';
 
-  const pm=currentPeriodMeta||getPeriodDates(currentPeriod);
-  const W=n=>Math.round(n).toLocaleString('ko-KR');
-  const delta=(c,p)=>{if(!p)return'';const pct=(c-p)/p*100;return` (${pct>=0?'▲':'▼'}${Math.abs(pct).toFixed(1)}%)`;};
-  const roasDelta=(c,p)=>{if(!p)return'';const d=c-p;return` (${d>=0?'▲':'▼'}${Math.abs(d).toFixed(0)}%p)`;};
+  const pm=kakaoPeriodMeta||getPeriodDates(kakaoPeriod, kakaoCustomRange);
+
+  const W=n=>Math.round(Number(n||0)).toLocaleString('ko-KR');
+  const pctChange=(c,p)=>{
+    c=Number(c||0); p=Number(p||0);
+    if(!p) return '';
+    const pct=(c-p)/p*100;
+    return ` (${pct>=0?'▲':'▼'}${Math.abs(pct).toFixed(1)}%)`;
+  };
+  const pointChange=(c,p,dec=2)=>{
+    c=Number(c||0); p=Number(p||0);
+    // p==0이면 의미있는 %p 계산이 불가하니 생략
+    if(p===0) return '';
+    const d=c-p;
+    return ` (${d>=0?'▲':'▼'}${Math.abs(d).toFixed(dec)}%p)`;
+  };
 
   let kwLine='';
   if(selectedKws.size){
-    kwLine='\n■ 주요 전환 키워드\n'+[...selectedKws].map((k,i)=>`${i+1}. ${k}`).join('\n');
+    kwLine='
+■ 주요 전환 키워드
+'+[...selectedKws].map((k,i)=>`${i+1}. ${k}`).join('
+');
   }
 
   const msg=
@@ -1213,12 +1345,16 @@ ${advName}
 ${greeting}
 
 ■ 주요 성과 (${pm.prevLabel} → ${pm.curLabel})
-- 광고비: ${W(cur.cost)}원${delta(cur.cost,prev.cost)}
-- 클릭수: ${W(cur.click)}회${delta(cur.click,prev.click)}
-- 전환수: ${W(cur.conv)}건${delta(cur.conv,prev.conv)}
-- 매출액: ${W(cur.revenue)}원${delta(cur.revenue,prev.revenue)}
-- ROAS: ${Math.round(cur.roas)}%${roasDelta(cur.roas,prev.roas)}
-- CPC: ${W(cur.cpc)}원${delta(cur.cpc,prev.cpc)}${kwLine}
+- 광고비: ${W(cur.cost)}원${pctChange(cur.cost,prev.cost)}
+- 노출수: ${W(cur.imp)}회${pctChange(cur.imp,prev.imp)}
+- 클릭수: ${W(cur.click)}회${pctChange(cur.click,prev.click)}
+- 전환수: ${W(cur.conv)}건${pctChange(cur.conv,prev.conv)}
+- 매출액: ${W(cur.revenue)}원${pctChange(cur.revenue,prev.revenue)}
+- CPC: ${W(cur.cpc)}원${pctChange(cur.cpc,prev.cpc)}
+- 클릭율(CTR): ${Number(cur.ctr||0).toFixed(2)}%${pointChange(cur.ctr,prev.ctr,2)}
+- 전환율(CVR): ${Number(cur.cvr||0).toFixed(2)}%${pointChange(cur.cvr,prev.cvr,2)}
+- ROAS: ${Math.round(Number(cur.roas||0))}%${pointChange(cur.roas,prev.roas,0)}
+- 전환당비용(CPA): ${W(cur.cpa)}원${pctChange(cur.cpa,prev.cpa)}${kwLine}
 
 ■ 마케터 코멘트
 ${comment}
@@ -1230,6 +1366,7 @@ ${closing}`;
 
   document.getElementById('kakao-preview').textContent=msg;
 }
+
 
 function copyKakao(){
   const text=document.getElementById('kakao-preview').textContent;
@@ -1246,7 +1383,7 @@ function copyKakao(){
 // 실시간 미리보기 갱신
 ['msg-greeting','msg-closing','comment','plan'].forEach(id=>{
   document.getElementById(id).addEventListener('input',()=>{
-    if(reportData&&currentPeriodMeta){
+    if(reportData&&reportPeriodMeta){
       const cur=aggDays(reportData.days);
       const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
       updateKakaoPreview(cur,prev);
