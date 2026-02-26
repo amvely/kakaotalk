@@ -10,11 +10,13 @@ const crypto = require('crypto');
 
 const API_BASE = 'https://api.searchad.naver.com';
 
-// ─── 서명 생성 (공식: timestamp\nMETHOD\npath) ──────────────────
+// ─── 서명 생성 (공식: secretKey는 base64 디코딩 후 HMAC 키로 사용) ──
 function makeSignature(secretKey, timestamp, method, path) {
   const message = `${timestamp}\n${method}\n${path}`;
+  // 네이버 검색광고 비밀키는 Base64 인코딩된 바이너리 → 디코딩해서 사용
+  const keyBuffer = Buffer.from(secretKey, 'base64');
   return crypto
-    .createHmac('sha256', secretKey)
+    .createHmac('sha256', keyBuffer)
     .update(message, 'utf8')
     .digest('base64');
 }
