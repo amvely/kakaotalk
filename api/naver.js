@@ -425,6 +425,13 @@ try {
     return res.json({
       days: formattedDays, recentDays, recent21Days, prevAgg, convKws, convTerms, spendKws, clickKws, allCamps, allGroups,
       _meta: { period: `${startDate}~${endDate}`, campCount: campaigns.length, kwCount: keywords.length },
+      _debug: {
+        daily8_raw_first3: (daily8R?.data?.data || daily8R?.data || []).slice(0,3),
+        daily8_status: daily8R?.status,
+        dailyCur_raw_first3: (dailyCurR?.data?.data || dailyCurR?.data || []).slice(0,3),
+        dailyCur_status: dailyCurR?.status,
+        rec8Start, rec8End,
+      }
     });
 
   } catch (err) {
