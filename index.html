@@ -73,7 +73,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 /* ══ TOPBAR (탭) ══ */
 /* ══ PERIOD BAR ══ */
 .period-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;
-  max-width:1180px;margin:14px auto 0;padding:0 16px;}
+  max-width:1180px;margin:14px auto 0;padding:0 16px;margin-bottom:16px;}
 .period-left{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .period-btn{background:var(--s2);border:1.5px solid var(--border);color:var(--text2);
   padding:7px 10px;border-radius:9px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer;
@@ -141,26 +141,30 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 
 /* Scorecards v2 (image-like) */
 .sc2{padding:12px 14px;}
-.sc2-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
-.sc2-lbl{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;}
-.sc2-diff{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:900;line-height:1;}
-.sc2-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.02em;margin-bottom:4px;}
-.sc2-sub{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--text3);}
+.sc2-lbl{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.04em;margin-bottom:8px;}
+.sc2-mid{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.sc2-val-wrap{display:flex;align-items:center;gap:5px;}
+.sc2-bullet{font-size:10px;}
+.sc2-val{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1;}
+.sc2-diff{font-family:'JetBrains Mono',monospace;font-weight:900;line-height:1;display:flex;align-items:baseline;gap:2px;}
+.sc2-diff-arrow{font-size:13px;}
+.sc2-diff-pct{font-size:20px;}
+.sc2-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);}
 /* Chart */
 .chart-card{background:var(--s2);border:1px solid var(--border2);border-radius:var(--rad2);padding:14px 16px;}
 .chart-inner{display:flex;gap:14px;align-items:stretch;}
 .chart-canvas-wrap{flex:1;min-width:0;display:flex;flex-direction:column;}
 #chart-canvas{width:100%;display:block;flex:1;}
-.chart-metrics{flex-shrink:0;width:176px;display:flex;flex-direction:column;}
+.chart-metrics{flex-shrink:0;width:190px;display:flex;flex-direction:column;}
 .cm-header{font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding-bottom:6px;border-bottom:1px solid var(--border2);margin-bottom:5px;}
-.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;}
-.cm-btn{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:6px;cursor:pointer;transition:background .12s;border:1px solid transparent;user-select:none;}
+.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;flex:1;}
+.cm-btn{display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:6px;cursor:pointer;transition:background .12s;border:1px solid transparent;user-select:none;}
 .cm-btn:hover{background:var(--s3);}
 .cm-btn.sel1{background:rgba(3,199,90,.1);border-color:rgba(3,199,90,.25);}
 .cm-btn.sel2{background:rgba(30,198,255,.1);border-color:rgba(30,198,255,.25);}
 .cm-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
 .cm-dot.d2{border-radius:50%;}
-.cm-name{font-size:10px;color:var(--text2);white-space:nowrap;}
+.cm-name{font-size:9px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cm-btn.sel1 .cm-name{color:var(--g);font-weight:700;}
 .cm-btn.sel2 .cm-name{color:var(--b);font-weight:700;}
 .cm-footer{font-size:9px;color:var(--text3);margin-top:5px;padding-top:5px;border-top:1px solid var(--border2);}
@@ -225,13 +229,13 @@ table.dt tr.avg-row td:first-child{color:var(--y);}
 
 /* ══ KAKAO TAB ══ */
 #tab-kakao{max-width:860px;margin:0 auto;padding:24px 16px 60px;display:none;}
-#tab-kakao.active{display:grid;grid-template-columns:1.15fr 0.85fr;gap:24px;align-items:start;}
+#tab-kakao.active{display:grid;grid-template-columns:1.15fr 0.85fr;gap:24px;align-items:stretch;}
 @media(max-width:800px){#tab-kakao.active{grid-template-columns:1fr;}}
 
 /* 입력 패널 */
-.kk-input-panel{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rad);overflow:hidden;}
-.kk-panel-hd{padding:11px 16px;background:var(--s3);border-bottom:1px solid var(--border2);font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px;}
-.kk-panel-body{padding:16px;display:flex;flex-direction:column;gap:14px;}
+.kk-input-panel{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rad);overflow:hidden;display:flex;flex-direction:column;}
+.kk-panel-hd{padding:11px 16px;background:var(--s3);border-bottom:1px solid var(--border2);font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.kk-panel-body{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1;}
 .kk-field{display:flex;flex-direction:column;gap:5px;}
 .kk-label{font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
 .kk-label span{font-weight:400;text-transform:none;letter-spacing:0;font-size:9px;margin-left:4px;color:var(--text3);}
@@ -252,9 +256,9 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 .kw-chip.selected{background:var(--g);color:#fff;border-color:var(--g);}
 
 /* 카카오 프리뷰 */
-.kk-preview-panel{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rad);overflow:hidden;position:sticky;top:58px;}
-.kk-preview-hd{padding:10px 14px;background:#FEE500;font-size:11px;font-weight:800;color:#3C1E1E;display:flex;align-items:center;gap:6px;}
-.chat-bg{background:#baccd9;padding:14px 12px;min-height:320px;}
+.kk-preview-panel{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rad);overflow:hidden;display:flex;flex-direction:column;}
+.kk-preview-hd{padding:10px 14px;background:#FEE500;font-size:11px;font-weight:800;color:#3C1E1E;display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.chat-bg{background:#baccd9;padding:14px 12px;flex:1;overflow-y:auto;}
 .chat-row{display:flex;gap:8px;align-items:flex-start;}
 .chat-avatar{width:36px;height:36px;background:#FEE500;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
 .chat-sender{font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:4px;}
@@ -521,12 +525,12 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 
         <div class="kk-field">
           <label class="kk-label">마케터 코멘트 <span>분석 인사이트</span></label>
-          <textarea class="kk-inp" id="comment" rows="3" placeholder="성과에 대한 분석 내용을 입력하세요."></textarea>
+          <textarea class="kk-inp" id="comment" rows="4" placeholder="성과에 대한 분석 내용을 입력하세요." style="flex:1;min-height:80px"></textarea>
         </div>
 
         <div class="kk-field">
           <label class="kk-label">금일 운영 계획</label>
-          <textarea class="kk-inp" id="plan" rows="2" placeholder="오늘 진행할 최적화 작업을 입력하세요."></textarea>
+          <textarea class="kk-inp" id="plan" rows="3" placeholder="오늘 진행할 최적화 작업을 입력하세요." style="flex:1;min-height:60px"></textarea>
         </div>
 
         <div class="kk-field">
@@ -1110,16 +1114,33 @@ function renderScorecards(cur,prev){
 
   wrap.innerHTML=order.map((d,i)=>{
     const c=Number(cur[d.k]||0), p=Number(prev[d.k]||0);
-    const up = (['ctr','cvr','roas'].includes(d.k)) ? (c-p)>=0 : (c-p)>=0;
+    const up = (c-p)>=0;
     const cls = up ? 'up' : 'dn';
-    const line = up ? 'var(--g)' : 'var(--r)';
+    const lineColor = up ? 'var(--g)' : 'var(--r)';
+    // 증감률 텍스트
+    let absPct;
+    if(['ctr','cvr','roas'].includes(d.k)){
+      const diff = Number((c - p).toFixed(2));
+      absPct = Math.abs(diff).toFixed(2) + '%p';
+    } else {
+      const pctVal = p===0 ? (c===0?0:100) : Math.abs((c-p)/p*100);
+      absPct = pctVal.toFixed(1) + '%';
+    }
+    const arrow = up ? '▲' : '▼';
+    const bulletColor = up ? 'var(--up)' : 'var(--dn)';
     return `
-      <div class="sc sc2" style="--sc-c:${line}">
-        <div class="sc2-top">
-          <div class="sc2-lbl">${d.t}</div>
-          <div class="sc2-diff ${cls}">${diffTxt(d.k,c,p)}</div>
+      <div class="sc sc2" style="--sc-c:${lineColor}">
+        <div class="sc2-lbl">${d.t} 비교</div>
+        <div class="sc2-mid">
+          <div class="sc2-val-wrap">
+            <span class="sc2-bullet" style="color:${bulletColor}">●</span>
+            <span class="sc2-val">${valTxt(d.k,c)}</span>
+          </div>
+          <div class="sc2-diff ${cls}">
+            <span class="sc2-diff-arrow">${arrow}</span>
+            <span class="sc2-diff-pct">${absPct}</span>
+          </div>
         </div>
-        <div class="sc2-val">${valTxt(d.k,c)}</div>
         <div class="sc2-sub">이전 ${valTxt(d.k,p)} / 현재 ${valTxt(d.k,c)}</div>
       </div>
     `;
@@ -1166,7 +1187,7 @@ function drawChart(chartDays){
   ctx.scale(dpr,dpr);
   const yW=44;
   const PAD={t:22,r:chartSel.length>=2?yW:12,b:26,l:yW};
-  const cW=W0-PAD.l-PAD.r,cH=H0-PAD.t-PAD.b,n=days.length;
+  const cW=W0-PAD.l-PAD.r,cH=H0-PAD.t-PAD.b,n=chartDays.length;
   ctx.clearRect(0,0,W0,H0);
   if(n<2) return;
   const dark=document.body.getAttribute('data-theme')!=='light';
@@ -1175,7 +1196,7 @@ function drawChart(chartDays){
   for(let i=0;i<=4;i++){const y=PAD.t+(cH/4)*i;ctx.strokeStyle=gridC;ctx.lineWidth=1;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+cW,y);ctx.stroke();}
   chartSel.forEach((key,si)=>{
     const m=CHART_METRICS.find(x=>x.key===key);if(!m)return;
-    const vals=days.map(d=>d[key]);
+    const vals=chartDays.map(d=>d[key]);
     const minV=Math.min(...vals),maxV=Math.max(...vals)||1,range=maxV-minV||1;
     const lo=minV-range*.1,hi=maxV+range*.1,span=hi-lo||1;
     const pts=vals.map((v,i)=>({x:PAD.l+i*(cW/(n-1)),y:PAD.t+cH-((v-lo)/span)*cH,v}));
@@ -1203,7 +1224,7 @@ function drawChart(chartDays){
     });
   });
   ctx.fillStyle=xLabelC;ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';
-  days.forEach((d,i)=>ctx.fillText(d.date,PAD.l+i*(cW/(n-1)),H0-4));
+  chartDays.forEach((d,i)=>ctx.fillText(d.date,PAD.l+i*(cW/(n-1)),H0-4));
 }
 
 // ══ DAILY TABLE ══
