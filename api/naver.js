@@ -86,14 +86,16 @@ function aggRow(map, id, row) {
 }
 function calcMetrics(v) {
   return { ...v,
-    roas: v.cost  ? Math.round(v.revenue / v.cost * 100)           : 0,
-    ctr : v.imp   ? parseFloat((v.click / v.imp * 100).toFixed(2)) : 0,
-    cvr : v.click ? parseFloat((v.conv  / v.click * 100).toFixed(2)): 0,
-    cpc : v.click ? Math.round(v.cost / v.click)                   : 0,
-    cpa : v.conv  ? Math.round(v.cost / v.conv)                   : 0,
-    cpa : v.conv  ? Math.round(v.cost / v.conv)                     : 0,
+    roas: v.cost  ? Math.round(v.revenue / v.cost * 100)             : 0,
+    ctr : v.imp   ? parseFloat((v.click / v.imp * 100).toFixed(2))   : 0,
+    cvr : v.click ? parseFloat((v.conv  / v.click * 100).toFixed(2)) : 0,
+    cpc : v.click ? Math.round(v.cost / v.click)                     : 0,
+    cpa : v.conv  ? Math.round(v.cost / v.conv)                      : 0,
+    aov : v.conv  ? Math.round(v.revenue / v.conv)                   : 0, // 객단가
+    rpc : v.click ? Math.round(v.revenue / v.click)                  : 0, // 클릭당매출액
   };
 }
+
 
 // ─── 핸들러 ──────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
@@ -156,14 +158,18 @@ module.exports = async function handler(req, res) {
     const rec8S    = new Date(curEDate - 7*86400000);
     const rec8Start = fmtYMD(rec8S);
 
-    const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R] = await Promise.all([
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
+    
+    const rec21S    = new Date(curEDate - 20*86400000);
+    const rec21Start = fmtYMD(rec21S);
+const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
+apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
       apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate)),
       groupIds.length
         ? apiRequest(cid, lic, sec, 'GET', statsUrl(groupIds, startDate, endDate))
         : { data: [] },
       apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, prevStart, prevEnd)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 'DAY')),
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 'DAY')),,
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, endDate, 'DAY')),
     ]);
 
     // 4. 일별 (period 필드 없으면 startDate로 집계)
@@ -225,6 +231,22 @@ module.exports = async function handler(req, res) {
         ...calcMetrics(v),
       }));
 
+    // 6d. 최근 21일 daily (주간 비교 차트용)
+    const daily21Map = {};
+    toSafeArr2(daily21R?.data?.data || daily21R?.data).forEach(row => {
+      const d = row.period || row.date || row.statDate || row.statDt || rec21Start;
+      const key = String(d).replace(/-/g, '');
+      if (!daily21Map[key]) daily21Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
+      aggRow(daily21Map, key, row);
+    });
+    const recent21Days = Object.entries(daily21Map)
+      .sort(([a],[b]) => a.localeCompare(b))
+      .map(([ds, v]) => ({
+        date   : `${ds.slice(4,6)}/${ds.slice(6,8)}`,
+        dateRaw: ds,
+        ...calcMetrics(v),
+      }));
+
     // 7. 키워드 (비용 발생한 상위 10개 광고그룹에서 수집)
     const activeGroupIds = allGroups
       .filter(g => g.imp > 0 || g.cost > 0)
@@ -271,13 +293,13 @@ module.exports = async function handler(req, res) {
         };
       });
 
-      convKws  = kwList.filter(k => k.conv  > 0).sort((a, b) => b.conv  - a.conv).slice(0, 50);
+      convKws  = kwList.filter(k => k.conv  > 0).sort((a, b) => b.conv  - a.conv).slice(0, 200);
       spendKws = [...kwList].sort((a, b) => b.cost  - a.cost).slice(0, 10);
       clickKws = [...kwList].sort((a, b) => b.click - a.click).slice(0, 10);
     }
 
     return res.json({
-      days: formattedDays, recentDays, prevAgg, convKws, spendKws, clickKws, allCamps, allGroups,
+      days: formattedDays, recentDays, recent21Days, prevAgg, convKws, spendKws, clickKws, allCamps, allGroups,
       _meta: { period: `${startDate}~${endDate}`, campCount: campaigns.length, kwCount: keywords.length },
     });
 
