@@ -373,18 +373,14 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
           <div class="sec-label">핵심 성과 지표</div>
           <div class="scorecards" id="scorecards"></div>
 
-          <div class="sec-label">추이 차트 <span class="sec-label-hint">(최대 2개 선택)</span></div>
-          <div class="chart-card">
-            <div class="chart-inner">
-              <div class="chart-canvas-wrap">
-                <canvas id="chart-canvas" height="190"></canvas>
-              </div>
-              <div class="chart-metrics">
-                <div class="cm-header">지표 선택 (최대 2개)</div>
-                <div class="cm-grid" id="cm-grid"></div>
-                <div class="cm-footer">● 실선 &nbsp;◌ 점선</div>
-              </div>
+          <div class="sec-label">📈 성과 추이 <span class="sec-label-hint">최근 8일 · 지표 탭 클릭으로 전환</span></div>
+          <div class="chart-card" id="trend-chart-card">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+              <div id="trend-metric-tabs" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+              <div id="trend-legend" style="display:flex;gap:10px;align-items:center;font-size:9px;color:var(--text3)"></div>
             </div>
+            <canvas id="chart-canvas" height="200" style="width:100%;display:block"></canvas>
+            <div id="trend-x-labels" style="display:flex;justify-content:space-between;margin-top:4px;padding:0 8px"></div>
           </div>
 
           <div class="sec-label">일별 광고 성과 / 항목별 증감 비교</div>
@@ -446,13 +442,17 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
             </div>
           </div>
 
-          <div class="sec-label">주간 성과 비교 <span class="sec-label-hint">(이번 주 vs 지난주 요일별)</span></div>
-          <div class="chart-card" style="padding:14px 16px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <div style="display:flex;gap:6px;flex-wrap:wrap" id="weekly-metric-btns"></div>
-              <div style="font-size:9px;color:var(--text3)">● 이번 주 &nbsp; ○ 지난주</div>
+          <div class="sec-label">📅 주간 요일별 비교 <span class="sec-label-hint">이번 주(월~일) vs 지난주</span></div>
+          <div class="chart-card" id="weekly-chart-card">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+              <div id="weekly-metric-btns" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+              <div style="display:flex;gap:10px;font-size:9px;color:var(--text3);align-items:center">
+                <span><span style="display:inline-block;width:10px;height:10px;background:#03C75A;border-radius:2px;margin-right:3px;vertical-align:middle"></span>이번 주</span>
+                <span><span style="display:inline-block;width:10px;height:10px;background:#03C75A44;border:1.5px solid #03C75A88;border-radius:2px;margin-right:3px;vertical-align:middle"></span>지난주</span>
+              </div>
             </div>
-            <canvas id="weekly-chart-canvas" height="180" style="width:100%;display:block"></canvas>
+            <canvas id="weekly-chart-canvas" height="200" style="width:100%;display:block"></canvas>
+            <div id="weekly-x-labels" style="display:flex;justify-content:space-around;margin-top:4px"></div>
           </div>
         </div>
 
@@ -660,7 +660,7 @@ function getPeriodDates(period, range){
   let curS,curE,ps,pe,periodLabel,dateStr2,compareStr,curLabel,prevLabel;
 
   // 사용자 지정 기간
-  if(period==='CUSTOM' && range?.start && customRange?.end){
+  if(period==='CUSTOM' && range?.start && range?.end){
     curS=new Date(range.start); curE=new Date(range.end);
     curS.setHours(0,0,0,0); curE.setHours(0,0,0,0);
     if(curE < curS){ const t=curS; curS=curE; curE=t; }
@@ -1060,85 +1060,189 @@ function renderScorecards(cur,prev){
   }).join('');
 }
 
-// ══ CHART ══
-function renderChartMetrics(){
-  document.getElementById('cm-grid').innerHTML=CHART_METRICS.map(m=>{
-    const idx=chartSel.indexOf(m.key);
-    const cls=idx===0?'sel1':idx===1?'sel2':'';
-    const dotStyle=idx>=0?`background:${m.color}`:`background:var(--border)`;
-    return `<div class="cm-btn ${cls}" onclick="toggleChartMetric('${m.key}')">
-      <div class="cm-dot ${idx===1?'d2':''}" style="${dotStyle}"></div>
-      <div class="cm-name">${m.label}</div>
-    </div>`;
+// ══ TREND CHART ══
+const TREND_METRICS=[
+  {key:'cost',    label:'광고비',   color:'#03C75A', fmt:'money'},
+  {key:'revenue', label:'매출액',   color:'#1EC6FF', fmt:'money'},
+  {key:'click',   label:'클릭수',   color:'#FFC800', fmt:'num'},
+  {key:'conv',    label:'전환수',   color:'#845AFF', fmt:'num'},
+  {key:'roas',    label:'ROAS',    color:'#FF6B35', fmt:'pct'},
+  {key:'cpc',     label:'CPC',     color:'#FB923C', fmt:'money'},
+  {key:'ctr',     label:'CTR',     color:'#34D399', fmt:'rate'},
+  {key:'cvr',     label:'CVR',     color:'#E879F9', fmt:'rate'},
+  {key:'cpa',     label:'CPA',     color:'#F87171', fmt:'money'},
+];
+let trendMetric='cost';
+
+function fmtVal(v,fmt){
+  v=Number(v)||0;
+  if(fmt==='money'){
+    if(v>=100000000) return (v/100000000).toFixed(1)+'억';
+    if(v>=10000) return Math.round(v/10000)+'만';
+    return '₩'+Math.round(v).toLocaleString('ko-KR');
+  }
+  if(fmt==='rate') return v.toFixed(2)+'%';
+  if(fmt==='pct')  return Math.round(v)+'%';
+  if(v>=10000) return Math.round(v/1000)+'K';
+  return Math.round(v).toLocaleString('ko-KR');
+}
+function fmtAxis(v,fmt){
+  v=Number(v)||0;
+  if(fmt==='money'){
+    if(v>=100000000) return (v/100000000).toFixed(1)+'억';
+    if(v>=10000) return (v/10000).toFixed(0)+'만';
+    if(v>=1000) return (v/1000).toFixed(0)+'K';
+    return Math.round(v)+'';
+  }
+  if(fmt==='rate') return v.toFixed(1)+'%';
+  if(fmt==='pct') return Math.round(v)+'%';
+  if(v>=10000) return (v/1000).toFixed(0)+'K';
+  return Math.round(v)+'';
+}
+
+function renderTrendTabs(){
+  const tabs=document.getElementById('trend-metric-tabs');
+  if(!tabs) return;
+  tabs.innerHTML=TREND_METRICS.map(m=>{
+    const active=m.key===trendMetric;
+    return `<button onclick="setTrendMetric('${m.key}')"
+      style="padding:5px 11px;border-radius:20px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;
+      background:${active?m.color:'var(--s3)'};border:1.5px solid ${active?m.color:'var(--border)'};
+      color:${active?'#fff':'var(--text3)'}">${m.label}</button>`;
   }).join('');
 }
-function toggleChartMetric(key){
-  const idx=chartSel.indexOf(key);
-  if(idx>=0) chartSel.splice(idx,1);
-  else{if(chartSel.length>=2) chartSel.shift(); chartSel.push(key);}
-  renderChartMetrics();
-  if(reportData){const cd=reportData.recentDays?.length>=2?reportData.recentDays:reportData.days;drawChart(cd);}
+function setTrendMetric(key){
+  trendMetric=key;
+  renderTrendTabs();
+  if(reportData){
+    const cd=reportData.recentDays?.length>=2?reportData.recentDays:reportData.days;
+    drawTrendChart(cd);
+  }
 }
-function fmtAx(v,key){
-  if(['ctr','cvr'].includes(key)) return v.toFixed(1)+'%';
-  if(key==='roas') return Math.round(v)+'%';
-  if(key==='cpc') return '₩'+Math.round(v/100)*100;
-  if(v>=1000000) return (v/1000000).toFixed(1)+'M';
-  if(v>=10000) return (v/10000).toFixed(0)+'만';
-  if(v>=1000) return (v/1000).toFixed(0)+'K';
-  return Math.round(v).toString();
-}
-function drawChart(days){
+
+function drawTrendChart(days){
   const canvas=document.getElementById('chart-canvas');
+  if(!canvas||!days||days.length<2) return;
+  const m=TREND_METRICS.find(x=>x.key===trendMetric)||TREND_METRICS[0];
   const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
-  const W0=canvas.parentElement.getBoundingClientRect().width;
-  const H0=190;
+  const W0=canvas.parentElement.getBoundingClientRect().width||600;
+  const H0=200;
   canvas.width=W0*dpr; canvas.height=H0*dpr;
   canvas.style.width=W0+'px'; canvas.style.height=H0+'px';
   ctx.scale(dpr,dpr);
-  const yW=44;
-  const PAD={t:22,r:chartSel.length>=2?yW:12,b:26,l:yW};
-  const cW=W0-PAD.l-PAD.r,cH=H0-PAD.t-PAD.b,n=days.length;
-  ctx.clearRect(0,0,W0,H0);
-  if(n<2) return;
+
   const dark=document.body.getAttribute('data-theme')!=='light';
-  const gridC=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.06)';
-  const xLabelC=dark?'#475569':'#94a3b8';
-  for(let i=0;i<=4;i++){const y=PAD.t+(cH/4)*i;ctx.strokeStyle=gridC;ctx.lineWidth=1;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+cW,y);ctx.stroke();}
-  chartSel.forEach((key,si)=>{
-    const m=CHART_METRICS.find(x=>x.key===key);if(!m)return;
-    const vals=days.map(d=>d[key]);
-    const minV=Math.min(...vals),maxV=Math.max(...vals)||1,range=maxV-minV||1;
-    const lo=minV-range*.1,hi=maxV+range*.1,span=hi-lo||1;
-    const pts=vals.map((v,i)=>({x:PAD.l+i*(cW/(n-1)),y:PAD.t+cH-((v-lo)/span)*cH,v}));
-    ctx.font='8.5px JetBrains Mono,monospace';
-    for(let ti=0;ti<=5;ti++){
-      const ratio=ti/5,tickVal=lo+(hi-lo)*ratio,yPos=PAD.t+cH-ratio*cH;
-      if(si===0){ctx.fillStyle=m.color+'cc';ctx.textAlign='right';ctx.fillText(fmtAx(tickVal,key),PAD.l-4,yPos+3);ctx.strokeStyle=m.color+'44';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(PAD.l-1,yPos);ctx.lineTo(PAD.l+3,yPos);ctx.stroke();}
-      else{ctx.fillStyle=m.color+'cc';ctx.textAlign='left';ctx.fillText(fmtAx(tickVal,key),PAD.l+cW+4,yPos+3);ctx.strokeStyle=m.color+'44';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(PAD.l+cW-3,yPos);ctx.lineTo(PAD.l+cW+1,yPos);ctx.stroke();}
-    }
-    ctx.font='bold 9px Noto Sans KR,sans-serif';
-    if(si===0){ctx.fillStyle=m.color;ctx.textAlign='left';ctx.fillText('● '+m.label,PAD.l,PAD.t-8);}
-    else{ctx.fillStyle=m.color;ctx.textAlign='right';ctx.fillText(m.label+' ●',PAD.l+cW,PAD.t-8);}
-    if(si===0){const g=ctx.createLinearGradient(0,PAD.t,0,PAD.t+cH);g.addColorStop(0,m.color+'28');g.addColorStop(1,m.color+'02');ctx.beginPath();ctx.moveTo(pts[0].x,PAD.t+cH);pts.forEach(p=>ctx.lineTo(p.x,p.y));ctx.lineTo(pts[n-1].x,PAD.t+cH);ctx.closePath();ctx.fillStyle=g;ctx.fill();}
-    ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
-    ctx.strokeStyle=m.color;ctx.lineWidth=si===0?2:1.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash(si===0?[]:[4,3]);ctx.stroke();ctx.setLineDash([]);
-    ctx.font='bold 8.5px JetBrains Mono,monospace';
-    pts.forEach(p=>{
-      ctx.beginPath();ctx.arc(p.x,p.y,si===0?3.5:3,0,Math.PI*2);ctx.fillStyle=m.color;ctx.fill();
-      if(si===0){ctx.beginPath();ctx.arc(p.x,p.y,1.5,0,Math.PI*2);ctx.fillStyle=dark?'#0f1117':'#fff';ctx.fill();}
-      const labelStr=fmtAx(p.v,key),tw=ctx.measureText(labelStr).width,labelY=p.y-7;
-      const bg=dark?'rgba(15,17,23,0.75)':'rgba(255,255,255,0.82)';
-      ctx.fillStyle=bg;ctx.textAlign='center';
-      if(ctx.roundRect){ctx.beginPath();ctx.roundRect(p.x-tw/2-2,labelY-9,tw+4,11,3);ctx.fill();}
-      ctx.fillStyle=m.color;ctx.fillText(labelStr,p.x,labelY);
-    });
+  const n=days.length;
+  const vals=days.map(d=>Number(d[m.key]||0));
+  const maxV=Math.max(...vals)||1;
+  const PAD={t:28,r:20,b:12,l:56};
+  const cW=W0-PAD.l-PAD.r, cH=H0-PAD.t-PAD.b;
+  const barW=Math.min(36, (cW/n)*0.55);
+
+  ctx.clearRect(0,0,W0,H0);
+
+  // Grid lines + Y axis labels
+  const gridC=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)';
+  const labelC=dark?'#64748b':'#94a3b8';
+  ctx.font='10px JetBrains Mono,monospace';
+  for(let i=0;i<=4;i++){
+    const y=PAD.t+(cH/4)*i;
+    const val=maxV*(1-i/4);
+    ctx.strokeStyle=gridC; ctx.lineWidth=1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cW,y); ctx.stroke();
+    ctx.fillStyle=labelC; ctx.textAlign='right';
+    ctx.fillText(fmtAxis(val,m.fmt), PAD.l-6, y+3.5);
+  }
+
+  // Bar centers
+  const cx=i=>PAD.l+(i+0.5)*(cW/n);
+
+  // Gradient fill for bars
+  vals.forEach((v,i)=>{
+    const x=cx(i), bH=(v/maxV)*cH;
+    const by=PAD.t+cH-bH;
+    const grad=ctx.createLinearGradient(0,by,0,PAD.t+cH);
+    grad.addColorStop(0,m.color+'dd');
+    grad.addColorStop(1,m.color+'44');
+    ctx.fillStyle=grad;
+    const r=Math.min(5,barW/2);
+    // Rounded top bar
+    ctx.beginPath();
+    if(ctx.roundRect){ ctx.roundRect(x-barW/2, by, barW, bH, [r,r,0,0]); }
+    else { ctx.rect(x-barW/2, by, barW, bH); }
+    ctx.fill();
   });
-  ctx.fillStyle=xLabelC;ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';
-  days.forEach((d,i)=>ctx.fillText(d.date,PAD.l+i*(cW/(n-1)),H0-4));
+
+  // Smooth line on top of bars (连接各bar顶部中心)
+  const pts=vals.map((v,i)=>({x:cx(i), y:PAD.t+cH-(v/maxV)*cH, v}));
+
+  // Area under line
+  if(pts.length>=2){
+    const grad=ctx.createLinearGradient(0,PAD.t,0,PAD.t+cH);
+    grad.addColorStop(0,m.color+'18');
+    grad.addColorStop(1,m.color+'00');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, PAD.t+cH);
+    pts.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.lineTo(pts[n-1].x, PAD.t+cH);
+    ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+  }
+
+  // Smooth curved line
+  ctx.beginPath();
+  ctx.strokeStyle=m.color;
+  ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.setLineDash([]);
+  pts.forEach((p,i)=>{
+    if(i===0) ctx.moveTo(p.x,p.y);
+    else {
+      const prev=pts[i-1];
+      const cpx=(prev.x+p.x)/2;
+      ctx.bezierCurveTo(cpx,prev.y,cpx,p.y,p.x,p.y);
+    }
+  });
+  ctx.stroke();
+
+  // Dots + value labels
+  ctx.font='bold 9px JetBrains Mono,monospace';
+  pts.forEach((p,i)=>{
+    // dot
+    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2);
+    ctx.fillStyle=m.color; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,2,0,Math.PI*2);
+    ctx.fillStyle=dark?'#0f1117':'#fff'; ctx.fill();
+
+    // value label above
+    const lbl=fmtVal(p.v,m.fmt);
+    const tw=ctx.measureText(lbl).width;
+    const lx=Math.max(PAD.l+tw/2+2, Math.min(PAD.l+cW-tw/2-2, p.x));
+    const ly=Math.max(PAD.t+11, p.y-9);
+    ctx.fillStyle=dark?'rgba(15,17,23,.82)':'rgba(255,255,255,.9)';
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(lx-tw/2-3,ly-10,tw+6,13,3); ctx.fill(); }
+    ctx.fillStyle=m.color; ctx.textAlign='center';
+    ctx.fillText(lbl, lx, ly);
+  });
+
+  // X axis date labels
+  const xEl=document.getElementById('trend-x-labels');
+  if(xEl){
+    xEl.innerHTML=days.map(d=>`<span style="font-size:9px;color:${labelC};font-family:'JetBrains Mono',monospace;text-align:center;flex:1">${d.date}</span>`).join('');
+  }
+
+  // Legend
+  const leg=document.getElementById('trend-legend');
+  if(leg){
+    leg.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:${m.color};font-weight:700">
+      <span style="width:12px;height:12px;background:${m.color};border-radius:3px;display:inline-block"></span>
+      ${m.label} (최근 ${n}일)
+    </span>`;
+  }
 }
 
+// called from renderReport
+function renderChartMetrics(){ renderTrendTabs(); }
+function drawChart(days){ drawTrendChart(days); }
+function toggleChartMetric(key){ setTrendMetric(key); }
 // ══ DAILY TABLE ══
 function renderDailyTable(days,hlStr){
   if(!days||days.length===0){
@@ -1349,44 +1453,42 @@ function renderConvKw(list){
     }).join('');
 }
 
-// ══ WEEKLY COMPARISON CHART ══
+// ══ WEEKLY BAR CHART ══
 const WEEKLY_METRICS=[
-  {key:'cost',   label:'광고비', color:'#03C75A'},
-  {key:'click',  label:'클릭수', color:'#FFC800'},
-  {key:'conv',   label:'전환수', color:'#845AFF'},
-  {key:'revenue',label:'매출액', color:'#FF6B35'},
-  {key:'roas',   label:'ROAS',  color:'#FACC15'},
-  {key:'cpa',    label:'전환당비용', color:'#F87171'},
+  {key:'cost',    label:'광고비',  color:'#03C75A', fmt:'money'},
+  {key:'revenue', label:'매출액',  color:'#1EC6FF', fmt:'money'},
+  {key:'click',   label:'클릭수',  color:'#FFC800', fmt:'num'},
+  {key:'conv',    label:'전환수',  color:'#845AFF', fmt:'num'},
+  {key:'roas',    label:'ROAS',   color:'#FF6B35', fmt:'pct'},
+  {key:'cpa',     label:'CPA',    color:'#F87171', fmt:'money'},
 ];
 let weeklyMetricSel='cost';
 
 function renderWeeklyChart(thisWeekDays, lastWeekDays){
-  // thisWeekDays, lastWeekDays: [{dateRaw:'YYYYMMDD', cost, click, ...}, ...]
   const DAYS_KO=['월','화','수','목','금','토','일'];
-
-  // dateRaw → 요일 인덱스(0=월,6=일)
   function dowIdx(dateRaw){
     if(!dateRaw) return -1;
     const d=new Date(`${dateRaw.slice(0,4)}-${dateRaw.slice(4,6)}-${dateRaw.slice(6,8)}T00:00:00Z`);
-    return (d.getUTCDay()+6)%7; // 0=월...6=일
+    return (d.getUTCDay()+6)%7;
   }
-
-  // 요일 슬롯 배열 생성 (index 0=월...6=일)
-  const thisSlots=Array(7).fill(null);
-  const lastSlots=Array(7).fill(null);
+  const thisSlots=Array(7).fill(null), lastSlots=Array(7).fill(null);
   (thisWeekDays||[]).forEach(d=>{ const i=dowIdx(d.dateRaw); if(i>=0) thisSlots[i]=d; });
   (lastWeekDays||[]).forEach(d=>{ const i=dowIdx(d.dateRaw); if(i>=0) lastSlots[i]=d; });
 
-  // 버튼 렌더
+  // Render metric tabs
   const btnEl=document.getElementById('weekly-metric-btns');
-  if(btnEl) btnEl.innerHTML=WEEKLY_METRICS.map(m=>
-    `<button onclick="setWeeklyMetric('${m.key}')" style="background:${weeklyMetricSel===m.key?m.color+'22':'var(--s2)'};border:1.5px solid ${weeklyMetricSel===m.key?m.color:'var(--border)'};color:${weeklyMetricSel===m.key?m.color:'var(--text3)'};padding:4px 10px;border-radius:7px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .13s">${m.label}</button>`
-  ).join('');
+  if(btnEl) btnEl.innerHTML=WEEKLY_METRICS.map(m=>{
+    const active=m.key===weeklyMetricSel;
+    return `<button onclick="setWeeklyMetric('${m.key}')"
+      style="padding:5px 11px;border-radius:20px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;
+      background:${active?m.color:'var(--s3)'};border:1.5px solid ${active?m.color:'var(--border)'};
+      color:${active?'#fff':'var(--text3)'}">${m.label}</button>`;
+  }).join('');
 
-  // 차트용 구조 변환
-  const thisWeek=DAYS_KO.map((label,i)=>({label, data:thisSlots[i]}));
-  const lastWeek=DAYS_KO.map((label,i)=>({label, data:lastSlots[i]}));
-  drawWeeklyChart(thisWeek, lastWeek);
+  drawWeeklyChart(
+    DAYS_KO.map((label,i)=>({label, data:thisSlots[i]})),
+    DAYS_KO.map((label,i)=>({label, data:lastSlots[i]}))
+  );
 }
 
 function setWeeklyMetric(key){
@@ -1394,102 +1496,104 @@ function setWeeklyMetric(key){
   if(reportData) renderWeeklyChart(reportData.thisWeekDays||[], reportData.lastWeekDays||[]);
 }
 
-function drawWeeklyChart(thisWeek,lastWeek){
+function drawWeeklyChart(thisWeek, lastWeek){
   const canvas=document.getElementById('weekly-chart-canvas');
   if(!canvas) return;
+  const m=WEEKLY_METRICS.find(x=>x.key===weeklyMetricSel)||WEEKLY_METRICS[0];
   const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
   const W0=canvas.parentElement.getBoundingClientRect().width||600;
-  const H0=180;
-  canvas.width=W0*dpr;canvas.height=H0*dpr;
-  canvas.style.width=W0+'px';canvas.style.height=H0+'px';
+  const H0=200;
+  canvas.width=W0*dpr; canvas.height=H0*dpr;
+  canvas.style.width=W0+'px'; canvas.style.height=H0+'px';
   ctx.scale(dpr,dpr);
 
-  const metric=WEEKLY_METRICS.find(m=>m.key===weeklyMetricSel)||WEEKLY_METRICS[0];
   const dark=document.body.getAttribute('data-theme')!=='light';
-  const PAD={t:24,r:12,b:30,l:52};
-  const cW=W0-PAD.l-PAD.r,cH=H0-PAD.t-PAD.b;
   const n=7;
+  const PAD={t:28,r:20,b:12,l:56};
+  const cW=W0-PAD.l-PAD.r, cH=H0-PAD.t-PAD.b;
 
-  const thisVals=thisWeek.map(d=>d.data?Number(d.data[metric.key]||0):null);
-  const lastVals=lastWeek.map(d=>d.data?Number(d.data[metric.key]||0):null);
-  const allVals=[...thisVals,...lastVals].filter(v=>v!==null);
-  if(allVals.length===0){ctx.clearRect(0,0,W0,H0);return;}
-
-  const maxV=Math.max(...allVals)||1;
-  const toY=v=>PAD.t+cH-(v/maxV)*cH;
-  const toX=i=>PAD.l+i*(cW/(n-1));
+  const getV=d=>d.data ? Number(d.data[m.key]||0) : null;
+  const thisVals=thisWeek.map(getV);
+  const lastVals=lastWeek.map(getV);
+  const allVals=[...thisVals,...lastVals].filter(v=>v!==null&&v>0);
+  const maxV=allVals.length>0?Math.max(...allVals):1;
 
   ctx.clearRect(0,0,W0,H0);
 
   // Grid
-  const gridC=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.06)';
+  const gridC=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)';
+  const labelC=dark?'#64748b':'#94a3b8';
+  ctx.font='10px JetBrains Mono,monospace';
   for(let i=0;i<=4;i++){
     const y=PAD.t+(cH/4)*i;
-    ctx.strokeStyle=gridC;ctx.lineWidth=1;ctx.setLineDash([]);
-    ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+cW,y);ctx.stroke();
-    // Y axis labels
     const val=maxV*(1-i/4);
-    ctx.fillStyle=dark?'#475569':'#94a3b8';ctx.font='8px JetBrains Mono,monospace';ctx.textAlign='right';
-    ctx.fillText(fmtAx(val,metric.key),PAD.l-4,y+3);
+    ctx.strokeStyle=gridC; ctx.lineWidth=1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cW,y); ctx.stroke();
+    ctx.fillStyle=labelC; ctx.textAlign='right';
+    ctx.fillText(fmtAxis(val,m.fmt), PAD.l-6, y+3.5);
   }
 
-  // Last week line (dashed)
-  ctx.beginPath();ctx.setLineDash([4,3]);ctx.strokeStyle=metric.color+'88';ctx.lineWidth=1.5;
-  let started=false;
-  lastVals.forEach((v,i)=>{
-    if(v===null) return;
-    if(!started){ctx.moveTo(toX(i),toY(v));started=true;}
-    else ctx.lineTo(toX(i),toY(v));
-  });
-  ctx.stroke();ctx.setLineDash([]);
+  // Grouped bars: each day slot = 2 bars side by side
+  const slotW=cW/n;
+  const gap=4, barW=Math.min(22,(slotW-gap*3)/2);
+  const r=Math.min(4,barW/2);
 
-  // Last week dots
-  lastVals.forEach((v,i)=>{
-    if(v===null) return;
-    ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);
-    ctx.fillStyle=metric.color+'88';ctx.fill();
-  });
+  ctx.font='bold 9px JetBrains Mono,monospace';
 
-  // This week fill
-  const validThis=thisVals.map((v,i)=>v!==null?{x:toX(i),y:toY(v),v}:null).filter(Boolean);
-  if(validThis.length>=2){
-    const g=ctx.createLinearGradient(0,PAD.t,0,PAD.t+cH);
-    g.addColorStop(0,metric.color+'30');g.addColorStop(1,metric.color+'02');
-    ctx.beginPath();ctx.moveTo(validThis[0].x,PAD.t+cH);
-    validThis.forEach(p=>ctx.lineTo(p.x,p.y));
-    ctx.lineTo(validThis[validThis.length-1].x,PAD.t+cH);
-    ctx.closePath();ctx.fillStyle=g;ctx.fill();
+  for(let i=0;i<n;i++){
+    const slotCX=PAD.l+(i+0.5)*slotW;
+    const lv=lastVals[i], tv=thisVals[i];
+
+    // Last week bar (left, muted)
+    if(lv!==null){
+      const bH=Math.max(2,(lv/maxV)*cH);
+      const by=PAD.t+cH-bH;
+      const bx=slotCX-barW-gap/2;
+      ctx.fillStyle=m.color+'3a';
+      ctx.strokeStyle=m.color+'88'; ctx.lineWidth=1.2;
+      if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx,by,barW,bH,[r,r,0,0]); ctx.fill(); ctx.stroke(); }
+      else { ctx.fillRect(bx,by,barW,bH); ctx.strokeRect(bx,by,barW,bH); }
+      // value label
+      if(lv>0){
+        const lbl=fmtVal(lv,m.fmt);
+        ctx.fillStyle=m.color+'aa'; ctx.textAlign='center';
+        ctx.fillText(lbl, bx+barW/2, by-4);
+      }
+    }
+
+    // This week bar (right, solid)
+    if(tv!==null){
+      const bH=Math.max(2,(tv/maxV)*cH);
+      const by=PAD.t+cH-bH;
+      const bx=slotCX+gap/2;
+      const grad=ctx.createLinearGradient(0,by,0,PAD.t+cH);
+      grad.addColorStop(0,m.color+'ee'); grad.addColorStop(1,m.color+'88');
+      ctx.fillStyle=grad;
+      if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx,by,barW,bH,[r,r,0,0]); ctx.fill(); }
+      else { ctx.fillRect(bx,by,barW,bH); }
+      // value label
+      if(tv>0){
+        const lbl=fmtVal(tv,m.fmt);
+        const tw2=ctx.measureText(lbl).width;
+        const lx=bx+barW/2;
+        const ly=Math.max(PAD.t+12, by-4);
+        ctx.fillStyle=dark?'rgba(15,17,23,.85)':'rgba(255,255,255,.9)';
+        if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(lx-tw2/2-2,ly-10,tw2+4,12,3); ctx.fill(); }
+        ctx.fillStyle=m.color; ctx.textAlign='center';
+        ctx.fillText(lbl, lx, ly);
+      }
+    }
+
+    // Day label
+    ctx.fillStyle=labelC; ctx.font='10px Noto Sans KR,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(thisWeek[i].label, slotCX, H0-2);
   }
 
-  // This week line
-  ctx.beginPath();ctx.strokeStyle=metric.color;ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';
-  started=false;
-  thisVals.forEach((v,i)=>{
-    if(v===null) return;
-    if(!started){ctx.moveTo(toX(i),toY(v));started=true;}
-    else ctx.lineTo(toX(i),toY(v));
-  });
-  ctx.stroke();
-
-  // This week dots + labels
-  ctx.font='bold 8.5px JetBrains Mono,monospace';
-  thisVals.forEach((v,i)=>{
-    if(v===null) return;
-    const x=toX(i),y=toY(v);
-    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fillStyle=metric.color;ctx.fill();
-    ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fillStyle=dark?'#0f1117':'#fff';ctx.fill();
-    const lbl=fmtAx(v,metric.key);const tw=ctx.measureText(lbl).width;
-    ctx.fillStyle=dark?'rgba(15,17,23,.8)':'rgba(255,255,255,.85)';
-    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(x-tw/2-2,y-18,tw+4,11,3);ctx.fill();}
-    ctx.fillStyle=metric.color;ctx.textAlign='center';ctx.fillText(lbl,x,y-9);
-  });
-
-  // X labels
-  ctx.fillStyle=dark?'#475569':'#94a3b8';ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';
-  thisWeek.forEach((d,i)=>ctx.fillText(d.label,toX(i),H0-6));
+  // X label bar
+  const xEl=document.getElementById('weekly-x-labels');
+  if(xEl) xEl.innerHTML='';
 }
-
 // ══ 카카오 보고서 ══
 function toggleKwChip(el,name){
   if(selectedKws.has(name)){selectedKws.delete(name);el.classList.remove('selected');}
