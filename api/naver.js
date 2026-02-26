@@ -90,6 +90,7 @@ function calcMetrics(v) {
     ctr : v.imp   ? parseFloat((v.click / v.imp * 100).toFixed(2)) : 0,
     cvr : v.click ? parseFloat((v.conv  / v.click * 100).toFixed(2)): 0,
     cpc : v.click ? Math.round(v.cost / v.click)                   : 0,
+    cpa : v.conv  ? Math.round(v.cost / v.conv)                   : 0,
     cpa : v.conv  ? Math.round(v.cost / v.conv)                     : 0,
   };
 }
