@@ -1043,8 +1043,8 @@ function renderReport(){
 
   renderScorecards(cur,prev);
 
-  // 추이 차트: 최근 8일 고정 (없으면 days로)
-  const chartDays=(recentDays&&recentDays.length>=2)?recentDays:days;
+  // 추이 차트: 최근 8일 고정 (recentDays 우선, 없으면 days 폴백)
+  const chartDays = recentDays?.length ? recentDays : days;
   renderChartMetrics(); drawChart(chartDays);
 
   // 일별 표: 최신일 상단 + 최근 7일 + 평균
@@ -1165,7 +1165,7 @@ function toggleChartMetric(key){
   if(idx>=0) chartSel.splice(idx,1);
   else{if(chartSel.length>=2) chartSel.shift(); chartSel.push(key);}
   renderChartMetrics();
-  if(reportData){const cd=reportData.recentDays?.length>=2?reportData.recentDays:reportData.days;drawChart(cd);}
+  if(reportData){const cd=reportData.recentDays?.length?reportData.recentDays:reportData.days;drawChart(cd);}
 }
 function fmtAx(v,key){
   if(['ctr','cvr'].includes(key)) return v.toFixed(1)+'%';
@@ -1597,7 +1597,7 @@ async function captureReport(){
 window.onload=()=>{
   renderAdvGrid();
   window.addEventListener('resize',()=>{
-    if(reportData){const cd=reportData.recentDays?.length>=2?reportData.recentDays:reportData.days;drawChart(cd);}
+    if(reportData){const cd=reportData.recentDays?.length?reportData.recentDays:reportData.days;drawChart(cd);}
   });
 };
 
