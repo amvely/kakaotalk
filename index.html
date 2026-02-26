@@ -71,6 +71,23 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 .adv-action-btn:hover{color:var(--text);border-color:var(--text2);}
 
 /* ══ TOPBAR (탭) ══ */
+/* ══ PERIOD BAR ══ */
+.period-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;
+  max-width:1180px;margin:14px auto 0;padding:0 16px;}
+.period-left{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.period-btn{background:var(--s2);border:1.5px solid var(--border);color:var(--text2);
+  padding:7px 10px;border-radius:9px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer;
+  transition:all .13s;user-select:none;}
+.period-btn:hover{border-color:var(--g);color:var(--text);}
+.period-btn.active{background:var(--g2);border-color:rgba(3,199,90,.35);color:var(--g);}
+.period-right{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.period-date{background:var(--s2);border:1.5px solid var(--border);color:var(--text);
+  padding:6px 9px;border-radius:9px;font-size:11px;font-family:'JetBrains Mono',monospace;outline:none;}
+.period-apply{background:var(--g);border:none;color:#fff;padding:7px 12px;border-radius:9px;
+  font-size:11px;font-weight:900;font-family:inherit;cursor:pointer;transition:opacity .13s;}
+.period-apply:hover{opacity:.86;}
+.period-sep{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;}
+
 #screen-report{display:none;}
 .topbar{position:sticky;top:0;z-index:200;background:var(--topbar-bg);backdrop-filter:blur(16px);border-bottom:1px solid var(--border2);display:flex;align-items:stretch;height:50px;}
 .topbar-left{display:flex;align-items:center;gap:10px;padding:0 16px;border-right:1px solid var(--border2);flex-shrink:0;}
@@ -316,6 +333,22 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 
   <!-- ─── 탭: 성과 리포트 ─── -->
   <div class="tab-panel active" id="tab-report">
+    <!-- 기간 선택 -->
+    <div class="period-bar" id="period-bar">
+      <div class="period-left">
+        <button class="period-btn" id="btn-p-d1" onclick="setPeriod('D1')">어제</button>
+        <button class="period-btn" id="btn-p-d7" onclick="setPeriod('D7')">최근 7일</button>
+        <button class="period-btn" id="btn-p-pm" onclick="setPeriod('PM')">전월</button>
+        <button class="period-btn" id="btn-p-tm" onclick="setPeriod('TM')">당월(누계)</button>
+      </div>
+      <div class="period-right">
+        <input class="period-date" id="custom-start" type="date">
+        <span class="period-sep">~</span>
+        <input class="period-date" id="custom-end" type="date">
+        <button class="period-apply" onclick="applyCustomRange()">조회</button>
+      </div>
+    </div>
+
     <div id="report-wrap">
       <div id="report-page">
         <div class="rpt-header">
@@ -574,6 +607,7 @@ let advertisers=loadAdv();
 
 // ══ STATE ══
 let currentAdv=null, currentPeriod='D1', reportData=null, currentPeriodMeta=null;
+let customRange=null; // {start:Date,end:Date} 사용자 지정 기간
 let selectedCamps=null, selectedGroups=null, campModalType='camp', tempCampSel=[], filterZeroImp=true;
 let brandExcludeTerms='', selectedKws=new Set();
 
@@ -587,6 +621,7 @@ const CHART_METRICS=[
   {key:'ctr',    label:'CTR',   color:'#34D399'},
   {key:'cvr',    label:'CVR',   color:'#E879F9'},
   {key:'roas',   label:'ROAS',  color:'#FACC15'},
+  {key:'cpa',    label:'전환당비용', color:'#F87171'},
 ];
 let chartSel=['cost','conv'];
 
@@ -607,44 +642,116 @@ function aggDays(days){
   const cost=sum(days,'cost'),imp=sum(days,'imp'),click=sum(days,'click'),conv=sum(days,'conv'),revenue=sum(days,'revenue');
   return{cost,imp,click,conv,revenue,
     ctr:imp?click/imp*100:0, cvr:click?conv/click*100:0,
-    roas:cost?revenue/cost*100:0, cpc:click?Math.round(cost/click):0};
+    roas:cost?revenue/cost*100:0, cpc:click?Math.round(cost/click):0,
+    cpa:conv?Math.round(cost/conv):0};
 }
 
 // ══ PERIOD ══
+
 function getPeriodDates(period){
   const today=new Date(), yest=addDays(today,-1);
   let curS,curE,ps,pe,periodLabel,dateStr2,compareStr,curLabel,prevLabel;
+
+  // 사용자 지정 기간
+  if(period==='CUSTOM' && customRange?.start && customRange?.end){
+    curS=new Date(customRange.start); curE=new Date(customRange.end);
+    curS.setHours(0,0,0,0); curE.setHours(0,0,0,0);
+    if(curE < curS){ const t=curS; curS=curE; curE=t; }
+
+    // ✅ 이전 기간 = 선택 시작일 바로 전날부터 동일 기간 길이
+    const span=Math.round((curE-curS)/86400000); // 0이면 1일
+    pe=addDays(curS,-1);
+    ps=addDays(pe,-span);
+
+    periodLabel='기간 선택';
+    dateStr2=dispRange(curS,curE);
+    compareStr='이전 기간: '+dispRange(ps,pe);
+    curLabel=shortRange(curS,curE);
+    prevLabel=shortRange(ps,pe);
+
+    return{curS,curE,ps,pe,periodLabel,dateStr2,compareStr,curLabel,prevLabel};
+  }
+
   if(period==='D1'){
     curS=curE=yest; pe=addDays(curS,-1); ps=pe;
     periodLabel='어제 리포트'; dateStr2=dispDate(yest);
     compareStr='이전 기간: '+dispDate(pe);
     curLabel=pad(curS.getMonth()+1)+'.'+pad(curS.getDate());
     prevLabel=pad(ps.getMonth()+1)+'.'+pad(ps.getDate());
+
   } else if(period==='D7'){
-    curE=yest; curS=addDays(yest,-6); pe=addDays(curS,-1); ps=addDays(pe,-6);
+    curE=yest; curS=addDays(yest,-6);
+    // ✅ 이전 기간 = 바로 직전 7일
+    pe=addDays(curS,-1); ps=addDays(pe,-6);
+
     periodLabel='최근 7일'; dateStr2=dispRange(curS,curE);
     compareStr='이전 기간: '+dispRange(ps,pe);
     curLabel=shortRange(curS,curE); prevLabel=shortRange(ps,pe);
+
   } else if(period==='PM'){
     const y=today.getMonth()===0?today.getFullYear()-1:today.getFullYear();
     const m=today.getMonth()===0?11:today.getMonth()-1;
     curS=new Date(y,m,1); curE=new Date(y,m+1,0);
+
+    // ✅ 이전 기간 = 전전월(전월과 동일한 "월" 단위)
     const py=m===0?y-1:y; const pm2=m===0?11:m-1;
     ps=new Date(py,pm2,1); pe=new Date(py,pm2+1,0);
+
     periodLabel='전월 리포트'; dateStr2=dispRange(curS,curE);
-    compareStr='이전(전전월): '+dispRange(ps,pe);
+    compareStr='이전 기간: '+dispRange(ps,pe);
     curLabel=(m+1)+'월'; prevLabel=(pm2+1)+'월';
-  } else {
-    curS=new Date(today.getFullYear(),today.getMonth(),1); curE=addDays(today,-1);
-    const y=today.getMonth()===0?today.getFullYear()-1:today.getFullYear();
-    const pm2=today.getMonth()===0?11:today.getMonth()-1;
-    ps=new Date(y,pm2,1); pe=new Date(y,pm2+1,0);
+
+  } else { // TM: 당월(누계)
+    curS=new Date(today.getFullYear(),today.getMonth(),1);
+    curE=yest;
+
+    // ✅ 이전 기간 = 선택 시작일 바로 전날부터 동일 기간 길이
+    pe=addDays(curS,-1);
+    const span=Math.round((curE-curS)/86400000);
+    ps=addDays(pe,-span);
+
     periodLabel='당월 리포트'; dateStr2=dispRange(curS,curE)+' (월 누계)';
-    compareStr='이전(전월): '+dispRange(ps,pe);
-    curLabel=(today.getMonth()+1)+'월누계'; prevLabel=(pm2+1)+'월';
+    compareStr='이전 기간: '+dispRange(ps,pe);
+    curLabel=(today.getMonth()+1)+'월누계'; prevLabel=shortRange(ps,pe);
   }
   return{curS,curE,ps,pe,periodLabel,dateStr2,compareStr,curLabel,prevLabel};
 }
+
+// ══ PERIOD CONTROLS ══
+function syncPeriodButtons(){
+  const ids=[['D1','btn-p-d1'],['D7','btn-p-d7'],['PM','btn-p-pm'],['TM','btn-p-tm']];
+  ids.forEach(([p,id])=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.classList.toggle('active', currentPeriod===p);
+  });
+  // CUSTOM이면 버튼 전체 비활성 느낌
+  if(currentPeriod==='CUSTOM'){
+    ids.forEach(([p,id])=>{
+      const el=document.getElementById(id);
+      if(el) el.classList.remove('active');
+    });
+  }
+}
+
+function setPeriod(p){
+  currentPeriod=p;
+  customRange=null;
+  syncPeriodButtons();
+  loadReportData();
+}
+
+function applyCustomRange(){
+  const s=document.getElementById('custom-start')?.value;
+  const e=document.getElementById('custom-end')?.value;
+  if(!s||!e){ showToast('기간을 선택해주세요'); return; }
+  const sd=new Date(s+'T00:00:00'); const ed=new Date(e+'T00:00:00');
+  customRange={start:sd,end:ed};
+  currentPeriod='CUSTOM';
+  syncPeriodButtons();
+  loadReportData();
+}
+
 
 // ══ TAB SWITCH ══
 function switchTab(name, btn){
@@ -654,7 +761,7 @@ function switchTab(name, btn){
   btn.classList.add('active');
   if(name==='kakao'&&reportData&&currentPeriodMeta){
     const cur=aggDays(reportData.days);
-    const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0};
+    const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
     updateKakaoPreview(cur,prev);
   }
 }
@@ -690,6 +797,13 @@ async function selectAdv(id){
   document.getElementById('ctrl-adv-name').innerHTML=`${currentAdv.emoji} ${currentAdv.name}<em>${currentAdv.cat||''}</em>`;
   // 기본 기간: 어제
   currentPeriod='D1';
+  // 날짜 입력 기본값 세팅
+  const y=new Date();
+  const ys=addDays(y,-1);
+  const toISO=d=>d.toISOString().slice(0,10);
+  const cs=document.getElementById('custom-start'); const ce=document.getElementById('custom-end');
+  if(cs&&ce){ cs.value=toISO(ys); ce.value=toISO(ys); }
+  syncPeriodButtons();
   await loadReportData();
 }
 function goBack(){
@@ -751,7 +865,7 @@ function renderReport(){
   document.getElementById('cmp-header-label').textContent=prevLabel+' → '+curLabel;
 
   const cur=aggDays(days);
-  const prev=prevAgg?.cost!==undefined?prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0};
+  const prev=prevAgg?.cost!==undefined?prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
 
   renderScorecards(cur,prev);
   const chartDays=recentDays.length>=2?recentDays:days;
@@ -792,27 +906,40 @@ function renderReport(){
 }
 
 // ══ SCORECARDS ══
+
 function renderScorecards(cur,prev){
+  // ✅ 요청 순서: 광고비 → 노출 → 클릭 → 전환 → 매출 → CPC → 클릭율 → 전환율 → ROAS → 전환당비용
+  const W=n=>'₩'+Math.round(n).toLocaleString('ko-KR');
+  const M=n=>Math.round(n).toLocaleString('ko-KR');
+  const P=v=>Number(v||0).toFixed(2)+'%';
+  const R=v=>Math.round(v||0)+'%';
+
   const defs=[
-    {key:'cost',   label:'총 광고비',cls:'cg',ac:true,  money:true},
-    {key:'imp',    label:'노출수',   cls:'cb',           num:true},
-    {key:'click',  label:'클릭수',   cls:'cb',           num:true},
-    {key:'ctr',    label:'CTR',     cls:'cb', pct:true},
-    {key:'conv',   label:'전환수',   cls:'cy',           num:true},
-    {key:'cvr',    label:'CVR',     cls:'cy', pct:true},
-    {key:'revenue',label:'매출액',   cls:'cg',ac:true,  money:true},
-    {key:'roas',   label:'ROAS',    cls:'cr',ac:true,   roas:true},
+    {key:'cost',    label:'광고비',       cls:'cg', fmt:W, ac:true, isMoney:true},
+    {key:'imp',     label:'노출수',       cls:'cb', fmt:M},
+    {key:'click',   label:'클릭수',       cls:'cb', fmt:M},
+    {key:'conv',    label:'전환수',       cls:'cy', fmt:M},
+    {key:'revenue', label:'매출액',       cls:'cg', fmt:W, ac:true, isMoney:true},
+    {key:'cpc',     label:'CPC',          cls:'cr', fmt:W, ac:true, isMoney:true},
+    {key:'ctr',     label:'클릭율',       cls:'cb', fmt:P},
+    {key:'cvr',     label:'전환율',       cls:'cy', fmt:P},
+    {key:'roas',    label:'ROAS',         cls:'cr', fmt:R, ac:true},
+    {key:'cpa',     label:'전환당비용',    cls:'cr', fmt:W, ac:true, isMoney:true},
   ];
+
   document.getElementById('scorecards').innerHTML=defs.map(d=>{
-    const cv=cur[d.key],pv=prev[d.key]||0;
-    const diff=cv-pv,pct=pv?(diff/pv*100):0,isUp=diff>=0;
-    const fmt=d.pct?v=>v.toFixed(2)+'%':d.money?v=>'₩'+Math.round(v).toLocaleString('ko-KR'):d.roas?v=>Math.round(v)+'%':v=>Math.round(v).toLocaleString('ko-KR');
+    const cv=Number(cur[d.key]||0), pv=Number(prev[d.key]||0);
+    const diff=cv-pv, pct=pv?(diff/pv*100):0, isUp=diff>=0;
+    const diffStr=d.isMoney
+      ? (isUp?'+':'-')+'₩'+Math.round(Math.abs(diff)).toLocaleString('ko-KR')
+      : (isUp?'+':'-')+(d.key==='ctr'||d.key==='cvr'?Math.abs(diff).toFixed(2)+'%':d.key==='roas'?Math.round(Math.abs(diff))+'%':Math.round(Math.abs(diff)).toLocaleString('ko-KR'));
+
     return `<div class="sc ${d.cls}">
       <div class="sc-lbl">${d.label}</div>
-      <div class="sc-val ${d.ac?'ac':''}">${fmt(cv)}</div>
+      <div class="sc-val ${d.ac?'ac':''}">${d.fmt(cv)}</div>
       <div class="sc-cmp">
-        <span class="sc-prev">이전 ${fmt(pv)}</span>
-        <span class="sc-diff ${isUp?'up':'dn'}">${isUp?'▲':'▼'}${Math.abs(pct).toFixed(1)}%</span>
+        <div class="sc-prev">이전 ${d.fmt(pv)}</div>
+        <div class="sc-diff ${isUp?'up':'dn'}">${diffStr} · ${(pv?pct:0).toFixed(1)}%</div>
       </div>
     </div>`;
   }).join('');
@@ -911,22 +1038,25 @@ function renderDailyTable(days,hlStr){
 // ══ COMPARE TABLE ══
 function renderCompareTable(cur,prev,curLabel,prevLabel){
   const W=n=>'₩'+Math.round(n).toLocaleString('ko-KR'),M=n=>Math.round(n).toLocaleString('ko-KR');
+  const P=v=>Number(v||0).toFixed(2)+'%';
+  const R=v=>Math.round(v||0)+'%';
   const defs=[
-    {label:'광고비', c:cur.cost,    p:prev.cost,    fmt:W,isMoney:true},
-    {label:'노출수', c:cur.imp,     p:prev.imp,     fmt:M},
-    {label:'클릭수', c:cur.click,   p:prev.click,   fmt:M},
-    {label:'CTR',   c:cur.ctr,     p:prev.ctr,     fmt:v=>v.toFixed(2)+'%'},
-    {label:'전환수', c:cur.conv,    p:prev.conv,    fmt:M},
-    {label:'CVR',   c:cur.cvr,     p:prev.cvr,     fmt:v=>v.toFixed(2)+'%'},
-    {label:'CPC',   c:cur.cpc,     p:prev.cpc,     fmt:W,isMoney:true},
-    {label:'매출액', c:cur.revenue, p:prev.revenue, fmt:W,isMoney:true},
-    {label:'ROAS',  c:cur.roas,    p:prev.roas,    fmt:v=>Math.round(v)+'%'},
+    {label:'광고비',     c:cur.cost,    p:prev.cost,    fmt:W,isMoney:true},
+    {label:'노출수',     c:cur.imp,     p:prev.imp,     fmt:M},
+    {label:'클릭수',     c:cur.click,   p:prev.click,   fmt:M},
+    {label:'전환수',     c:cur.conv,    p:prev.conv,    fmt:M},
+    {label:'매출액',     c:cur.revenue, p:prev.revenue, fmt:W,isMoney:true},
+    {label:'CPC',       c:cur.cpc,     p:prev.cpc,     fmt:W,isMoney:true},
+    {label:'클릭율',     c:cur.ctr,     p:prev.ctr,     fmt:P},
+    {label:'전환율',     c:cur.cvr,     p:prev.cvr,     fmt:P},
+    {label:'ROAS',      c:cur.roas,    p:prev.roas,    fmt:R},
+    {label:'전환당비용', c:cur.cpa,     p:prev.cpa,     fmt:W,isMoney:true},
   ];
   document.getElementById('tbl-compare-body').innerHTML=defs.map(d=>{
     const diff=d.c-d.p,pct=d.p?(diff/d.p*100):0,isUp=diff>=0,cls=isUp?'cmp-up':'cmp-dn';
     const absDiff=Math.abs(diff);
     const diffStr=d.isMoney?(isUp?'+':'-')+'₩'+Math.round(absDiff).toLocaleString('ko-KR'):(isUp?'+':'-')+d.fmt(absDiff);
-    return `<tr><td>${d.label}</td><td>${d.fmt(d.p)}</td><td>${d.fmt(d.c)}</td><td class="${cls}">${diffStr}</td><td class="${cls}">${isUp?'▲':'▼'}${Math.abs(pct).toFixed(1)}%</td></tr>`;
+    return `<tr><td>${d.label}</td><td>${d.fmt(d.p)}</td><td>${d.fmt(d.c)}</td><td class="${cls}">${diffStr}</td><td class="${cls}">${(d.p?pct:0).toFixed(1)}%</td></tr>`;
   }).join('');
 }
 
@@ -1054,7 +1184,7 @@ function toggleKwChip(el,name){
   else{selectedKws.add(name);el.classList.add('selected');}
   if(reportData&&currentPeriodMeta){
     const cur=aggDays(reportData.days);
-    const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0};
+    const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
     updateKakaoPreview(cur,prev);
   }
 }
@@ -1118,7 +1248,7 @@ function copyKakao(){
   document.getElementById(id).addEventListener('input',()=>{
     if(reportData&&currentPeriodMeta){
       const cur=aggDays(reportData.days);
-      const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0};
+      const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
       updateKakaoPreview(cur,prev);
     }
   });
