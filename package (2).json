@@ -1,0 +1,9 @@
+{
+  "name": "naver-ad-report",
+  "version": "1.0.0",
+  "description": "네이버 검색광고 리포트 · 카카오톡 보고 생성기",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}
