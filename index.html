@@ -1332,10 +1332,7 @@ function updateKakaoPreview(cur,prev){
 
   let kwLine='';
   if(selectedKws.size){
-    kwLine='
-■ 주요 전환 키워드
-'+[...selectedKws].map((k,i)=>`${i+1}. ${k}`).join('
-');
+    kwLine="\n\n■ 주요 전환 키워드\n" + [...selectedKws].map((k,i)=>`${i+1}. ${k}`).join("\n");
   }
 
   const msg=
