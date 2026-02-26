@@ -279,7 +279,7 @@ module.exports = async function handler(req, res) {
     const dailyMap = {};
     const toSafeArr = v => Array.isArray(v) ? v : [];
     toSafeArr(dailyCurR?.data?.data || dailyCurR?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || startDate;
+      const d = row.dt || row.period || row.date || row.statDate || row.statDt || startDate;
       const key = String(d).replace(/-/g, '');
       if (!dailyMap[key]) dailyMap[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(dailyMap, key, row);
@@ -321,7 +321,7 @@ module.exports = async function handler(req, res) {
     // 6c. 최근 8일 daily (차트/일별표 고정용)
     const daily8Map = {};
     toSafeArr2(daily8R?.data?.data || daily8R?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || rec8Start;
+      const d = row.dt || row.period || row.date || row.statDate || row.statDt || rec8Start;
       const key = String(d).replace(/-/g, '');
       if (!daily8Map[key]) daily8Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(daily8Map, key, row);
@@ -337,7 +337,7 @@ module.exports = async function handler(req, res) {
     // 6d. 최근 21일 daily (주간 비교 차트용)
     const daily21Map = {};
     toSafeArr2(daily21R?.data?.data || daily21R?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || rec21Start;
+      const d = row.dt || row.period || row.date || row.statDate || row.statDt || rec21Start;
       const key = String(d).replace(/-/g, '');
       if (!daily21Map[key]) daily21Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(daily21Map, key, row);
