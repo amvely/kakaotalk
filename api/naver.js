@@ -280,41 +280,47 @@ module.exports = async function handler(req, res) {
 
     let convKws = [], spendKws = [], clickKws = [], searchTerms = [];
     if (kwIds.length > 0) {
+      // EXPKEYWORD: 광고그룹 ID 기반 검색어별 실적 조회
+      const expGroupIds  = (groupIds.length ? groupIds : campIds).slice(0, 100);
+      const expFields    = encodeURIComponent('["impCnt","clkCnt","salesAmt","ccnt","convAmt"]');
+      const expTimeRange = encodeURIComponent(`{"since":"${fmtISO(startDate)}","until":"${fmtISO(endDate)}"}`);
+      const expIdsQuery  = expGroupIds.map(id => `ids=${encodeURIComponent(id)}`).join('&');
+
       const [kwCurR, kwPrevR, expKwR] = await Promise.all([
         apiRequest(cid, lic, sec, 'GET', statsUrl(kwIds, startDate, endDate)),
         apiRequest(cid, lic, sec, 'GET', statsUrl(kwIds, prevStart, prevEnd)),
-        // EXPKEYWORD: 검색어별 통계 (reportTp=EXPKEYWORD)
         apiRequest(cid, lic, sec, 'GET',
-          `/stats?${kwIds.slice(0,100).map(id=>`ids=${encodeURIComponent(id)}`).join('&')}` +
-          `&fields=${encodeURIComponent('["impCnt","clkCnt","salesAmt","ccnt","convAmt"]')}` +
-          `&timeRange=${encodeURIComponent(`{"since":"${fmtISO(startDate)}","until":"${fmtISO(endDate)}"}`)}` +
-          `&reportTp=EXPKEYWORD`
+          `/stats?${expIdsQuery}&fields=${expFields}&timeRange=${expTimeRange}&reportTp=EXPKEYWORD`
         ),
       ]);
-      // EXPKEYWORD 처리: 검색어별 전환 데이터 집계
-      const stMap = {};
+
+      // EXPKEYWORD 응답 파싱 (검색어 필드명은 API 버전에 따라 다름)
       const toArr2 = v => Array.isArray(v) ? v : [];
-      toArr2(expKwR?.data?.data || expKwR?.data).forEach(r => {
-        // 검색어 필드 탐색 (API 응답에 따라 다를 수 있음)
-        const term = r.query || r.searchQuery || r.keywordQuery || r.keywordText || r.keyword || null;
+      const expRows = toArr2(expKwR?.data?.data || expKwR?.data);
+      console.log('[expkw] status:', expKwR?.status, 'rows:', expRows.length);
+      if (expRows.length > 0) console.log('[expkw] sample keys:', Object.keys(expRows[0]).join(','));
+
+      const stMap = {};
+      expRows.forEach(r => {
+        const term = r.query || r.searchQuery || r.searchKeyword || r.keywordText ||
+                     r.keyword || r.expKeyword || r.searchTerm || null;
         if (!term) return;
         if (!stMap[term]) stMap[term] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
-        stMap[term].cost    += Number(r.salesAmt || 0);
+        stMap[term].cost    += Number(r.salesAmt || r.cost    || 0);
         stMap[term].imp     += Number(r.impCnt   || 0);
-        stMap[term].click   += Number(r.clkCnt   || 0);
-        stMap[term].conv    += Number(r.ccnt     || 0);
-        stMap[term].revenue += Number(r.convAmt  || 0);
+        stMap[term].click   += Number(r.clkCnt   || r.click   || 0);
+        stMap[term].conv    += Number(r.ccnt     || r.convCnt || 0);
+        stMap[term].revenue += Number(r.convAmt  || r.revenue || 0);
       });
       searchTerms = Object.entries(stMap)
         .filter(([,v]) => v.conv > 0)
         .map(([term, v]) => ({
-          name: term,
-          ...v,
+          name: term, ...v,
           roas: v.cost ? Math.round(v.revenue / v.cost * 100) : 0,
           cpa : v.conv ? Math.round(v.cost / v.conv)          : 0,
         }))
         .sort((a, b) => b.conv - a.conv);
-      console.log('[expkw] 검색어 수:', searchTerms.length, '/ 전환 있음:', searchTerms.length);
+      console.log('[expkw] 전환 검색어:', searchTerms.length);
       const extractKwId = r => r.nccKeywordId || r.keywordId || r.id;
       const toArr = v => Array.isArray(v) ? v : [];
       toArr(kwCurR?.data?.data  || kwCurR?.data ).forEach(r => aggRow(kwCurMap,  extractKwId(r), r));
