@@ -86,16 +86,14 @@ function aggRow(map, id, row) {
 }
 function calcMetrics(v) {
   return { ...v,
-    roas: v.cost  ? Math.round(v.revenue / v.cost * 100)             : 0,
-    ctr : v.imp   ? parseFloat((v.click / v.imp * 100).toFixed(2))   : 0,
-    cvr : v.click ? parseFloat((v.conv  / v.click * 100).toFixed(2)) : 0,
-    cpc : v.click ? Math.round(v.cost / v.click)                     : 0,
-    cpa : v.conv  ? Math.round(v.cost / v.conv)                      : 0,
-    aov : v.conv  ? Math.round(v.revenue / v.conv)                   : 0, // 객단가
-    rpc : v.click ? Math.round(v.revenue / v.click)                  : 0, // 클릭당매출액
+    roas: v.cost  ? Math.round(v.revenue / v.cost * 100)           : 0,
+    ctr : v.imp   ? parseFloat((v.click / v.imp * 100).toFixed(2)) : 0,
+    cvr : v.click ? parseFloat((v.conv  / v.click * 100).toFixed(2)): 0,
+    cpc : v.click ? Math.round(v.cost / v.click)                   : 0,
+    cpa : v.conv  ? Math.round(v.cost / v.conv)                   : 0,
+    cpa : v.conv  ? Math.round(v.cost / v.conv)                     : 0,
   };
 }
-
 
 // ─── 핸들러 ──────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
@@ -153,23 +151,38 @@ module.exports = async function handler(req, res) {
       : (grpRaw?.adGroups || grpRaw?.items || grpRaw?.data || []);
     const groupIds = adgroups.map(g => g.nccAdgroupId || g.adGroupId || g.id).filter(Boolean);
 
-    // 3. 통계 병렬 (현재+이전+최근8일)
-    const curEDate = parseYMD(endDate);
-    const rec8S    = new Date(curEDate - 7*86400000);
-    const rec8Start = fmtYMD(rec8S);
+    // 3. 주간 날짜 계산 (이번주 월~어제, 지난주 월~일)
+    const today      = new Date();
+    const dow        = today.getDay(); // 0=일,1=월
+    const thisMonDay = new Date(today);
+    thisMonDay.setDate(today.getDate() - ((dow + 6) % 7));
+    thisMonDay.setHours(0,0,0,0);
+    const lastMonDay  = new Date(thisMonDay); lastMonDay.setDate(thisMonDay.getDate() - 7);
+    const lastSunDay  = new Date(thisMonDay); lastSunDay.setDate(thisMonDay.getDate() - 1);
+    const yest        = new Date(today); yest.setDate(today.getDate() - 1);
 
-    
-    const rec21S    = new Date(curEDate - 20*86400000);
-    const rec21Start = fmtYMD(rec21S);
-const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
-apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
+    const thisWeekStart = fmtYMD(thisMonDay);
+    const thisWeekEnd   = fmtYMD(yest);
+    const lastWeekStart = fmtYMD(lastMonDay);
+    const lastWeekEnd   = fmtYMD(lastSunDay);
+
+    // 3-b. 최근 8일
+    const curEDate   = parseYMD(endDate);
+    const rec8S      = new Date(curEDate - 7*86400000);
+    const rec8Start  = fmtYMD(rec8S);
+
+    const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R,
+           thisWeekR, lastWeekR] = await Promise.all([
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
       apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate)),
       groupIds.length
         ? apiRequest(cid, lic, sec, 'GET', statsUrl(groupIds, startDate, endDate))
         : { data: [] },
       apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, prevStart, prevEnd)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 'DAY')),,
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, endDate, 'DAY')),
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 'DAY')),
+      // 주간 캠페인 일별
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, thisWeekStart, thisWeekEnd, 'DAY')),
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, lastWeekStart, lastWeekEnd, 'DAY')),
     ]);
 
     // 4. 일별 (period 필드 없으면 startDate로 집계)
@@ -231,21 +244,21 @@ apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
         ...calcMetrics(v),
       }));
 
-    // 6d. 최근 21일 daily (주간 비교 차트용)
-    const daily21Map = {};
-    toSafeArr2(daily21R?.data?.data || daily21R?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || rec21Start;
-      const key = String(d).replace(/-/g, '');
-      if (!daily21Map[key]) daily21Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
-      aggRow(daily21Map, key, row);
-    });
-    const recent21Days = Object.entries(daily21Map)
-      .sort(([a],[b]) => a.localeCompare(b))
-      .map(([ds, v]) => ({
-        date   : `${ds.slice(4,6)}/${ds.slice(6,8)}`,
-        dateRaw: ds,
-        ...calcMetrics(v),
-      }));
+    // 6d. 주간 일별 데이터
+    function buildWeekDays(raw, weekStartYMD) {
+      const wMap = {};
+      toSafeArr2(raw?.data?.data || raw?.data).forEach(row => {
+        const d = row.period || row.date || row.statDate || row.statDt || weekStartYMD;
+        const key = String(d).replace(/-/g,'');
+        if (!wMap[key]) wMap[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
+        aggRow(wMap, key, row);
+      });
+      return Object.entries(wMap)
+        .sort(([a],[b]) => a.localeCompare(b))
+        .map(([ds, v]) => ({ dateRaw: ds, ...calcMetrics(v) }));
+    }
+    const thisWeekDays = buildWeekDays(thisWeekR, thisWeekStart);
+    const lastWeekDays = buildWeekDays(lastWeekR, lastWeekStart);
 
     // 7. 키워드 (비용 발생한 상위 10개 광고그룹에서 수집)
     const activeGroupIds = allGroups
@@ -265,13 +278,43 @@ apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
     console.log('[kw] 키워드 수:', keywords.length);
     const kwIds    = keywords.map(k => k.nccKeywordId || k.keywordId || k.id).filter(Boolean).slice(0, 200);
 
-    let convKws = [], spendKws = [], clickKws = [];
+    let convKws = [], spendKws = [], clickKws = [], searchTerms = [];
     if (kwIds.length > 0) {
-      const [kwCurR, kwPrevR] = await Promise.all([
+      const [kwCurR, kwPrevR, expKwR] = await Promise.all([
         apiRequest(cid, lic, sec, 'GET', statsUrl(kwIds, startDate, endDate)),
         apiRequest(cid, lic, sec, 'GET', statsUrl(kwIds, prevStart, prevEnd)),
+        // EXPKEYWORD: 검색어별 통계 (reportTp=EXPKEYWORD)
+        apiRequest(cid, lic, sec, 'GET',
+          `/stats?${kwIds.slice(0,100).map(id=>`ids=${encodeURIComponent(id)}`).join('&')}` +
+          `&fields=${encodeURIComponent('["impCnt","clkCnt","salesAmt","ccnt","convAmt"]')}` +
+          `&timeRange=${encodeURIComponent(`{"since":"${fmtISO(startDate)}","until":"${fmtISO(endDate)}"}`)}` +
+          `&reportTp=EXPKEYWORD`
+        ),
       ]);
-      const kwCurMap = {}, kwPrevMap = {};
+      // EXPKEYWORD 처리: 검색어별 전환 데이터 집계
+      const stMap = {};
+      const toArr2 = v => Array.isArray(v) ? v : [];
+      toArr2(expKwR?.data?.data || expKwR?.data).forEach(r => {
+        // 검색어 필드 탐색 (API 응답에 따라 다를 수 있음)
+        const term = r.query || r.searchQuery || r.keywordQuery || r.keywordText || r.keyword || null;
+        if (!term) return;
+        if (!stMap[term]) stMap[term] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
+        stMap[term].cost    += Number(r.salesAmt || 0);
+        stMap[term].imp     += Number(r.impCnt   || 0);
+        stMap[term].click   += Number(r.clkCnt   || 0);
+        stMap[term].conv    += Number(r.ccnt     || 0);
+        stMap[term].revenue += Number(r.convAmt  || 0);
+      });
+      searchTerms = Object.entries(stMap)
+        .filter(([,v]) => v.conv > 0)
+        .map(([term, v]) => ({
+          name: term,
+          ...v,
+          roas: v.cost ? Math.round(v.revenue / v.cost * 100) : 0,
+          cpa : v.conv ? Math.round(v.cost / v.conv)          : 0,
+        }))
+        .sort((a, b) => b.conv - a.conv);
+      console.log('[expkw] 검색어 수:', searchTerms.length, '/ 전환 있음:', searchTerms.length);
       const extractKwId = r => r.nccKeywordId || r.keywordId || r.id;
       const toArr = v => Array.isArray(v) ? v : [];
       toArr(kwCurR?.data?.data  || kwCurR?.data ).forEach(r => aggRow(kwCurMap,  extractKwId(r), r));
@@ -293,13 +336,14 @@ apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
         };
       });
 
-      convKws  = kwList.filter(k => k.conv  > 0).sort((a, b) => b.conv  - a.conv).slice(0, 200);
+      convKws  = kwList.filter(k => k.conv  > 0).sort((a, b) => b.conv  - a.conv).slice(0, 50);
       spendKws = [...kwList].sort((a, b) => b.cost  - a.cost).slice(0, 10);
       clickKws = [...kwList].sort((a, b) => b.click - a.click).slice(0, 10);
     }
 
     return res.json({
-      days: formattedDays, recentDays, recent21Days, prevAgg, convKws, spendKws, clickKws, allCamps, allGroups,
+      days: formattedDays, recentDays, prevAgg, convKws, spendKws, clickKws, allCamps, allGroups,
+      thisWeekDays, lastWeekDays, searchTerms,
       _meta: { period: `${startDate}~${endDate}`, campCount: campaigns.length, kwCount: keywords.length },
     });
 
