@@ -11,18 +11,9 @@ const crypto = require('crypto');
 const API_BASE = 'https://api.searchad.naver.com';
 
 // ─── 서명 생성 (공식: secretKey는 base64 디코딩 후 HMAC 키로 사용) ──
-// naver (35).js 수정
 function makeSignature(secretKey, timestamp, method, path) {
-  // 1. 서명 재료를 정확히 확인하기 위해 로그 출력
   const message = `${timestamp}\n${method}\n${path}`;
-  
-  console.log("---------- [서명 디버깅 시작] ----------");
-  console.log("1. 타임스탬프:", timestamp);
-  console.log("2. 메서드:", method);
-  console.log("3. 경로(Path):", path);
-  console.log("4. 최종 메시지(JSON 형태):", JSON.stringify(message)); // 줄바꿈(\n) 포함 여부 확인용
-  console.log("---------------------------------------");
-
+  // 네이버 검색광고 비밀키는 Base64 인코딩된 바이너리 → 디코딩해서 사용
   const keyBuffer = Buffer.from(secretKey, 'base64');
   return crypto
     .createHmac('sha256', keyBuffer)
@@ -50,8 +41,6 @@ async function apiRequest(cid, lic, sec, method, pathWithQuery, payload) {
   }
 
   const url = API_BASE + pathWithQuery;
-
-  
   const r = await fetch(url, opts);
   const txt = await r.text();
   let data;
