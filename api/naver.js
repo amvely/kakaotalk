@@ -10,13 +10,11 @@ const crypto = require('crypto');
 
 const API_BASE = 'https://api.searchad.naver.com';
 
-// ─── 서명 생성 (공식: secretKey는 base64 디코딩 후 HMAC 키로 사용) ──
+// ─── 서명 생성 (공식: timestamp\nMETHOD\npath) ──────────────────
 function makeSignature(secretKey, timestamp, method, path) {
   const message = `${timestamp}\n${method}\n${path}`;
-  // 네이버 검색광고 비밀키는 Base64 인코딩된 바이너리 → 디코딩해서 사용
-  const keyBuffer = Buffer.from(secretKey, 'base64');
   return crypto
-    .createHmac('sha256', keyBuffer)
+    .createHmac('sha256', secretKey)
     .update(message, 'utf8')
     .digest('base64');
 }
@@ -281,7 +279,7 @@ module.exports = async function handler(req, res) {
     const dailyMap = {};
     const toSafeArr = v => Array.isArray(v) ? v : [];
     toSafeArr(dailyCurR?.data?.data || dailyCurR?.data).forEach(row => {
-      const d = row.dt || row.period || row.date || row.statDate || row.statDt || startDate;
+      const d = row.period || row.date || row.statDate || row.statDt || startDate;
       const key = String(d).replace(/-/g, '');
       if (!dailyMap[key]) dailyMap[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(dailyMap, key, row);
@@ -323,7 +321,7 @@ module.exports = async function handler(req, res) {
     // 6c. 최근 8일 daily (차트/일별표 고정용)
     const daily8Map = {};
     toSafeArr2(daily8R?.data?.data || daily8R?.data).forEach(row => {
-      const d = row.dt || row.period || row.date || row.statDate || row.statDt || rec8Start;
+      const d = row.period || row.date || row.statDate || row.statDt || rec8Start;
       const key = String(d).replace(/-/g, '');
       if (!daily8Map[key]) daily8Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(daily8Map, key, row);
@@ -339,7 +337,7 @@ module.exports = async function handler(req, res) {
     // 6d. 최근 21일 daily (주간 비교 차트용)
     const daily21Map = {};
     toSafeArr2(daily21R?.data?.data || daily21R?.data).forEach(row => {
-      const d = row.dt || row.period || row.date || row.statDate || row.statDt || rec21Start;
+      const d = row.period || row.date || row.statDate || row.statDt || rec21Start;
       const key = String(d).replace(/-/g, '');
       if (!daily21Map[key]) daily21Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(daily21Map, key, row);
@@ -427,13 +425,6 @@ try {
     return res.json({
       days: formattedDays, recentDays, recent21Days, prevAgg, convKws, convTerms, spendKws, clickKws, allCamps, allGroups,
       _meta: { period: `${startDate}~${endDate}`, campCount: campaigns.length, kwCount: keywords.length },
-      _debug: {
-        daily8_raw_first3: (daily8R?.data?.data || daily8R?.data || []).slice(0,3),
-        daily8_status: daily8R?.status,
-        dailyCur_raw_first3: (dailyCurR?.data?.data || dailyCurR?.data || []).slice(0,3),
-        dailyCur_status: dailyCurR?.status,
-        rec8Start, rec8End,
-      }
     });
 
   } catch (err) {
