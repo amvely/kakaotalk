@@ -41,34 +41,32 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 ::-webkit-scrollbar-track{background:var(--s1);}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
-/* ══ SCREEN SELECT ══ */
-#screen-select{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:50px 20px 80px;}
-.app-brand{display:flex;align-items:center;gap:9px;margin-bottom:40px;}
-.brand-icon{width:38px;height:38px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;}
-.brand-name{font-size:19px;font-weight:800;letter-spacing:-.04em;}
-.brand-name span{color:var(--g);}
-.sel-top{width:100%;max-width:720px;display:flex;align-items:center;gap:12px;margin-bottom:10px;}
-.sel-heading{font-size:22px;font-weight:800;letter-spacing:-.04em;}
-.sel-spacer{flex:1;}
-.btn-add-adv{background:var(--g);border:none;color:#fff;padding:8px 16px;border-radius:9px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
-.btn-add-adv:hover{opacity:.85;}
-.sel-sub{font-size:12px;color:var(--text2);margin-bottom:28px;}
-.search-wrap{width:100%;max-width:720px;position:relative;margin-bottom:20px;}
-.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text3);}
-#adv-search{width:100%;background:var(--s2);border:1.5px solid var(--border);color:var(--text);padding:12px 14px 12px 40px;border-radius:var(--rad);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s;}
-#adv-search:focus{border-color:var(--g);}
-#adv-search::placeholder{color:var(--text3);}
-.adv-grid{width:100%;max-width:720px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-@media(max-width:600px){.adv-grid{grid-template-columns:1fr 1fr;}}
-.adv-card{background:var(--s2);border:1.5px solid var(--border);border-radius:var(--rad);padding:16px 18px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
-.adv-card:hover{border-color:var(--g);transform:translateY(-2px);box-shadow:0 8px 28px rgba(3,199,90,.12);}
-.adv-card.hidden{display:none;}
-.adv-emoji{font-size:24px;margin-bottom:8px;display:block;}
-.adv-name{font-size:14px;font-weight:700;margin-bottom:2px;}
-.adv-cat{font-size:11px;color:var(--text2);}
-.adv-actions{position:absolute;top:10px;right:10px;}
-.adv-action-btn{background:var(--s3);border:1px solid var(--border);color:var(--text3);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .12s;}
-.adv-action-btn:hover{color:var(--text);border-color:var(--text2);}
+/* ══ ADV DROPDOWN ══ */
+.adv-dropdown-wrap{position:relative;display:flex;align-items:center;}
+.adv-dropdown-btn{display:flex;align-items:center;gap:7px;background:var(--s2);border:1.5px solid var(--border);
+  color:var(--text);padding:6px 12px;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;
+  cursor:pointer;transition:all .15s;min-width:160px;max-width:240px;white-space:nowrap;overflow:hidden;}
+.adv-dropdown-btn:hover{border-color:var(--g);}
+.adv-dropdown-btn.open{border-color:var(--g);background:var(--s3);}
+.adv-dropdown-btn .dd-arrow{margin-left:auto;font-size:9px;color:var(--text3);transition:transform .2s;flex-shrink:0;}
+.adv-dropdown-btn.open .dd-arrow{transform:rotate(180deg);}
+.adv-dropdown-btn .dd-placeholder{color:var(--text3);font-weight:600;}
+.adv-dd-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:999;
+  background:var(--s2);border:1.5px solid var(--border);border-radius:var(--rad);
+  box-shadow:0 12px 40px rgba(0,0,0,.4);min-width:260px;max-width:320px;overflow:hidden;}
+.adv-dd-search{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);
+  color:var(--text);padding:10px 14px;font-size:13px;font-family:inherit;outline:none;}
+.adv-dd-search::placeholder{color:var(--text3);}
+.adv-dd-list{max-height:280px;overflow-y:auto;}
+.adv-dd-item{display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;
+  transition:background .1s;border-bottom:1px solid var(--border2);}
+.adv-dd-item:last-child{border-bottom:none;}
+.adv-dd-item:hover,.adv-dd-item.active{background:var(--g2);}
+.adv-dd-item.active .adv-dd-name{color:var(--g);}
+.adv-dd-em{font-size:18px;flex-shrink:0;}
+.adv-dd-name{font-size:13px;font-weight:700;}
+.adv-dd-cat{font-size:10px;color:var(--text3);}
+.adv-dd-empty{padding:20px 14px;color:var(--text3);font-size:12px;text-align:center;}
 
 /* ══ TOPBAR (탭) ══ */
 /* ══ PERIOD BAR ══ */
@@ -88,7 +86,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 .period-apply:hover{opacity:.86;}
 .period-sep{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;}
 
-#screen-report{display:none;}
+#screen-report{display:block;}
 .topbar{position:sticky;top:0;z-index:200;background:var(--topbar-bg);backdrop-filter:blur(16px);border-bottom:1px solid var(--border2);display:flex;align-items:stretch;height:50px;}
 .topbar-left{display:flex;align-items:center;gap:10px;padding:0 16px;border-right:1px solid var(--border2);flex-shrink:0;}
 .btn-back{background:none;border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:11px;transition:all .13s;}
@@ -307,22 +305,7 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 </head>
 <body data-theme="dark">
 
-<!-- ═══ SCREEN 1: 광고주 선택 ═══ -->
-<div id="screen-select">
-  <div class="app-brand">
-    <div class="brand-icon">💬</div>
-    <div class="brand-name">카톡<span>보고</span></div>
-  </div>
-  <div class="sel-top">
-    <div class="sel-heading">광고주 선택</div>
-  </div>
-  <div class="sel-sub">광고주를 선택하면 네이버광고 성과 데이터 기반 카카오톡 보고서 문구를 자동 생성합니다</div>
-  <div class="search-wrap">
-    <span class="search-icon">🔍</span>
-    <input type="text" id="adv-search" placeholder="광고주명으로 검색…" oninput="filterAdv(this.value)" autocomplete="off">
-  </div>
-  <div class="adv-grid" id="adv-grid"></div>
-</div>
+
 
 <!-- ═══ SCREEN 2: 리포트 ═══ -->
 <div id="screen-report">
@@ -330,8 +313,21 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
     <!-- 탑바 -->
   <div class="topbar">
     <div class="topbar-left">
-      <button class="btn-back" onclick="goBack()">← 목록</button>
-      <div class="topbar-adv" id="ctrl-adv-name"></div>
+      <div class="app-brand" style="margin:0;padding-right:12px;border-right:1px solid var(--border2)">
+        <div class="brand-icon" style="width:28px;height:28px;font-size:14px">💬</div>
+        <div class="brand-name" style="font-size:14px">카톡<span>보고</span></div>
+      </div>
+      <!-- 광고주 드롭다운 -->
+      <div class="adv-dropdown-wrap" id="adv-dropdown-wrap">
+        <button class="adv-dropdown-btn" id="adv-dd-btn" onclick="toggleAdvDropdown()" type="button">
+          <span id="adv-dd-label" class="dd-placeholder">광고주 선택…</span>
+          <span class="dd-arrow">▼</span>
+        </button>
+        <div class="adv-dd-panel" id="adv-dd-panel" style="display:none">
+          <input class="adv-dd-search" id="adv-dd-search" placeholder="🔍 검색…" oninput="filterAdvDD(this.value)" autocomplete="off">
+          <div class="adv-dd-list" id="adv-dd-list"></div>
+        </div>
+      </div>
     </div>
     <div class="topbar-tabs">
       <button class="tab-btn active" onclick="switchTab('kakao',this)">💬 카카오톡 보고서</button>
@@ -432,15 +428,29 @@ document.head.appendChild(_s);
 // ══ ADVERTISERS (Vercel 환경변수에서 로드) ══
 let advertisers = [];
 async function loadAdvertisers() {
+  const grid = document.getElementById('adv-grid');
+  if (grid) // loading...
   try {
     const r = await fetch('/api/advertisers');
+    const text = await r.text();
     if (r.ok) {
-      advertisers = await r.json();
+      try {
+        advertisers = JSON.parse(text);
+      } catch(e) {
+        console.error('JSON 파싱 실패:', text);
+        advertisers = [];
+        const l=document.getElementById('adv-dd-list'); if(l) l.innerHTML='<div class="adv-dd-empty">❌ JSON 파싱 오류: '+text.slice(0,100)+'</div>';
+        return;
+      }
     } else {
-      console.error('광고주 목록 로드 실패:', r.status);
+      console.error('광고주 목록 로드 실패:', r.status, text);
+      const l2=document.getElementById('adv-dd-list'); if(l2) l2.innerHTML='<div class="adv-dd-empty">❌ API 오류 '+r.status+'</div>';
+      return;
     }
   } catch(e) {
     console.error('광고주 목록 로드 오류:', e);
+    const l3=document.getElementById('adv-dd-list'); if(l3) l3.innerHTML='<div class="adv-dd-empty">❌ 네트워크 오류: '+e.message+'</div>';
+    return;
   }
 }
 
@@ -681,31 +691,61 @@ function switchTab(name, btn){
 
 
 // ══ SCREEN SELECT ══
-function renderAdvGrid(filter=''){
+// ── 드롭다운 ──────────────────────────────────────────────────────
+function renderAdvDD(filter=''){
   const fl=filter.toLowerCase().trim();
-  const grid=document.getElementById('adv-grid');
+  const list=document.getElementById('adv-dd-list');
   if(!advertisers.length){
-    grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">광고주가 없습니다. "+ 광고주 추가"를 눌러 추가하세요.</div>`;
+    list.innerHTML='<div class="adv-dd-empty">광고주가 없습니다.<br>ADVERTISER_KEYS_JSON 환경변수를 설정하세요.</div>';
     return;
   }
-  grid.innerHTML=advertisers.map(a=>{
-    const hide=fl&&!a.name.toLowerCase().includes(fl)&&!(a.cat||'').toLowerCase().includes(fl);
-    return `<div class="adv-card ${hide?'hidden':''}" onclick="selectAdv('${a.id}')">
-      <span class="adv-emoji">${a.emoji}</span>
-      <div class="adv-name">${a.name}</div>
-      <div class="adv-cat">${a.cat||''}</div>
-    </div>`;
-  }).join('');
+  const filtered=advertisers.filter(a=>
+    !fl || a.name.toLowerCase().includes(fl) || (a.cat||'').toLowerCase().includes(fl)
+  );
+  if(!filtered.length){
+    list.innerHTML='<div class="adv-dd-empty">검색 결과 없음</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(a=>`
+    <div class="adv-dd-item ${currentAdv?.id===a.id?'active':''}" onclick="selectAdv('${a.id}')">
+      <span class="adv-dd-em">${a.emoji}</span>
+      <div>
+        <div class="adv-dd-name">${a.name}</div>
+        ${a.cat?`<div class="adv-dd-cat">${a.cat}</div>`:''}
+      </div>
+    </div>`).join('');
 }
-function filterAdv(v){renderAdvGrid(v)}
+function filterAdvDD(v){renderAdvDD(v);}
+function toggleAdvDropdown(){
+  const panel=document.getElementById('adv-dd-panel');
+  const btn=document.getElementById('adv-dd-btn');
+  const isOpen=panel.style.display==='block';
+  panel.style.display=isOpen?'none':'block';
+  btn.classList.toggle('open',!isOpen);
+  if(!isOpen){
+    renderAdvDD('');
+    const s=document.getElementById('adv-dd-search');
+    if(s){s.value='';s.focus();}
+  }
+}
+function closeAdvDropdown(){
+  document.getElementById('adv-dd-panel').style.display='none';
+  document.getElementById('adv-dd-btn').classList.remove('open');
+}
+// 바깥 클릭 시 닫기
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('adv-dropdown-wrap');
+  if(wrap&&!wrap.contains(e.target)) closeAdvDropdown();
+});
 
 async function selectAdv(id){
   currentAdv=advertisers.find(a=>a.id===id);
   if(!currentAdv) return;
   selectedCamps=null; selectedGroups=null; selectedKws.clear();
-  document.getElementById('screen-select').style.display='none';
-  document.getElementById('screen-report').style.display='block';
-  document.getElementById('ctrl-adv-name').innerHTML=`${currentAdv.emoji} ${currentAdv.name}<em>${currentAdv.cat||''}</em>`;
+  // 드롭다운 레이블 업데이트
+  const lbl=document.getElementById('adv-dd-label');
+  if(lbl){lbl.textContent=currentAdv.emoji+' '+currentAdv.name;lbl.classList.remove('dd-placeholder');}
+  closeAdvDropdown();
   // 기본 기간(카카오): 어제
   kakaoPeriod='D1';
   kakaoCustomRange=null;
@@ -721,10 +761,7 @@ async function selectAdv(id){
   syncKakaoPeriodButtons();
   await loadKakaoData();
 }
-function goBack(){
-  document.getElementById('screen-select').style.display='flex';
-  document.getElementById('screen-report').style.display='none';
-}
+// goBack removed (dropdown 방식)
 function showEmptyState(msg){
   document.getElementById('report-page').innerHTML=`<div style="padding:80px;text-align:center;color:var(--text3)"><div style="font-size:40px;margin-bottom:16px">📭</div><div style="font-size:15px;font-weight:700;color:var(--text2);margin-bottom:8px">${msg}</div><div style="font-size:12px">API 키와 Customer ID를 확인하거나 다른 기간을 선택해주세요</div></div>`;
 }
@@ -1389,7 +1426,7 @@ async function captureReport(){
 // ══ INIT ══
 window.onload = async () => {
   await loadAdvertisers();
-  renderAdvGrid();
+  renderAdvDD();
 };
 
 // ══ WEEKDAY COMPARE (금주 vs 지난주) ══
