@@ -8,36 +8,39 @@
 
 const crypto = require('crypto');
 
-const API_BASE = 'https://api.naver.com';
+const API_BASE = 'https://api.searchad.naver.com';
 
 // ─── 유틸: sleep ─────────────────────────────────────────────
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ─── 서명 생성 ────────────────────────────────────────────────
 function makeSignature(secretKey, timestamp, method, path) {
-  const message = `${timestamp}.${method}.${path}`; // 점(.) 구분자
-  return crypto
-    .createHmac('sha256', secretKey)
-    .update(message, 'utf8')
-    .digest('base64');
+  const m = String(method).toUpperCase();
+  const message = `${timestamp}.${m}.${path}`;
+  return crypto.createHmac('sha256', secretKey).update(message, 'utf8').digest('base64');
 }
 
 // ─── API 요청 (fetch 사용 → 리다이렉트 자동 처리) ───────────────
 async function apiRequest(cid, lic, sec, method, pathWithQuery, payload) {
+  const m = String(method).toUpperCase();
   const pathOnly  = pathWithQuery.split('?')[0];
   const timestamp = Date.now().toString();
-  const sig       = makeSignature(sec, timestamp, method, pathOnly);
+  const sig       = makeSignature(sec, timestamp, m, pathOnly);
 
   const headers = {
-    'Content-Type': 'application/json; charset=UTF-8',
     'X-Timestamp': timestamp,
     'X-API-KEY'  : lic,
     'X-Customer' : cid,
     'X-Signature': sig,
   };
 
-  const opts = { method, headers };
-  if (method !== 'GET' && method !== 'DELETE' && payload !== undefined) {
+  // GET/DELETE에 Content-Type 굳이 안 넣는 게 더 안전
+  if (m !== 'GET' && m !== 'DELETE') {
+    headers['Content-Type'] = 'application/json; charset=UTF-8';
+  }
+
+  const opts = { method: m, headers };
+  if (m !== 'GET' && m !== 'DELETE' && payload !== undefined) {
     opts.body = JSON.stringify(payload);
   }
 
@@ -69,8 +72,8 @@ function statsUrl(ids, start, end, timeUnit, breakdown) {
   const timeRange = encodeURIComponent(`{"since":"${fmtISO(start)}","until":"${fmtISO(end)}"}`);
 
   let url = `/stats?${idsQuery}&fields=${fields}&timeRange=${timeRange}`;
-  if (timeUnit)   url += `&timeUnit=${encodeURIComponent(timeUnit)}`;
-  if (breakdown)  url += `&breakdown=${encodeURIComponent(breakdown)}`;
+  if (timeIncrement) url += `&timeIncrement=${encodeURIComponent(String(timeIncrement))}`;
+  if (breakdown)     url += `&breakdown=${encodeURIComponent(breakdown)}`;
   return url;
 }
 
