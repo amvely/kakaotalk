@@ -428,8 +428,6 @@ document.head.appendChild(_s);
 // ══ ADVERTISERS (Vercel 환경변수에서 로드) ══
 let advertisers = [];
 async function loadAdvertisers() {
-  const grid = document.getElementById('adv-grid');
-  if (grid) // loading...
   try {
     const r = await fetch('/api/advertisers');
     const text = await r.text();
