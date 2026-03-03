@@ -315,8 +315,6 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
   </div>
   <div class="sel-top">
     <div class="sel-heading">광고주 선택</div>
-    <div class="sel-spacer"></div>
-    <button class="btn-add-adv" onclick="openAdvModal(null)">+ 광고주 추가</button>
   </div>
   <div class="sel-sub">광고주를 선택하면 네이버광고 성과 데이터 기반 카카오톡 보고서 문구를 자동 생성합니다</div>
   <div class="search-wrap">
@@ -409,48 +407,6 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 
 </div><!-- /screen-report -->
 
-<!-- ═══ ADVERTISER MODAL ═══ -->
-<div class="modal-bg" id="modal-adv">
-  <div class="modal">
-    <div class="modal-title" id="modal-adv-title">광고주 추가</div>
-    <div class="modal-sub">네이버 광고 API 키를 입력하세요</div>
-    <div class="sec-note">🛡 API 키는 브라우저 로컬스토리지에 암호화 저장됩니다.</div>
-    <div style="margin-bottom:10px">
-      <div class="fg-label">이모지 선택</div>
-      <div class="emoji-row" id="emoji-row"></div>
-    </div>
-    <div class="form-row">
-      <div class="fg">
-        <label class="fg-label">광고주명 *</label>
-        <input type="text" class="fg-input name-inp" id="inp-name" placeholder="예: 스타일마켓">
-      </div>
-      <div class="fg">
-        <label class="fg-label">업종/카테고리</label>
-        <input type="text" class="fg-input name-inp" id="inp-cat" placeholder="예: 패션/의류">
-      </div>
-    </div>
-    <div class="fg">
-      <label class="fg-label">Customer ID *</label>
-      <input type="text" class="fg-input" id="inp-cid" placeholder="네이버 광고 고객 ID">
-      <div class="fg-hint">네이버 검색광고 계정 → 고객센터 → Customer ID</div>
-    </div>
-    <div class="fg">
-      <label class="fg-label">Access License *</label>
-      <input type="text" class="fg-input" id="inp-lic" placeholder="API 접근 라이선스 키">
-    </div>
-    <div class="fg">
-      <label class="fg-label">Secret Key *</label>
-      <input type="password" class="fg-input" id="inp-sec" placeholder="비밀키">
-      <div class="fg-hint">⚠ Secret Key는 저장 즉시 마스킹됩니다</div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn-del" id="btn-del-adv" onclick="deleteAdv()" style="display:none">삭제</button>
-      <button class="btn-cancel" onclick="closeAdvModal()">취소</button>
-      <button class="btn-save" onclick="saveAdv()">저장</button>
-    </div>
-  </div>
-</div>
-
 <!-- ═══ CAMPAIGN MODAL ═══ -->
 <div class="modal-bg" id="modal-camp">
   <div class="modal" style="max-width:460px">
@@ -473,11 +429,20 @@ const _s=document.createElement('script');
 _s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
 document.head.appendChild(_s);
 
-// ══ STORAGE ══
-const STORE_KEY='adreport_adv_v2';
-function loadAdv(){try{const r=localStorage.getItem(STORE_KEY);return r?JSON.parse(decodeURIComponent(escape(atob(r)))):[]}catch{return[]}}
-function saveAdv2(list){localStorage.setItem(STORE_KEY,btoa(unescape(encodeURIComponent(JSON.stringify(list)))))}
-let advertisers=loadAdv();
+// ══ ADVERTISERS (Vercel 환경변수에서 로드) ══
+let advertisers = [];
+async function loadAdvertisers() {
+  try {
+    const r = await fetch('/api/advertisers');
+    if (r.ok) {
+      advertisers = await r.json();
+    } else {
+      console.error('광고주 목록 로드 실패:', r.status);
+    }
+  } catch(e) {
+    console.error('광고주 목록 로드 오류:', e);
+  }
+}
 
 // ══ STATE ══
 let currentAdv=null;
@@ -726,9 +691,6 @@ function renderAdvGrid(filter=''){
   grid.innerHTML=advertisers.map(a=>{
     const hide=fl&&!a.name.toLowerCase().includes(fl)&&!(a.cat||'').toLowerCase().includes(fl);
     return `<div class="adv-card ${hide?'hidden':''}" onclick="selectAdv('${a.id}')">
-      <div class="adv-actions" onclick="event.stopPropagation()">
-        <button class="adv-action-btn" onclick="openAdvModal('${a.id}')">✏</button>
-      </div>
       <span class="adv-emoji">${a.emoji}</span>
       <div class="adv-name">${a.name}</div>
       <div class="adv-cat">${a.cat||''}</div>
@@ -772,7 +734,7 @@ const API_BASE=window.location.origin;
 async function fetchNaverData(adv,startDate,endDate){
   const resp=await fetch(API_BASE+'/api/naver',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({cid:adv.cid,lic:adv.lic,sec:adv.sec,startDate,endDate}),
+    body:JSON.stringify({advId:adv.id,startDate,endDate}),
   });
   if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'API 오류('+resp.status+')');}
   return resp.json();
@@ -1403,50 +1365,7 @@ function copyKakao(){
   });
 });
 
-// ══ ADVERTISER MODAL ══
-const EMOJIS=['👗','🍕','💄','🏠','📱','🐾','🍀','🎵','🏋','🛒','🚗','🌿','🎮','📚','✈','🏥'];
-let editingAdvId=null, selectedEmoji='👗';
-
-function openAdvModal(id){
-  editingAdvId=id; selectedEmoji=id?(advertisers.find(a=>a.id===id)?.emoji||'👗'):'👗';
-  document.getElementById('modal-adv-title').textContent=id?'광고주 수정':'광고주 추가';
-  document.getElementById('btn-del-adv').style.display=id?'block':'none';
-  renderEmojiRow();
-  if(id){
-    const a=advertisers.find(a=>a.id===id);
-    if(a){document.getElementById('inp-name').value=a.name;document.getElementById('inp-cat').value=a.cat||'';document.getElementById('inp-cid').value=a.cid;document.getElementById('inp-lic').value=a.lic;document.getElementById('inp-sec').value='';}
-  } else {
-    ['inp-name','inp-cat','inp-cid','inp-lic','inp-sec'].forEach(i=>document.getElementById(i).value='');
-  }
-  document.getElementById('modal-adv').classList.add('show');
-}
-function selectEmoji(e){selectedEmoji=e;renderEmojiRow();}
-function renderEmojiRow(){document.getElementById('emoji-row').innerHTML=EMOJIS.map(e=>`<span class="emoji-opt ${e===selectedEmoji?'sel':''}" onclick="selectEmoji('${e}')">${e}</span>`).join('');}
-function closeAdvModal(){document.getElementById('modal-adv').classList.remove('show');}
-
-function saveAdv(){
-  const name=document.getElementById('inp-name').value.trim();
-  if(!name){showToast('⚠ 광고주명을 입력해주세요');return;}
-  const cat=document.getElementById('inp-cat').value.trim();
-  const cid=document.getElementById('inp-cid').value.trim();
-  const lic=document.getElementById('inp-lic').value.trim();
-  const sec=document.getElementById('inp-sec').value.trim();
-  if(editingAdvId){
-    const idx=advertisers.findIndex(a=>a.id===editingAdvId);
-    if(idx>=0) advertisers[idx]={...advertisers[idx],emoji:selectedEmoji,name,cat,cid,lic,sec:sec||advertisers[idx].sec};
-  } else {
-    advertisers.push({id:'adv_'+Date.now(),emoji:selectedEmoji,name,cat,cid,lic,sec});
-  }
-  saveAdv2(advertisers);closeAdvModal();
-  renderAdvGrid(document.getElementById('adv-search').value);
-  showToast('✅ 저장되었습니다');
-}
-function deleteAdv(){
-  if(!editingAdvId||!confirm('정말 삭제하시겠습니까?'))return;
-  advertisers=advertisers.filter(a=>a.id!==editingAdvId);
-  saveAdv2(advertisers);closeAdvModal();renderAdvGrid();
-  showToast('🗑 삭제되었습니다');
-}
+// ══ ADVERTISER MODAL ══ (Vercel 환경변수로 관리)
 
 // ══ CAPTURE ══
 async function captureReport(){
@@ -1468,9 +1387,10 @@ async function captureReport(){
 }
 
 // ══ INIT ══
-window.onload=()=>{
+window.onload = async () => {
+  await loadAdvertisers();
   renderAdvGrid();
-  };
+};
 
 // ══ WEEKDAY COMPARE (금주 vs 지난주) ══
 function getMonday(d){
