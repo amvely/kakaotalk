@@ -1,10 +1,4 @@
-/**
- * Naver Search Ad API Proxy - Vercel Serverless Function
- * ✅ 수정사항:
- *   1. API 도메인: api.searchad.naver.com → api.naver.com
- *   2. 서명 포맷: timestamp\nMETHOD\nuri → timestamp.METHOD.path (점 구분자)
- *   3. stats 파라미터: fields[]=... → fields=["..."] JSON 형식
- */
+
 
 const crypto = require('crypto');
 
@@ -317,6 +311,15 @@ const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promi
       if (!dailyMap[key]) dailyMap[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
       aggRow(dailyMap, key, row);
     });
+
+    // ✅ 일부 계정/요청에서는 timeIncrement=1 응답이 비는 경우가 있어(=days가 빈 배열)
+    //   KPI(어제)와 일별표가 0으로 보이는 문제가 발생할 수 있음.
+    //   이 때는 같은 기간의 캠페인 합계(campCurR)로 1일치(=endDate) 폴백을 만든다.
+    if (Object.keys(dailyMap).length === 0) {
+      const tmp = {};
+      toSafeArr(campCurR?.data?.data || campCurR?.data).forEach(r => aggRow(tmp, 'total', r));
+      dailyMap[String(endDate)] = tmp.total || { cost:0, imp:0, click:0, conv:0, revenue:0 };
+    }
     const formattedDays = Object.entries(dailyMap)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([ds, v]) => ({
