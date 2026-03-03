@@ -64,16 +64,36 @@ function fmtISO(s) { // YYYYMMDD → YYYY-MM-DD
 }
 
 // ─── stats URL ✅ 수정: JSON 형식 파라미터 ──────────────────────
-function statsUrl(ids, start, end, timeUnit, breakdown) {
+function statsUrl(ids, start, end, timeIncrement, breakdown) {
   if (!ids || ids.length === 0) return null;
 
-  const idsQuery  = ids.slice(0, 200).map(id => `ids=${encodeURIComponent(id)}`).join('&');
-  const fields    = encodeURIComponent('["impCnt","clkCnt","salesAmt","ccnt","convAmt"]');
-  const timeRange = encodeURIComponent(`{"since":"${fmtISO(start)}","until":"${fmtISO(end)}"}`);
+  const idsQuery = ids
+    .slice(0, 200)
+    .map(id => `ids=${encodeURIComponent(id)}`)
+    .join("&");
+
+  const fields = encodeURIComponent(
+    JSON.stringify(["impCnt","clkCnt","salesAmt","ccnt","convAmt"])
+  );
+
+  const timeRange = encodeURIComponent(
+    JSON.stringify({
+      since: `${start.slice(0,4)}-${start.slice(4,6)}-${start.slice(6,8)}`,
+      until: `${end.slice(0,4)}-${end.slice(4,6)}-${end.slice(6,8)}`
+    })
+  );
 
   let url = `/stats?${idsQuery}&fields=${fields}&timeRange=${timeRange}`;
-  if (timeIncrement) url += `&timeIncrement=${encodeURIComponent(String(timeIncrement))}`;
-  if (breakdown)     url += `&breakdown=${encodeURIComponent(breakdown)}`;
+
+  // 🔥 여기 중요
+  if (typeof timeIncrement !== "undefined" && timeIncrement !== null) {
+    url += `&timeIncrement=${encodeURIComponent(String(timeIncrement))}`;
+  }
+
+  if (typeof breakdown !== "undefined" && breakdown !== null) {
+    url += `&breakdown=${encodeURIComponent(String(breakdown))}`;
+  }
+
   return url;
 }
 
@@ -267,16 +287,26 @@ module.exports = async function handler(req, res) {
     const rec21S     = new Date(curEDate - 20*86400000);
     const rec21Start = fmtYMD(rec21S);
 
-    const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 'DAY')),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate)),
-      groupIds.length
-        ? apiRequest(cid, lic, sec, 'GET', statsUrl(groupIds, startDate, endDate))
-        : { data: [] },
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, prevStart, prevEnd)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 'DAY')),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, endDate, 'DAY')),
-    ]);
+const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
+  // ✅ 일별: timeIncrement=1
+  apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 1)),
+
+  // ✅ 기간합계: timeIncrement 생략(=집계)
+  apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate)),
+
+  groupIds.length
+    ? apiRequest(cid, lic, sec, 'GET', statsUrl(groupIds, startDate, endDate))
+    : { data: [] },
+
+  // ✅ 이전기간 합계
+  apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, prevStart, prevEnd)),
+
+  // ✅ 최근 8일 일별: timeIncrement=1
+  apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 1)),
+
+  // ✅ 최근 21일 일별: timeIncrement=1
+  apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, endDate, 1)),
+]);
 
     // 4. 일별 (period 필드 없으면 startDate로 집계)
     const dailyMap = {};
