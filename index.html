@@ -354,7 +354,7 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
           <label class="kk-label">기간 선택 <span>(어제/7일/전월/당월 또는 직접 선택)</span></label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="camp-settings-btn" id="btn-k-d1" onclick="setKakaoPeriod('D1')">어제</button>
-            <button class="camp-settings-btn" id="btn-k-d7" onclick="setKakaoPeriod('D7')">최근 7일</button>
+            <button class="camp-settings-btn" id="btn-k-d7" onclick="setKakaoPeriod('D7')">지난주</button>
             <button class="camp-settings-btn" id="btn-k-pm" onclick="setKakaoPeriod('PM')">전월</button>
             <button class="camp-settings-btn" id="btn-k-tm" onclick="setKakaoPeriod('TM')">당월</button>
           </div>
@@ -579,11 +579,22 @@ function getPeriodDates(period, range){
     prevLabel=pad(ps.getMonth()+1)+'.'+pad(ps.getDate());
 
   } else if(period==='D7'){
-    curE=yest; curS=addDays(yest,-6);
-    // ✅ 이전 기간 = 바로 직전 7일
-    pe=addDays(curS,-1); ps=addDays(pe,-6);
+    // ✅ 지난주(월~일): '이번 주 월요일' 기준으로 바로 전 주(월~일)
+    const thisWeekStart = (()=>{ 
+      const d=new Date(today);
+      const day=d.getDay();            // 0=일 ... 6=토
+      const diff=(day+6)%7;            // 월요일 시작
+      return addDays(d,-diff);
+    })();
 
-    periodLabel='최근 7일'; dateStr2=dispRange(curS,curE);
+    curS = addDays(thisWeekStart,-7);
+    curE = addDays(curS,6);
+
+    // ✅ 이전 기간: 그 전 주(월~일)
+    ps = addDays(curS,-7);
+    pe = addDays(ps,6);
+
+    periodLabel='지난주'; dateStr2=dispRange(curS,curE);
     compareStr='이전 기간: '+dispRange(ps,pe);
     curLabel=shortRange(curS,curE); prevLabel=shortRange(ps,pe);
 
@@ -916,7 +927,7 @@ function renderReport(){
   const chartDays = recentDays?.length ? recentDays : days;
   renderChartMetrics(); drawChart(chartDays);
 
-  // 일별 표: 최신일 상단 + 최근 7일 + 평균
+  // 일별 표: 최신일 상단 + 지난주 + 평균
   const{curE:hlDate}=pm;
   const hlStr=pad(hlDate.getMonth()+1)+'/'+pad(hlDate.getDate());
   // 일별 성과는 '선택한 기간' 기준으로 보여주기 (days). 비어있으면 recentDays로 폴백.
@@ -1102,7 +1113,7 @@ function drawChart(chartDays){
 function renderDailyTable(days,hlStr){
   const W=n=>'₩'+Math.round(n).toLocaleString('ko-KR'),M=n=>Math.round(n).toLocaleString('ko-KR');
 
-  // 최신일(보통 어제) 상단 → 그 아래 최근 7일 → 마지막은 평균
+  // 최신일(보통 어제) 상단 → 그 아래 지난주 → 마지막은 평균
   const sorted=[...(days||[])].sort((a,b)=>String(b.dateRaw||'').localeCompare(String(a.dateRaw||'')));
 
   const rows=sorted.map(d=>{
