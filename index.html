@@ -231,21 +231,37 @@ table.dt tr.avg-row td:first-child{color:var(--y);}
 @media(max-width:800px){#tab-kakao.active{grid-template-columns:1fr;}}
 
 /* 입력 패널 */
-.kk-input-panel{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rad);overflow:hidden;display:flex;flex-direction:column;}
-.kk-panel-hd{padding:11px 16px;background:var(--s3);border-bottom:1px solid var(--border2);font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.kk-panel-body{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1;}
-.kk-field{display:flex;flex-direction:column;gap:5px;}
-.kk-label{font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
-.kk-label span{font-weight:400;text-transform:none;letter-spacing:0;font-size:9px;margin-left:4px;color:var(--text3);}
+.kk-input-panel{background:var(--s1);border:1px solid var(--border2);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,.18);}
+.kk-panel-hd{padding:14px 18px;background:linear-gradient(135deg,var(--s3),var(--s2));border-bottom:1px solid var(--border2);font-size:12px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;flex-shrink:0;letter-spacing:-.02em;}
+.kk-panel-hd-dot{width:8px;height:8px;border-radius:50%;background:var(--g);box-shadow:0 0 8px var(--g);flex-shrink:0;}
+.kk-panel-body{padding:18px;display:flex;flex-direction:column;gap:14px;flex:1;}
+.kk-field{display:flex;flex-direction:column;gap:6px;}
+.kk-label{font-size:10px;font-weight:800;color:var(--text2);letter-spacing:.02em;display:flex;align-items:center;gap:6px;}
+.kk-label span{font-weight:400;font-size:9.5px;color:var(--text3);}
+.kk-label-icon{font-size:12px;}
+.kk-period-btns{display:flex;gap:5px;flex-wrap:wrap;}
+.kk-period-btn{background:var(--s3);border:1.5px solid var(--border);color:var(--text2);padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.kk-period-btn:hover{border-color:var(--g);color:var(--g);}
+.kk-period-btn.active{background:rgba(3,199,90,.12);border-color:var(--g);color:var(--g);}
+.kk-date-row{display:flex;gap:6px;align-items:center;margin-top:4px;}
+.kk-date-inp{flex:1;background:var(--s2);border:1.5px solid var(--border);color:var(--text);padding:7px 10px;border-radius:9px;font-size:11px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .15s;min-width:0;color-scheme:dark;}
+.kk-date-inp:focus{border-color:var(--g);}
+.kk-date-inp::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.7;cursor:pointer;}
+.kk-date-inp::-webkit-calendar-picker-indicator:hover{opacity:1;}
+.kk-date-sep{font-size:11px;color:var(--text3);flex-shrink:0;}
+.kk-date-apply{background:var(--g);border:none;color:#fff;padding:7px 14px;border-radius:9px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer;transition:opacity .15s;white-space:nowrap;flex-shrink:0;}
+.kk-date-apply:hover{opacity:.85;}
 textarea.kk-inp, input.kk-inp{
-  width:100%;padding:9px 12px;
-  border:1px solid var(--border);border-radius:8px;
+  width:100%;padding:10px 13px;
+  border:1.5px solid var(--border);border-radius:10px;
   background:var(--s2);color:var(--text);
-  font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.65;
-  resize:vertical;outline:none;transition:border-color .15s,background .15s;
+  font-family:'Noto Sans KR',sans-serif;font-size:12px;line-height:1.7;
+  resize:vertical;outline:none;transition:border-color .15s,background .15s,box-shadow .15s;
 }
 input.kk-inp{resize:none;}
-textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(--s1);}
+textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(--s1);box-shadow:0 0 0 3px rgba(3,199,90,.08);}
+textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
+.kk-divider{height:1px;background:var(--border2);margin:2px 0;}
 
 /* 키워드 칩 */
 .kw-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;}
@@ -340,45 +356,50 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 
     <!-- 좌측: 기간선택 + 보고서 내용 입력 (통합) -->
     <div class="kk-input-panel">
-      <div class="kk-panel-hd">✍️ 카카오톡 보고서 설정 <span style="margin-left:auto;font-size:10px;color:var(--text3);font-weight:600" id="kakao-period-label"></span></div>
-      <div class="kk-panel-body" style="gap:14px">
+      <div class="kk-panel-hd">
+        <div class="kk-panel-hd-dot"></div>
+        보고서 설정
+        <span style="margin-left:auto;font-size:10px;color:var(--g);font-weight:700;font-family:'JetBrains Mono',monospace" id="kakao-period-label"></span>
+      </div>
+      <div class="kk-panel-body">
 
-        <!-- 기간 선택 (카카오톡 보고서 전용) -->
+        <!-- 기간 선택 -->
         <div class="kk-field">
-          <label class="kk-label">기간 선택 <span>(어제/7일/전월/당월 또는 직접 선택)</span></label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="camp-settings-btn" id="btn-k-d1" onclick="setKakaoPeriod('D1')">어제</button>
-            <button class="camp-settings-btn" id="btn-k-d7" onclick="setKakaoPeriod('D7')">지난주</button>
-            <button class="camp-settings-btn" id="btn-k-pm" onclick="setKakaoPeriod('PM')">전월</button>
-            <button class="camp-settings-btn" id="btn-k-tm" onclick="setKakaoPeriod('TM')">당월</button>
+          <label class="kk-label"><span class="kk-label-icon">📅</span> 기간 선택</label>
+          <div class="kk-period-btns">
+            <button class="kk-period-btn" id="btn-k-d1" onclick="setKakaoPeriod('D1')">어제</button>
+            <button class="kk-period-btn" id="btn-k-d7" onclick="setKakaoPeriod('D7')">지난주</button>
+            <button class="kk-period-btn" id="btn-k-pm" onclick="setKakaoPeriod('PM')">전월</button>
+            <button class="kk-period-btn" id="btn-k-tm" onclick="setKakaoPeriod('TM')">당월</button>
           </div>
-          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-            <input class="kk-inp" id="kakao-start" type="date" style="max-width:180px">
-            <span style="color:var(--text3);font-size:11px">~</span>
-            <input class="kk-inp" id="kakao-end" type="date" style="max-width:180px">
-            <button class="btn-add-adv" style="padding:8px 14px" onclick="fetchKakaoCustom()">조회</button>
+          <div class="kk-date-row">
+            <input class="kk-date-inp" id="kakao-start" type="date">
+            <span class="kk-date-sep">–</span>
+            <input class="kk-date-inp" id="kakao-end" type="date">
+            <button class="kk-date-apply" onclick="fetchKakaoCustom()">조회</button>
           </div>
         </div>
 
+        <div class="kk-divider"></div>
+
+        <!-- 전환 키워드 -->
         <div class="kk-field" id="kw-chips-wrap" style="display:none">
-          <label class="kk-label">💰 전환 키워드 <span>클릭하면 보고서에 포함</span></label>
+          <label class="kk-label"><span class="kk-label-icon">💰</span> 전환 키워드 <span>클릭하면 보고서에 포함</span></label>
           <div class="kw-chips" id="kw-chips"></div>
         </div>
 
+        <!-- 마케터 코멘트 -->
         <div class="kk-field">
-          <label class="kk-label">마케터 코멘트 <span>분석 인사이트</span></label>
-          <textarea class="kk-inp" id="comment" rows="4" placeholder="성과에 대한 분석 내용을 입력하세요." style="flex:1;min-height:80px"></textarea>
+          <label class="kk-label"><span class="kk-label-icon">✏️</span> 마케터 코멘트 <span>성과 분석 인사이트</span></label>
+          <textarea class="kk-inp" id="comment" rows="4" placeholder="이번 기간 주요 성과와 인사이트를 입력하세요." style="min-height:80px"></textarea>
         </div>
 
+        <!-- 운영 계획 -->
         <div class="kk-field">
-          <label class="kk-label">금일 운영 계획</label>
-          <textarea class="kk-inp" id="plan" rows="3" placeholder="오늘 진행할 최적화 작업을 입력하세요." style="flex:1;min-height:60px"></textarea>
+          <label class="kk-label"><span class="kk-label-icon">🎯</span> 금일 운영 계획</label>
+          <textarea class="kk-inp" id="plan" rows="4" placeholder="오늘 진행할 최적화 작업을 입력하세요." style="min-height:80px"></textarea>
         </div>
 
-        <div class="kk-field">
-          <label class="kk-label">하단 마무리 멘트 <span>(비워두면 기본값 사용)</span></label>
-          <input class="kk-inp" id="msg-closing" type="text" placeholder="항상 최선을 다하겠습니다. 감사합니다! 🙏">
-        </div>
 
       </div>
     </div>
@@ -1322,7 +1343,7 @@ function toggleKwChip(el,name){
 function updateKakaoPreview(cur,prev){
   lastKakaoCur=cur; lastKakaoPrev=prev;
   const advName=currentAdv?.name||'업체명';
-  const closing =document.getElementById('msg-closing').value.trim() ||'항상 최선을 다하겠습니다. 감사합니다! 🙏';
+  const closing ='항상 최선을 다하겠습니다. 감사합니다! 🙏';
   const comment =document.getElementById('comment').value.trim()     ||'성과 분석 내용이 없습니다.';
   const plan    =document.getElementById('plan').value.trim()        ||'상시 모니터링 및 입찰가 최적화 진행 예정입니다.';
 
@@ -1394,7 +1415,7 @@ function copyKakao(){
 }
 
 // 실시간 미리보기 갱신
-['msg-closing','comment','plan'].forEach(id=>{
+['comment','plan'].forEach(id=>{
   document.getElementById(id).addEventListener('input',()=>{
     if(lastKakaoCur){ updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0}); }
   });
