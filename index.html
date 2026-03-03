@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>네이버광고 · 카카오톡 보고서</title>
+<title>카카오톡 보고서</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -310,7 +310,7 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 <!-- ═══ SCREEN 1: 광고주 선택 ═══ -->
 <div id="screen-select">
   <div class="app-brand">
-    <div class="brand-icon">📨</div>
+    <div class="brand-icon">💬</div>
     <div class="brand-name">카톡<span>보고</span></div>
   </div>
   <div class="sel-top">
@@ -318,7 +318,7 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
     <div class="sel-spacer"></div>
     <button class="btn-add-adv" onclick="openAdvModal(null)">+ 광고주 추가</button>
   </div>
-  <div class="sel-sub">광고주를 선택하면 네이버광고 성과 데이터 기반 카카오톡 보고서를 자동 생성합니다</div>
+  <div class="sel-sub">광고주를 선택하면 네이버광고 성과 데이터 기반 카카오톡 보고서 문구를 자동 생성합니다</div>
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
     <input type="text" id="adv-search" placeholder="광고주명으로 검색…" oninput="filterAdv(this.value)" autocomplete="off">
@@ -329,172 +329,20 @@ textarea.kk-inp:focus, input.kk-inp:focus{border-color:var(--g);background:var(-
 <!-- ═══ SCREEN 2: 리포트 ═══ -->
 <div id="screen-report">
 
-  <!-- 탑바 -->
+    <!-- 탑바 -->
   <div class="topbar">
     <div class="topbar-left">
       <button class="btn-back" onclick="goBack()">← 목록</button>
       <div class="topbar-adv" id="ctrl-adv-name"></div>
     </div>
     <div class="topbar-tabs">
-      <button class="tab-btn active" onclick="switchTab('report',this)">📊 성과 리포트</button>
-      <button class="tab-btn" onclick="switchTab('kakao',this)">💬 카카오톡 보고서</button>
-    </div>
-    <div class="topbar-right">
-      <button class="capture-btn" onclick="captureReport()">📸 캡처</button>
-    </div>
-  </div>
-
-  <!-- ─── 탭: 성과 리포트 ─── -->
-  <div class="tab-panel active" id="tab-report">
-    <!-- 기간 선택 -->
-    <div class="period-bar" id="period-bar">
-      <div class="period-left">
-        <button class="period-btn" id="btn-p-d1" onclick="setReportPeriod('D1')">어제</button>
-        <button class="period-btn" id="btn-p-d7" onclick="setReportPeriod('D7')">최근 7일</button>
-        <button class="period-btn" id="btn-p-pm" onclick="setReportPeriod('PM')">전월</button>
-        <button class="period-btn" id="btn-p-tm" onclick="setReportPeriod('TM')">당월(누계)</button>
-      </div>
-      <div class="period-right">
-        <input class="period-date" id="custom-start" type="date">
-        <span class="period-sep">~</span>
-        <input class="period-date" id="custom-end" type="date">
-        <button class="period-apply" onclick="applyReportCustomRange()">조회</button>
-      </div>
-    </div>
-
-    <div id="report-wrap">
-      <div id="report-page">
-        <div class="rpt-header">
-          <div class="rh-row">
-            <div>
-              <div class="rh-title" id="rh-title"></div>
-              <div class="rh-badge">● 성과 요약 리포트</div>
-            </div>
-            <div class="rh-right">
-              <div class="rh-period" id="rh-period"></div>
-              <div class="rh-date" id="rh-date"></div>
-              <div class="rh-compare" id="rh-compare"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="rpt-body">
-          <div class="sec-label">핵심 성과 지표</div>
-          <div class="scorecards" id="scorecards"></div>
-
-          <div class="sec-label">추이 차트 <span class="sec-label-hint">(최대 2개 선택)</span></div>
-          <div class="chart-card">
-            <div class="chart-inner">
-              <div class="chart-canvas-wrap">
-                <canvas id="chart-canvas" height="190"></canvas>
-              </div>
-              <div class="chart-metrics">
-                <div class="cm-header">지표 선택 (최대 2개)</div>
-                <div class="cm-grid" id="cm-grid"></div>
-                <div class="cm-footer">● 실선 &nbsp;◌ 점선</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="sec-label">일별 광고 성과 / 항목별 증감 비교</div>
-          <div class="tables-row">
-            <div class="tbl-card">
-              <div class="tbl-hd">📅 일별 광고 성과 <small>최근 8일</small></div>
-              <div class="tbl-wrap">
-                <table class="dt">
-                  <thead><tr><th>날짜</th><th>광고비</th><th>클릭수</th><th>전환수</th><th>매출액</th><th>ROAS</th></tr></thead>
-                  <tbody id="tbl-daily-body"></tbody>
-                </table>
-              </div>
-            </div>
-            <div class="tbl-card">
-              <div class="tbl-hd">📊 항목별 증감 비교 <small id="cmp-header-label"></small></div>
-              <div class="tbl-wrap">
-                <table class="dt">
-                  <thead><tr><th>지표</th><th id="th-prev">이전 기간</th><th id="th-cur">기준</th><th>증감</th><th>증감률</th></tr></thead>
-                  <tbody id="tbl-compare-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="sec-label">주요 캠페인 / 광고그룹 성과</div>
-          <div class="camp-grid">
-            <div class="tbl-card">
-              <div class="tbl-hd">🎯 캠페인
-                <div class="tbl-hd-actions"><small>광고비 순</small><button class="camp-settings-btn" onclick="openCampModal('camp')">⚙ 선택</button></div>
-              </div>
-              <div class="tbl-wrap">
-                <table class="dt">
-                  <thead><tr><th>캠페인</th><th>광고비</th><th>클릭수</th><th>전환수</th><th>매출액</th><th>ROAS</th></tr></thead>
-                  <tbody id="tbl-camp-body"></tbody>
-                </table>
-              </div>
-            </div>
-            <div class="tbl-card">
-              <div class="tbl-hd">📦 광고그룹
-                <div class="tbl-hd-actions"><small>광고비 순</small><button class="camp-settings-btn" onclick="openCampModal('group')">⚙ 선택</button></div>
-              </div>
-              <div class="tbl-wrap">
-                <table class="dt">
-                  <thead><tr><th>광고그룹</th><th>광고비</th><th>클릭수</th><th>전환수</th><th>매출액</th><th>ROAS</th></tr></thead>
-                  <tbody id="tbl-group-body"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="sec-label">전환 키워드 <span class="sec-label-hint" id="conv-total-lbl"></span></div>
-          <div class="conv-kw-wrap">
-            <div class="conv-kw-hd">🏆 전환 키워드 <small id="conv-count-lbl"></small></div>
-            <div class="tbl-wrap">
-              <table class="dt">
-                <thead><tr><th style="text-align:left;width:20px">#</th><th style="text-align:left">키워드</th><th>이전 전환</th><th>전환수</th><th>비율</th><th>광고비</th><th>매출액</th><th>ROAS</th></tr></thead>
-                <tbody id="conv-kw-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          
-          <div class="sec-label">요일별 성과 비교 <span class="sec-label-hint">(금주 vs 지난주, 지표 선택)</span></div>
-          <div class="chart-card">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-              <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.08em;text-transform:uppercase">지표</span>
-              <select id="week-metric" class="fg-input" style="max-width:220px" onchange="renderWeekCompare()">
-                <option value="cost">광고비</option>
-                <option value="imp">노출수</option>
-                <option value="click">클릭수</option>
-                <option value="conv">전환수</option>
-                <option value="revenue">매출액</option>
-                <option value="cpc">CPC</option>
-                <option value="ctr">클릭율(CTR)</option>
-                <option value="cvr">전환율(CVR)</option>
-                <option value="roas">ROAS</option>
-                <option value="cpa">전환당비용(CPA)</option>
-                <option value="aov">객단가</option>
-                <option value="rpc">클릭당매출액</option>
-              </select>
-              <span id="week-range-label" style="margin-left:auto;font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace"></span>
-            </div>
-            <canvas id="week-chart-canvas" height="190"></canvas>
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">
-              <span>■ 금주</span><span>□ 지난주</span>
-            </div>
-          </div>
-</div>
-        </div>
-
-        <div class="rpt-footer">
-          <div class="rf-brand">NAVER SEARCHAD · <em>카톡보고 생성기</em></div>
-          <div class="rf-ts" id="rf-ts"></div>
-        </div>
-      </div>
+      <button class="tab-btn active" onclick="switchTab('kakao',this)">💬 카카오톡 보고서</button>
     </div>
   </div>
 
   <!-- ─── 탭: 카카오톡 보고서 ─── -->
   
-  <div class="tab-panel" id="tab-kakao">
+  <div class="tab-panel active" id="tab-kakao">
 
     <!-- 좌측: 기간선택 + 보고서 내용 입력 (통합) -->
     <div class="kk-input-panel">
@@ -671,12 +519,30 @@ function hideLoading(){document.getElementById('loading').classList.remove('show
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
 
 function aggDays(days){
-  if(!days||!days.length) return{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
-  const cost=sum(days,'cost'),imp=sum(days,'imp'),click=sum(days,'click'),conv=sum(days,'conv'),revenue=sum(days,'revenue');
-  return{cost,imp,click,conv,revenue,
-    ctr:imp?click/imp*100:0, cvr:click?conv/click*100:0,
-    roas:cost?revenue/cost*100:0, cpc:click?Math.round(cost/click):0,
-    cpa:conv?Math.round(cost/conv):0};
+  if(!days||!days.length) return{
+    cost:0,imp:0,click:0,conv:0,revenue:0,
+    ctr:0,cvr:0,roas:0,cpc:0,cpa:0,
+    // ✅ 추가 지표
+    aov:0, // 객단가 = 매출액/전환수
+    rpc:0  // 클릭당매출액 = 매출액/클릭수
+  };
+  const cost=sum(days,'cost'),
+        imp=sum(days,'imp'),
+        click=sum(days,'click'),
+        conv=sum(days,'conv'),
+        revenue=sum(days,'revenue');
+
+  const ctr = imp   ? (click/imp*100)      : 0;
+  const cvr = click ? (conv/click*100)     : 0;
+  const roas= cost  ? (revenue/cost*100)   : 0;
+  const cpc = click ? Math.round(cost/click) : 0;
+  const cpa = conv  ? Math.round(cost/conv)  : 0;
+
+  // ✅ 사용자 요청 계산식 반영
+  const aov = conv  ? Math.round(revenue/conv)  : 0;
+  const rpc = click ? Math.round(revenue/click) : 0;
+
+  return{cost,imp,click,conv,revenue,ctr,cvr,roas,cpc,cpa,aov,rpc};
 }
 
 // ══ PERIOD ══
@@ -771,7 +637,7 @@ function setReportPeriod(p){
   reportPeriod=p;
   reportCustomRange=null;
   syncReportPeriodButtons();
-  loadReportData();
+  loadKakaoData();
 }
 
 function applyReportCustomRange(){
@@ -782,7 +648,7 @@ function applyReportCustomRange(){
   reportCustomRange={start:sd,end:ed};
   reportPeriod='CUSTOM';
   syncReportPeriodButtons();
-  loadReportData();
+  loadKakaoData();
 }
 
 
@@ -823,22 +689,17 @@ function applyKakaoCustomRange(){
 
 // ══ TAB SWITCH ══
 function switchTab(name, btn){
+  // 카카오 전용: 탭이 1개라서 안전하게 'kakao'만 활성화
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');
-  btn.classList.add('active');
+  const panel=document.getElementById('tab-kakao');
+  if(panel) panel.classList.add('active');
+  if(btn) btn.classList.add('active');
 
-  // ✅ 탭별로 기간/데이터를 독립적으로 관리
-  if(name==='kakao'){
-    syncKakaoPeriodButtons();
-    // 아직 데이터가 없으면 기본(어제)로 최초 1회 로드
-    if(currentAdv && !kakaoData){
-      loadKakaoData();
-      return;
-    }
-    if(kakaoData && kakaoPeriodMeta){
-      renderKakaoFromData();
-    }
+  syncKakaoPeriodButtons();
+  if(currentAdv){
+    // 최초 진입/기간 변경 시 데이터 로드
+    loadKakaoData();
   }
 }
 
@@ -872,16 +733,20 @@ async function selectAdv(id){
   document.getElementById('screen-select').style.display='none';
   document.getElementById('screen-report').style.display='block';
   document.getElementById('ctrl-adv-name').innerHTML=`${currentAdv.emoji} ${currentAdv.name}<em>${currentAdv.cat||''}</em>`;
-  // 기본 기간: 어제
-  reportPeriod='D1';
-  // 날짜 입력 기본값 세팅
+  // 기본 기간(카카오): 어제
+  kakaoPeriod='D1';
+  kakaoCustomRange=null;
+
+  // 날짜 입력 기본값(어제)
   const y=new Date();
   const ys=addDays(y,-1);
   const toISO=d=>d.toISOString().slice(0,10);
-  const cs=document.getElementById('custom-start'); const ce=document.getElementById('custom-end');
-  if(cs&&ce){ cs.value=toISO(ys); ce.value=toISO(ys); }
-  syncReportPeriodButtons();
-  await loadReportData();
+  const ks=document.getElementById('kakao-start');
+  const ke=document.getElementById('kakao-end');
+  if(ks&&ke){ ks.value=toISO(ys); ke.value=toISO(ys); }
+
+  syncKakaoPeriodButtons();
+  await loadKakaoData();
 }
 function goBack(){
   document.getElementById('screen-select').style.display='flex';
@@ -1443,11 +1308,7 @@ function renderClickTop(list){
 function toggleKwChip(el,name){
   if(selectedKws.has(name)){selectedKws.delete(name);el.classList.remove('selected');}
   else{selectedKws.add(name);el.classList.add('selected');}
-  if(reportData&&reportPeriodMeta){
-    const cur=aggDays(reportData.days);
-    const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
-    updateKakaoPreview(cur,prev);
-  }
+  if(lastKakaoCur){ updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0}); }
 }
 
 function updateKakaoPreview(cur,prev){
@@ -1527,11 +1388,7 @@ function copyKakao(){
 // 실시간 미리보기 갱신
 ['msg-closing','comment','plan'].forEach(id=>{
   document.getElementById(id).addEventListener('input',()=>{
-    if(reportData&&reportPeriodMeta){
-      const cur=aggDays(reportData.days);
-      const prev=reportData.prevAgg?.cost!==undefined?reportData.prevAgg:{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0};
-      updateKakaoPreview(cur,prev);
-    }
+    if(lastKakaoCur){ updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0}); }
   });
 });
 
@@ -1602,10 +1459,7 @@ async function captureReport(){
 // ══ INIT ══
 window.onload=()=>{
   renderAdvGrid();
-  window.addEventListener('resize',()=>{
-    if(reportData){const cd=reportData.recentDays?.length?reportData.recentDays:reportData.days;drawChart(cd);}
-  });
-};
+  };
 
 // ══ WEEKDAY COMPARE (금주 vs 지난주) ══
 function getMonday(d){
