@@ -1343,7 +1343,6 @@ function toggleKwChip(el,name){
 function updateKakaoPreview(cur,prev){
   lastKakaoCur=cur; lastKakaoPrev=prev;
   const advName=currentAdv?.name||'업체명';
-  const closing ='항상 최선을 다하겠습니다. 감사합니다! 🙏';
   const comment =document.getElementById('comment').value.trim()     ||'성과 분석 내용이 없습니다.';
   const plan    =document.getElementById('plan').value.trim()        ||'상시 모니터링 및 입찰가 최적화 진행 예정입니다.';
 
@@ -1372,8 +1371,7 @@ function updateKakaoPreview(cur,prev){
   }
 
   const msg=
-`[${pm.dateStr2}]
-${advName} 네이버광고 성과 보고
+`${advName} 네이버광고 성과 보고
 
 ■ 주요 성과 (${pm.prevLabel} → ${pm.curLabel})
 - 광고비: ${W(cur.cost)}원${pctChange(cur.cost,prev.cost)}
@@ -1393,9 +1391,7 @@ ${advName} 네이버광고 성과 보고
 ${comment}
 
 ■ 금일 운영 계획
-${plan}
-
-${closing}`;
+${plan}`;
 
   document.getElementById('kakao-preview').textContent=msg;
 }
