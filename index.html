@@ -317,9 +317,69 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
 @keyframes spin{to{transform:rotate(360deg);}}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g);color:#fff;padding:9px 20px;border-radius:50px;font-size:12px;font-weight:700;opacity:0;transition:all .3s;pointer-events:none;z-index:99999;white-space:nowrap;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ══ LOGIN SCREEN ══ */
+#screen-login{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px;
+}
+.login-card{
+  background:var(--s1);border:1.5px solid var(--border);border-radius:20px;
+  padding:36px 32px;width:100%;max-width:360px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center;}
+.login-title{font-size:20px;font-weight:800;letter-spacing:-.04em;margin-bottom:4px;text-align:center;}
+.login-sub{font-size:12px;color:var(--text2);text-align:center;margin-bottom:24px;}
+.login-input-wrap{position:relative;margin-bottom:14px;}
+.login-input{
+  width:100%;padding:13px 16px;
+  background:var(--s2);border:1.5px solid var(--border);
+  border-radius:12px;color:var(--text);
+  font-size:15px;font-family:'Noto Sans KR',sans-serif;
+  outline:none;transition:border-color .15s,box-shadow .15s;
+  letter-spacing:.1em;
+}
+.login-input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(3,199,90,.1);}
+.login-input::placeholder{letter-spacing:0;color:var(--text3);}
+.login-btn{
+  width:100%;padding:13px;
+  background:var(--g);border:none;border-radius:12px;
+  color:#fff;font-size:14px;font-weight:800;font-family:'Noto Sans KR',sans-serif;
+  cursor:pointer;transition:opacity .15s;
+}
+.login-btn:hover{opacity:.88;}
+.login-btn:disabled{opacity:.5;cursor:not-allowed;}
+.login-error{
+  margin-top:12px;padding:10px 14px;
+  background:rgba(255,71,71,.1);border:1px solid rgba(255,71,71,.2);
+  border-radius:9px;font-size:12px;color:var(--r);text-align:center;
+  display:none;
+}
+.login-error.show{display:block;}
 </style>
 </head>
 <body data-theme="dark">
+
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-icon">💬</div>
+      <div class="brand-name">카톡<span>보고</span></div>
+    </div>
+    <div class="login-title">내부 전용 시스템</div>
+    <div class="login-sub">접근하려면 비밀번호를 입력하세요</div>
+    <div class="login-input-wrap">
+      <input class="login-input" id="login-pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">입장하기</button>
+    <div class="login-error" id="login-error">비밀번호가 틀렸습니다</div>
+  </div>
+</div>
+
 
 
 
@@ -1439,9 +1499,63 @@ async function captureReport(){
 }
 
 // ══ INIT ══
+
+// ══ AUTH ══
+const SESSION_KEY = 'kkreport_auth_v1';
+
+function isAuthed() {
+  return sessionStorage.getItem(SESSION_KEY) === 'ok';
+}
+
+function showApp() {
+  document.getElementById('screen-login').style.display = 'none';
+  document.getElementById('screen-report').style.display = 'block';
+}
+
+async function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  btn.disabled = true; btn.textContent = '확인 중…';
+  err.classList.remove('show');
+  try {
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ password: pw })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      sessionStorage.setItem(SESSION_KEY, 'ok');
+      showApp();
+      await loadAdvertisers();
+      renderAdvDD();
+    } else {
+      err.textContent = d.error || '비밀번호가 틀렸습니다';
+      err.classList.add('show');
+      document.getElementById('login-pw').select();
+    }
+  } catch(e) {
+    err.textContent = '오류가 발생했습니다: ' + e.message;
+    err.classList.add('show');
+  }
+  btn.disabled = false; btn.textContent = '입장하기';
+}
+
+// Enter 키 지원
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('login-pw')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
 window.onload = async () => {
-  await loadAdvertisers();
-  renderAdvDD();
+  if (isAuthed()) {
+    showApp();
+    await loadAdvertisers();
+    renderAdvDD();
+  }
+  // 비인증 상태면 로그인 화면 유지
 };
 
 // ══ WEEKDAY COMPARE (금주 vs 지난주) ══
