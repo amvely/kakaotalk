@@ -1,25 +1,28 @@
 /**
  * Naver Search Ad API Proxy - Vercel Serverless Function
  * ✅ 수정사항:
- *   1. API 도메인: api.searchad.naver.com (공식 도메인)
- *   2. 서명 포맷: timestamp\nMETHOD\npath (줄바꿈 구분자 - 공식 문서 기준)
- *   3. stats 파라미터: fields=["..."] JSON 형식
+ *   1. API 도메인: api.searchad.naver.com → api.naver.com
+ *   2. 서명 포맷: timestamp\nMETHOD\nuri → timestamp.METHOD.path (점 구분자)
+ *   3. stats 파라미터: fields[]=... → fields=["..."] JSON 형식
  */
 
 const crypto = require('crypto');
 
-const API_BASE = 'https://api.searchad.naver.com';
+const API_BASE = 'https://api.naver.com';
 
-// ─── 서명 생성 (공식: timestamp\nMETHOD\npath) ──────────────────
+// ─── 유틸: sleep ─────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── 서명 생성 ────────────────────────────────────────────────
 function makeSignature(secretKey, timestamp, method, path) {
-  const message = `${timestamp}\n${method}\n${path}`;
+  const message = `${timestamp}.${method}.${path}`; // 점(.) 구분자
   return crypto
     .createHmac('sha256', secretKey)
     .update(message, 'utf8')
     .digest('base64');
 }
 
-// ─── API 요청 ────────────────────────────────────────────────
+// ─── API 요청 (fetch 사용 → 리다이렉트 자동 처리) ───────────────
 async function apiRequest(cid, lic, sec, method, pathWithQuery, payload) {
   const pathOnly  = pathWithQuery.split('?')[0];
   const timestamp = Date.now().toString();
@@ -253,15 +256,12 @@ module.exports = async function handler(req, res) {
     const groupIds = adgroups.map(g => g.nccAdgroupId || g.adGroupId || g.id).filter(Boolean);
 
     // 3. 통계 병렬 (현재+이전+최근8일)
-    // 최근 8일/21일은 선택 기간과 무관하게 항상 "실제 어제" 기준으로 고정
-    const todayUTC = new Date();
-    todayUTC.setUTCHours(0,0,0,0);
-    const yesterdayDate = new Date(todayUTC.getTime() - 86400000);
-    const rec8End   = fmtYMD(yesterdayDate);
-    const rec8S     = new Date(yesterdayDate.getTime() - 7*86400000); // 어제 포함 8일
+    const curEDate = parseYMD(endDate);
+    const rec8S    = new Date(curEDate - 7*86400000);
     const rec8Start = fmtYMD(rec8S);
 
-    const rec21S    = new Date(yesterdayDate.getTime() - 20*86400000); // 어제 포함 21일
+    
+    const rec21S     = new Date(curEDate - 20*86400000);
     const rec21Start = fmtYMD(rec21S);
 
     const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
@@ -271,8 +271,8 @@ module.exports = async function handler(req, res) {
         ? apiRequest(cid, lic, sec, 'GET', statsUrl(groupIds, startDate, endDate))
         : { data: [] },
       apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, prevStart, prevEnd)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, rec8End, 'DAY')),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, rec8End, 'DAY')),
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 'DAY')),
+      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, endDate, 'DAY')),
     ]);
 
     // 4. 일별 (period 필드 없으면 startDate로 집계)
