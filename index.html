@@ -67,6 +67,8 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-seri
 .adv-dd-name{font-size:13px;font-weight:700;}
 .adv-dd-cat{font-size:10px;color:var(--text3);}
 .adv-dd-empty{padding:20px 14px;color:var(--text3);font-size:12px;text-align:center;}
+.adv-dd-edit{font-size:11px;color:var(--text3);padding:3px 6px;border-radius:5px;transition:all .12s;flex-shrink:0;}
+.adv-dd-edit:hover{color:var(--text);background:var(--s3);}
 
 /* ══ TOPBAR (탭) ══ */
 /* ══ PERIOD BAR ══ */
@@ -318,67 +320,48 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g);color:#fff;padding:9px 20px;border-radius:50px;font-size:12px;font-weight:700;opacity:0;transition:all .3s;pointer-events:none;z-index:99999;white-space:nowrap;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
-/* ══ LOGIN SCREEN ══ */
-#screen-login{
-  position:fixed;inset:0;z-index:9999;
-  background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:20px;
-}
-.login-card{
-  background:var(--s1);border:1.5px solid var(--border);border-radius:20px;
-  padding:36px 32px;width:100%;max-width:360px;
-  box-shadow:0 20px 60px rgba(0,0,0,.4);
-}
-.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center;}
-.login-title{font-size:20px;font-weight:800;letter-spacing:-.04em;margin-bottom:4px;text-align:center;}
-.login-sub{font-size:12px;color:var(--text2);text-align:center;margin-bottom:24px;}
-.login-input-wrap{position:relative;margin-bottom:14px;}
-.login-input{
-  width:100%;padding:13px 16px;
-  background:var(--s2);border:1.5px solid var(--border);
-  border-radius:12px;color:var(--text);
-  font-size:15px;font-family:'Noto Sans KR',sans-serif;
-  outline:none;transition:border-color .15s,box-shadow .15s;
-  letter-spacing:.1em;
-}
-.login-input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(3,199,90,.1);}
-.login-input::placeholder{letter-spacing:0;color:var(--text3);}
-.login-btn{
-  width:100%;padding:13px;
-  background:var(--g);border:none;border-radius:12px;
-  color:#fff;font-size:14px;font-weight:800;font-family:'Noto Sans KR',sans-serif;
-  cursor:pointer;transition:opacity .15s;
-}
-.login-btn:hover{opacity:.88;}
-.login-btn:disabled{opacity:.5;cursor:not-allowed;}
-.login-error{
-  margin-top:12px;padding:10px 14px;
-  background:rgba(255,71,71,.1);border:1px solid rgba(255,71,71,.2);
-  border-radius:9px;font-size:12px;color:var(--r);text-align:center;
-  display:none;
-}
-.login-error.show{display:block;}
+
+/* ══ METRIC TOGGLE ══ */
+.metric-toggle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.metric-toggle-item{display:flex;align-items:center;gap:6px;padding:5px 8px;
+  background:var(--s2);border:1.5px solid var(--border);border-radius:8px;
+  cursor:pointer;transition:all .12s;user-select:none;}
+.metric-toggle-item:hover{border-color:var(--g);}
+.metric-toggle-item.on{background:rgba(3,199,90,.08);border-color:rgba(3,199,90,.3);}
+.metric-toggle-item input{display:none;}
+.metric-toggle-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);
+  flex-shrink:0;transition:all .12s;display:flex;align-items:center;justify-content:center;}
+.metric-toggle-item.on .metric-toggle-dot{background:var(--g);border-color:var(--g);}
+.metric-toggle-dot::after{content:'✓';font-size:8px;color:#fff;display:none;}
+.metric-toggle-item.on .metric-toggle-dot::after{display:block;}
+.metric-toggle-label{font-size:10px;font-weight:600;color:var(--text2);}
+.metric-toggle-item.on .metric-toggle-label{color:var(--g);}
+.metric-toggle-actions{display:flex;gap:5px;margin-bottom:6px;}
+.metric-toggle-all{font-size:10px;font-weight:700;color:var(--text3);background:none;border:none;
+  cursor:pointer;font-family:inherit;padding:2px 6px;border-radius:5px;transition:all .12s;}
+.metric-toggle-all:hover{color:var(--g);background:var(--g2);}
+
+/* ══ SHARE MODAL ══ */
+.share-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(5px);z-index:600;align-items:center;justify-content:center;padding:20px;}
+.share-modal-bg.show{display:flex;}
+.share-modal{background:var(--s2);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.share-modal-title{font-size:15px;font-weight:800;margin-bottom:4px;}
+.share-modal-sub{font-size:11px;color:var(--text2);margin-bottom:16px;}
+.share-adv-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:14px;}
+.share-adv-item{display:flex;align-items:center;gap:10px;background:var(--s3);border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;cursor:pointer;transition:all .12s;}
+.share-adv-item:hover{border-color:var(--text2);}
+.share-adv-item.selected{border-color:var(--g);background:rgba(3,199,90,.08);}
+.share-adv-item input{accent-color:var(--g);width:15px;height:15px;flex-shrink:0;cursor:pointer;}
+.share-adv-name{font-size:13px;font-weight:700;flex:1;}
+.share-adv-cat{font-size:10px;color:var(--text3);}
+.share-url-wrap{background:var(--s1);border:1.5px solid var(--border);border-radius:9px;padding:10px 12px;font-size:11px;color:var(--text2);word-break:break-all;font-family:'JetBrains Mono',monospace;max-height:80px;overflow-y:auto;margin-bottom:10px;line-height:1.5;}
+.share-btns{display:flex;gap:8px;justify-content:flex-end;}
+.share-btn-copy{background:var(--g);border:none;color:#fff;padding:9px 18px;border-radius:9px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;transition:opacity .15s;}
+.share-btn-copy:hover{opacity:.85;}
+.share-btn-cancel{background:none;border:1px solid var(--border);color:var(--text2);padding:9px 14px;border-radius:9px;font-size:12px;font-family:inherit;cursor:pointer;}
 </style>
 </head>
 <body data-theme="dark">
-
-<!-- ═══ LOGIN SCREEN ═══ -->
-<div id="screen-login">
-  <div class="login-card">
-    <div class="login-brand">
-      <div class="brand-icon">💬</div>
-      <div class="brand-name">카톡<span>보고</span></div>
-    </div>
-    <div class="login-title">내부 전용 시스템</div>
-    <div class="login-sub">접근하려면 비밀번호를 입력하세요</div>
-    <div class="login-input-wrap">
-      <input class="login-input" id="login-pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password">
-    </div>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">입장하기</button>
-    <div class="login-error" id="login-error">비밀번호가 틀렸습니다</div>
-  </div>
-</div>
 
 
 
@@ -402,6 +385,12 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
         <div class="adv-dd-panel" id="adv-dd-panel" style="display:none">
           <input class="adv-dd-search" id="adv-dd-search" placeholder="🔍 검색…" oninput="filterAdvDD(this.value)" autocomplete="off">
           <div class="adv-dd-list" id="adv-dd-list"></div>
+          <div style="padding:8px;border-top:1px solid var(--border2)">
+            <div style="display:flex;gap:5px;">
+              <button onclick="closeAdvDropdown();openAdvModal(null)" style="flex:1;background:var(--g2);border:1px dashed rgba(3,199,90,.3);color:var(--g);padding:7px;border-radius:8px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;">+ 추가</button>
+              <button onclick="closeAdvDropdown();openShareModal()" style="flex:1;background:var(--s3);border:1px solid var(--border);color:var(--text2);padding:7px;border-radius:8px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;" title="다른 기기로 공유">📤 공유</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -440,8 +429,18 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
           </div>
         </div>
 
-        <div class="kk-divider"></div>
 
+        <!-- 성과 항목 선택 -->
+        <div class="kk-field" id="metric-select-wrap">
+          <label class="kk-label"><span class="kk-label-icon">📊</span> 성과 항목 선택</label>
+          <div class="metric-toggle-actions">
+            <button class="metric-toggle-all" onclick="setAllMetrics(true)">전체 선택</button>
+            <button class="metric-toggle-all" onclick="setAllMetrics(false)">전체 해제</button>
+          </div>
+          <div class="metric-toggle-grid" id="metric-toggle-grid"></div>
+        </div>
+
+        <div class="kk-divider"></div>
         <!-- 전환 키워드 -->
         <div class="kk-field" id="kw-chips-wrap" style="display:none">
           <label class="kk-label"><span class="kk-label-icon">💰</span> 전환 키워드 <span>클릭하면 보고서에 포함</span></label>
@@ -484,6 +483,61 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
 
 </div><!-- /screen-report -->
 
+<!-- ═══ ADVERTISER MODAL ═══ -->
+<div class="modal-bg" id="modal-adv">
+  <div class="modal">
+    <div class="modal-title" id="modal-adv-title">광고주 추가</div>
+    <div class="modal-sub">네이버 광고 API 키를 입력하세요</div>
+    <div class="sec-note">🛡 API 키는 이 브라우저에만 저장됩니다. 다른 기기에서는 보이지 않습니다.</div>
+    <div style="margin-bottom:10px">
+      <div class="fg-label">이모지 선택</div>
+      <div class="emoji-row" id="emoji-row"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg">
+        <label class="fg-label">광고주명 *</label>
+        <input type="text" class="fg-input name-inp" id="inp-name" placeholder="예: 스타일마켓">
+      </div>
+      <div class="fg">
+        <label class="fg-label">업종/카테고리</label>
+        <input type="text" class="fg-input name-inp" id="inp-cat" placeholder="예: 패션/의류">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fg-label">Customer ID *</label>
+      <input type="text" class="fg-input" id="inp-cid" placeholder="네이버 광고 고객 ID">
+    </div>
+    <div class="fg">
+      <label class="fg-label">Access License *</label>
+      <input type="text" class="fg-input" id="inp-lic" placeholder="API 접근 라이선스 키">
+    </div>
+    <div class="fg">
+      <label class="fg-label">Secret Key *</label>
+      <input type="password" class="fg-input" id="inp-sec" placeholder="비밀키">
+      <div class="fg-hint">⚠ Secret Key는 저장 즉시 마스킹됩니다</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-del" id="btn-del-adv" onclick="deleteAdv()" style="display:none">삭제</button>
+      <button class="btn-cancel" onclick="closeAdvModal()">취소</button>
+      <button class="btn-save" onclick="saveAdv()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SHARE MODAL ═══ -->
+<div class="share-modal-bg" id="modal-share">
+  <div class="share-modal">
+    <div class="share-modal-title">📤 다른 기기로 공유</div>
+    <div class="share-modal-sub">공유할 광고주를 선택하면 링크가 생성됩니다. 링크를 카톡으로 본인에게 전송하세요.</div>
+    <div class="share-adv-list" id="share-adv-list"></div>
+    <div class="share-url-wrap" id="share-url-wrap" style="display:none"></div>
+    <div class="share-btns">
+      <button class="share-btn-cancel" onclick="closeShareModal()">닫기</button>
+      <button class="share-btn-copy" id="share-copy-btn" onclick="copyShareUrl()" style="display:none">🔗 링크 복사</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ CAMPAIGN MODAL ═══ -->
 <div class="modal-bg" id="modal-camp">
   <div class="modal" style="max-width:460px">
@@ -506,31 +560,20 @@ const _s=document.createElement('script');
 _s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
 document.head.appendChild(_s);
 
-// ══ ADVERTISERS (Vercel 환경변수에서 로드) ══
-let advertisers = [];
-async function loadAdvertisers() {
+// ══ ADVERTISERS (브라우저 localStorage에 저장) ══
+const STORE_KEY = 'adreport_adv_v2';
+function loadAdvFromStorage() {
   try {
-    const r = await fetch('/api/advertisers');
-    const text = await r.text();
-    if (r.ok) {
-      try {
-        advertisers = JSON.parse(text);
-      } catch(e) {
-        console.error('JSON 파싱 실패:', text);
-        advertisers = [];
-        const l=document.getElementById('adv-dd-list'); if(l) l.innerHTML='<div class="adv-dd-empty">❌ JSON 파싱 오류: '+text.slice(0,100)+'</div>';
-        return;
-      }
-    } else {
-      console.error('광고주 목록 로드 실패:', r.status, text);
-      const l2=document.getElementById('adv-dd-list'); if(l2) l2.innerHTML='<div class="adv-dd-empty">❌ API 오류 '+r.status+'</div>';
-      return;
-    }
-  } catch(e) {
-    console.error('광고주 목록 로드 오류:', e);
-    const l3=document.getElementById('adv-dd-list'); if(l3) l3.innerHTML='<div class="adv-dd-empty">❌ 네트워크 오류: '+e.message+'</div>';
-    return;
-  }
+    const r = localStorage.getItem(STORE_KEY);
+    return r ? JSON.parse(decodeURIComponent(escape(atob(r)))) : [];
+  } catch { return []; }
+}
+function saveAdvToStorage(list) {
+  localStorage.setItem(STORE_KEY, btoa(unescape(encodeURIComponent(JSON.stringify(list)))));
+}
+let advertisers = loadAdvFromStorage();
+async function loadAdvertisers() {
+  advertisers = loadAdvFromStorage();
 }
 
 // ══ STATE ══
@@ -775,7 +818,7 @@ function renderAdvDD(filter=''){
   const fl=filter.toLowerCase().trim();
   const list=document.getElementById('adv-dd-list');
   if(!advertisers.length){
-    list.innerHTML='<div class="adv-dd-empty">광고주가 없습니다.<br>ADVERTISER_KEYS_JSON 환경변수를 설정하세요.</div>';
+    list.innerHTML='<div class="adv-dd-empty">광고주가 없습니다.<br>아래 버튼으로 추가하세요.</div>';
     return;
   }
   const filtered=advertisers.filter(a=>
@@ -788,10 +831,11 @@ function renderAdvDD(filter=''){
   list.innerHTML=filtered.map(a=>`
     <div class="adv-dd-item ${currentAdv?.id===a.id?'active':''}" onclick="selectAdv('${a.id}')">
       <span class="adv-dd-em">${a.emoji}</span>
-      <div>
+      <div style="flex:1;min-width:0">
         <div class="adv-dd-name">${a.name}</div>
         ${a.cat?`<div class="adv-dd-cat">${a.cat}</div>`:''}
       </div>
+      <span class="adv-dd-edit" onclick="event.stopPropagation();closeAdvDropdown();openAdvModal('${a.id}')" title="수정">✏</span>
     </div>`).join('');
 }
 function filterAdvDD(v){renderAdvDD(v);}
@@ -850,7 +894,7 @@ const API_BASE=window.location.origin;
 async function fetchNaverData(adv,startDate,endDate){
   const resp=await fetch(API_BASE+'/api/naver',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({advId:adv.id,startDate,endDate}),
+    body:JSON.stringify({cid:adv.cid,lic:adv.lic,sec:adv.sec,startDate,endDate}),
   });
   if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'API 오류('+resp.status+')');}
   return resp.json();
@@ -1393,6 +1437,49 @@ function renderClickTop(list){
     }).join('');
 }
 
+
+// ══ METRIC TOGGLES ══
+const METRIC_DEFS = [
+  { key:'cost',    label:'광고비' },
+  { key:'imp',     label:'노출수' },
+  { key:'click',   label:'클릭수' },
+  { key:'conv',    label:'전환수' },
+  { key:'revenue', label:'매출액' },
+  { key:'cpc',     label:'CPC' },
+  { key:'ctr',     label:'CTR' },
+  { key:'cvr',     label:'CVR' },
+  { key:'roas',    label:'ROAS' },
+  { key:'cpa',     label:'CPA' },
+  { key:'aov',     label:'객단가' },
+  { key:'rpc',     label:'클릭당매출' },
+];
+let selectedMetrics = new Set(METRIC_DEFS.map(m=>m.key)); // 기본 전체 선택
+
+function renderMetricToggles(){
+  const grid = document.getElementById('metric-toggle-grid');
+  if(!grid) return;
+  grid.innerHTML = METRIC_DEFS.map(m => {
+    const on = selectedMetrics.has(m.key);
+    return `<label class="metric-toggle-item ${on?'on':''}" onclick="toggleMetric('${m.key}',this)">
+      <div class="metric-toggle-dot"></div>
+      <span class="metric-toggle-label">${m.label}</span>
+    </label>`;
+  }).join('');
+}
+
+function toggleMetric(key, el){
+  if(selectedMetrics.has(key)){ selectedMetrics.delete(key); el.classList.remove('on'); }
+  else { selectedMetrics.add(key); el.classList.add('on'); }
+  if(lastKakaoCur) updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{});
+}
+
+function setAllMetrics(val){
+  if(val) METRIC_DEFS.forEach(m=>selectedMetrics.add(m.key));
+  else selectedMetrics.clear();
+  renderMetricToggles();
+  if(lastKakaoCur) updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{});
+}
+
 // ══ 카카오 보고서 ══
 function toggleKwChip(el,name){
   if(selectedKws.has(name)){selectedKws.delete(name);el.classList.remove('selected');}
@@ -1434,18 +1521,20 @@ function updateKakaoPreview(cur,prev){
 `${advName} 네이버광고 성과 보고
 
 ■ 주요 성과 (${pm.prevLabel} → ${pm.curLabel})
-- 광고비: ${W(cur.cost)}원${pctChange(cur.cost,prev.cost)}
-- 노출수: ${W(cur.imp)}회${pctChange(cur.imp,prev.imp)}
-- 클릭수: ${W(cur.click)}회${pctChange(cur.click,prev.click)}
-- 전환수: ${W(cur.conv)}건${pctChange(cur.conv,prev.conv)}
-- 매출액: ${W(cur.revenue)}원${pctChange(cur.revenue,prev.revenue)}
-- CPC: ${W(cur.cpc)}원${pctChange(cur.cpc,prev.cpc)}
-- 클릭율(CTR): ${Number(cur.ctr||0).toFixed(2)}%${pointChange(cur.ctr,prev.ctr,2)}
-- 전환율(CVR): ${Number(cur.cvr||0).toFixed(2)}%${pointChange(cur.cvr,prev.cvr,2)}
-- ROAS: ${Math.round(Number(cur.roas||0))}%${pointChange(cur.roas,prev.roas,0)}
-- 전환당비용(CPA): ${W(cur.cpa)}원${pctChange(cur.cpa,prev.cpa)}
-- 객단가: ${W(cur.aov)}원${pctChange(cur.aov,prev.aov)}
-- 클릭당매출액: ${W(cur.rpc)}원${pctChange(cur.rpc,prev.rpc)}${kwLine}
+${[
+  selectedMetrics.has('cost')    ? '- 광고비: '+W(cur.cost)+'원'+pctChange(cur.cost,prev.cost) : null,
+  selectedMetrics.has('imp')     ? '- 노출수: '+W(cur.imp)+'회'+pctChange(cur.imp,prev.imp) : null,
+  selectedMetrics.has('click')   ? '- 클릭수: '+W(cur.click)+'회'+pctChange(cur.click,prev.click) : null,
+  selectedMetrics.has('conv')    ? '- 전환수: '+W(cur.conv)+'건'+pctChange(cur.conv,prev.conv) : null,
+  selectedMetrics.has('revenue') ? '- 매출액: '+W(cur.revenue)+'원'+pctChange(cur.revenue,prev.revenue) : null,
+  selectedMetrics.has('cpc')     ? '- CPC: '+W(cur.cpc)+'원'+pctChange(cur.cpc,prev.cpc) : null,
+  selectedMetrics.has('ctr')     ? '- 클릭율(CTR): '+Number(cur.ctr||0).toFixed(2)+'%'+pointChange(cur.ctr,prev.ctr,2) : null,
+  selectedMetrics.has('cvr')     ? '- 전환율(CVR): '+Number(cur.cvr||0).toFixed(2)+'%'+pointChange(cur.cvr,prev.cvr,2) : null,
+  selectedMetrics.has('roas')    ? '- ROAS: '+Math.round(Number(cur.roas||0))+'%'+pointChange(cur.roas,prev.roas,0) : null,
+  selectedMetrics.has('cpa')     ? '- 전환당비용(CPA): '+W(cur.cpa)+'원'+pctChange(cur.cpa,prev.cpa) : null,
+  selectedMetrics.has('aov')     ? '- 객단가: '+W(cur.aov)+'원'+pctChange(cur.aov,prev.aov) : null,
+  selectedMetrics.has('rpc')     ? '- 클릭당매출액: '+W(cur.rpc)+'원'+pctChange(cur.rpc,prev.rpc) : null,
+].filter(Boolean).join('\n')}${kwLine}
 
 ■ 마케터 코멘트
 ${comment}
@@ -1477,7 +1566,141 @@ function copyKakao(){
   });
 });
 
-// ══ ADVERTISER MODAL ══ (Vercel 환경변수로 관리)
+
+
+// ══ SHARE (광고주 공유) ══
+let shareSelected = new Set();
+
+function openShareModal(){
+  shareSelected = new Set();
+  document.getElementById('share-url-wrap').style.display = 'none';
+  document.getElementById('share-copy-btn').style.display = 'none';
+  renderShareList();
+  document.getElementById('modal-share').classList.add('show');
+}
+function closeShareModal(){
+  document.getElementById('modal-share').classList.remove('show');
+}
+function renderShareList(){
+  const list = document.getElementById('share-adv-list');
+  if(!advertisers.length){
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">추가된 광고주가 없습니다</div>';
+    return;
+  }
+  list.innerHTML = advertisers.map(a => {
+    const sel = shareSelected.has(a.id);
+    return `<div class="share-adv-item ${sel?'selected':''}" onclick="toggleShareAdv('${a.id}',this)">
+      <input type="checkbox" ${sel?'checked':''} onclick="event.stopPropagation();toggleShareAdv('${a.id}',this.closest('.share-adv-item'))">
+      <span style="font-size:18px">${a.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div class="share-adv-name">${a.name}</div>
+        ${a.cat?`<div class="share-adv-cat">${a.cat}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleShareAdv(id, el){
+  if(shareSelected.has(id)){ shareSelected.delete(id); el.classList.remove('selected'); el.querySelector('input').checked=false; }
+  else { shareSelected.add(id); el.classList.add('selected'); el.querySelector('input').checked=true; }
+  generateShareUrl();
+}
+function generateShareUrl(){
+  const urlWrap = document.getElementById('share-url-wrap');
+  const copyBtn = document.getElementById('share-copy-btn');
+  if(!shareSelected.size){
+    urlWrap.style.display='none'; copyBtn.style.display='none'; return;
+  }
+  const selected = advertisers.filter(a => shareSelected.has(a.id));
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(selected))));
+  const url = `${location.origin}${location.pathname}?import=${encoded}`;
+  urlWrap.textContent = url;
+  urlWrap.style.display = 'block';
+  copyBtn.style.display = 'block';
+}
+function copyShareUrl(){
+  const url = document.getElementById('share-url-wrap').textContent;
+  navigator.clipboard.writeText(url).then(()=>{
+    const btn = document.getElementById('share-copy-btn');
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(()=>{ btn.textContent='🔗 링크 복사'; }, 2000);
+    showToast('🔗 공유 링크가 복사되었습니다');
+  });
+}
+
+// ══ IMPORT (링크로 가져오기) ══
+function checkImportUrl(){
+  const params = new URLSearchParams(location.search);
+  const raw = params.get('import');
+  if(!raw) return;
+  try {
+    const incoming = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    if(!Array.isArray(incoming) || !incoming.length) return;
+    const names = incoming.map(a=>a.name).join(', ');
+    if(confirm(`📥 광고주 데이터를 가져올까요?\n\n${names}\n\n※ 이미 같은 ID가 있으면 덮어씁니다`)){
+      incoming.forEach(a => {
+        const idx = advertisers.findIndex(x=>x.id===a.id);
+        if(idx>=0) advertisers[idx] = a;
+        else advertisers.push(a);
+      });
+      saveAdvToStorage(advertisers);
+      renderAdvDD();
+      showToast(`✅ ${incoming.length}개 광고주가 추가되었습니다`);
+    }
+    // URL에서 import 파라미터 제거
+    history.replaceState(null,'',location.pathname);
+  } catch(e){ console.warn('import 파싱 실패:', e); }
+}
+
+// ══ ADVERTISER MODAL ══
+const EMOJIS=['👗','🍕','💄','🏠','📱','🐾','🍀','🎵','🏋','🛒','🚗','🌿','🎮','📚','✈','🏥'];
+let editingAdvId=null, selectedEmoji='👗';
+
+function openAdvModal(id){
+  editingAdvId=id; selectedEmoji=id?(advertisers.find(a=>a.id===id)?.emoji||'👗'):'👗';
+  document.getElementById('modal-adv-title').textContent=id?'광고주 수정':'광고주 추가';
+  document.getElementById('btn-del-adv').style.display=id?'block':'none';
+  renderEmojiRow();
+  if(id){
+    const a=advertisers.find(a=>a.id===id);
+    if(a){document.getElementById('inp-name').value=a.name;document.getElementById('inp-cat').value=a.cat||'';document.getElementById('inp-cid').value=a.cid;document.getElementById('inp-lic').value=a.lic;document.getElementById('inp-sec').value='';}
+  } else {
+    ['inp-name','inp-cat','inp-cid','inp-lic','inp-sec'].forEach(i=>document.getElementById(i).value='');
+  }
+  document.getElementById('modal-adv').classList.add('show');
+}
+function selectEmoji(e){selectedEmoji=e;renderEmojiRow();}
+function renderEmojiRow(){document.getElementById('emoji-row').innerHTML=EMOJIS.map(e=>`<span class="emoji-opt ${e===selectedEmoji?'sel':''}" onclick="selectEmoji('${e}')">${e}</span>`).join('');}
+function closeAdvModal(){document.getElementById('modal-adv').classList.remove('show');}
+
+function saveAdv(){
+  const name=document.getElementById('inp-name').value.trim();
+  if(!name){showToast('⚠ 광고주명을 입력해주세요');return;}
+  const cat=document.getElementById('inp-cat').value.trim();
+  const cid=document.getElementById('inp-cid').value.trim();
+  const lic=document.getElementById('inp-lic').value.trim();
+  const sec=document.getElementById('inp-sec').value.trim();
+  if(!cid||!lic){showToast('⚠ Customer ID와 License Key는 필수입니다');return;}
+  if(editingAdvId){
+    const idx=advertisers.findIndex(a=>a.id===editingAdvId);
+    if(idx>=0) advertisers[idx]={...advertisers[idx],emoji:selectedEmoji,name,cat,cid,lic,sec:sec||advertisers[idx].sec};
+  } else {
+    if(!sec){showToast('⚠ Secret Key를 입력해주세요');return;}
+    advertisers.push({id:'adv_'+Date.now(),emoji:selectedEmoji,name,cat,cid,lic,sec});
+  }
+  saveAdvToStorage(advertisers);
+  closeAdvModal();
+  renderAdvDD();
+  showToast('✅ 저장되었습니다');
+}
+function deleteAdv(){
+  if(!editingAdvId||!confirm('정말 삭제하시겠습니까?'))return;
+  advertisers=advertisers.filter(a=>a.id!==editingAdvId);
+  saveAdvToStorage(advertisers);
+  closeAdvModal();
+  renderAdvDD();
+  showToast('🗑 삭제되었습니다');
+}
+
 
 // ══ CAPTURE ══
 async function captureReport(){
@@ -1500,62 +1723,11 @@ async function captureReport(){
 
 // ══ INIT ══
 
-// ══ AUTH ══
-const SESSION_KEY = 'kkreport_auth_v1';
-
-function isAuthed() {
-  return sessionStorage.getItem(SESSION_KEY) === 'ok';
-}
-
-function showApp() {
-  document.getElementById('screen-login').style.display = 'none';
-  document.getElementById('screen-report').style.display = 'block';
-}
-
-async function doLogin() {
-  const pw = document.getElementById('login-pw').value;
-  const btn = document.getElementById('login-btn');
-  const err = document.getElementById('login-error');
-  btn.disabled = true; btn.textContent = '확인 중…';
-  err.classList.remove('show');
-  try {
-    const r = await fetch('/api/auth', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ password: pw })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      sessionStorage.setItem(SESSION_KEY, 'ok');
-      showApp();
-      await loadAdvertisers();
-      renderAdvDD();
-    } else {
-      err.textContent = d.error || '비밀번호가 틀렸습니다';
-      err.classList.add('show');
-      document.getElementById('login-pw').select();
-    }
-  } catch(e) {
-    err.textContent = '오류가 발생했습니다: ' + e.message;
-    err.classList.add('show');
-  }
-  btn.disabled = false; btn.textContent = '입장하기';
-}
-
-// Enter 키 지원
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('login-pw')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-  });
-});
-
 window.onload = async () => {
-  if (isAuthed()) {
-    showApp();
-    await loadAdvertisers();
-    renderAdvDD();
-  }
-  // 비인증 상태면 로그인 화면 유지
+  await loadAdvertisers();
+  renderAdvDD();
+  renderMetricToggles();
+  checkImportUrl();
 };
 
 // ══ WEEKDAY COMPARE (금주 vs 지난주) ══
