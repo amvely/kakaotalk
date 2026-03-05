@@ -444,22 +444,27 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
         <!-- 마케터 코멘트 -->
         <div class="kk-field">
           <label class="kk-label" style="justify-content:space-between">
-            <span style="display:flex;align-items:center;gap:6px"><span class="kk-label-icon">✏️</span> 마케터 코멘트 <span>성과 분석 인사이트</span></span>
-            <button id="btn-ai-analyze" onclick="runAiAnalysis()" style="display:flex;align-items:center;gap:4px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;color:#fff;padding:4px 10px;border-radius:7px;font-size:10px;font-weight:800;font-family:inherit;cursor:pointer;transition:opacity .15s;flex-shrink:0;white-space:nowrap" onmouseover="this.style.opacity='.82'" onmouseout="this.style.opacity='1'">
-              <span id="ai-btn-icon">✨</span><span id="ai-btn-text"> AI 분석</span>
-            </button>
+            <span style="display:flex;align-items:center;gap:6px">
+              <span class="kk-label-icon">✏️</span> 마케터 코멘트 <span>성과 분석 인사이트</span>
+            </span>
+            <span style="display:flex;align-items:center;gap:5px">
+              <button id="btn-ai-analyze" onclick="runAiAnalysis()" style="display:flex;align-items:center;gap:4px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;color:#fff;padding:4px 9px;border-radius:7px;font-size:10px;font-weight:800;font-family:inherit;cursor:pointer;transition:opacity .15s;flex-shrink:0;white-space:nowrap" onmouseover="this.style.opacity='.82'" onmouseout="this.style.opacity='1'"><span id="ai-btn-icon">✨</span><span id="ai-btn-text"> AI 분석</span></button>
+              <button onclick="openGeminiSettingsModal()" title="AI 설정" style="display:flex;align-items:center;justify-content:center;background:var(--s3);border:1.5px solid var(--border);color:var(--text3);width:26px;height:26px;border-radius:7px;font-size:13px;cursor:pointer;transition:all .13s;flex-shrink:0;padding:0" onmouseover="this.style.borderColor='var(--g)';this.style.color='var(--g)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">⚙️</button>
+              <button id="btn-hide-comment" onclick="toggleSectionHide('comment')" title="숨기기" style="display:flex;align-items:center;justify-content:center;background:var(--s3);border:1.5px solid var(--border);color:var(--text3);width:26px;height:26px;border-radius:7px;font-size:11px;cursor:pointer;transition:all .13s;flex-shrink:0;padding:0;font-weight:800;font-family:inherit" onmouseover="this.style.borderColor='var(--text2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">👁</button>
+            </span>
           </label>
           <textarea class="kk-inp" id="comment" rows="4" placeholder="이번 기간 주요 성과와 인사이트를 입력하세요." style="min-height:80px"></textarea>
-          <div style="font-size:9.5px;color:var(--text3);margin-top:4px;display:flex;align-items:center;gap:4px"><span>💡</span> 클릭해서 편집 중엔 카톡 미리보기에서 잠시 숨겨집니다</div>
         </div>
 
         <!-- 운영 계획 -->
         <div class="kk-field">
-          <label class="kk-label">
-            <span class="kk-label-icon">🎯</span> 금일 운영 계획
+          <label class="kk-label" style="justify-content:space-between">
+            <span style="display:flex;align-items:center;gap:6px">
+              <span class="kk-label-icon">🎯</span> 금일 운영 계획
+            </span>
+            <button id="btn-hide-plan" onclick="toggleSectionHide('plan')" title="숨기기" style="display:flex;align-items:center;justify-content:center;background:var(--s3);border:1.5px solid var(--border);color:var(--text3);width:26px;height:26px;border-radius:7px;font-size:11px;cursor:pointer;transition:all .13s;flex-shrink:0;padding:0;font-weight:800;font-family:inherit" onmouseover="this.style.borderColor='var(--text2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">👁</button>
           </label>
           <textarea class="kk-inp" id="plan" rows="4" placeholder="오늘 진행할 최적화 작업을 입력하세요." style="min-height:80px"></textarea>
-          <div style="font-size:9.5px;color:var(--text3);margin-top:4px;display:flex;align-items:center;gap:4px"><span>💡</span> 클릭해서 편집 중엔 카톡 미리보기에서 잠시 숨겨집니다</div>
         </div>
 
 
@@ -486,23 +491,35 @@ textarea.kk-inp::placeholder,input.kk-inp::placeholder{color:var(--text3);}
 
 </div><!-- /screen-report -->
 
-<!-- ═══ GEMINI API KEY MODAL ═══ -->
+<!-- ═══ GEMINI SETTINGS MODAL ═══ -->
 <div class="modal-bg" id="modal-gemini">
-  <div class="modal" style="max-width:420px">
+  <div class="modal" style="max-width:480px">
     <div class="modal-title" style="display:flex;align-items:center;gap:8px">
-      <span style="background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✨ Gemini AI 설정</span>
+      <span>⚙️ AI 설정</span>
     </div>
-    <div class="modal-sub">Google AI Studio에서 발급받은 API 키를 입력하세요</div>
-    <div class="sec-note" style="background:rgba(79,70,229,.08);border-color:rgba(79,70,229,.2);color:var(--text2)">
-      🔑 <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#7c3aed;text-decoration:none;font-weight:700">aistudio.google.com</a> 에서 무료로 발급받을 수 있습니다. 키는 이 브라우저에만 저장됩니다.
-    </div>
+    <div class="modal-sub">Gemini API 키와 분석 프롬프트를 설정하세요</div>
+
     <div class="fg">
-      <label class="fg-label">Gemini API Key</label>
+      <label class="fg-label" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Gemini API Key</span>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#7c3aed;text-decoration:none;font-size:9.5px;font-weight:700">🔑 무료 발급받기 →</a>
+      </label>
       <input type="password" class="fg-input" id="inp-gemini-key" placeholder="AIza...">
+      <div class="fg-hint">키는 이 브라우저에만 저장됩니다. 본인 API 키를 사용하세요.</div>
     </div>
+
+    <div class="fg" style="margin-top:4px">
+      <label class="fg-label" style="display:flex;align-items:center;justify-content:space-between">
+        <span>AI 프롬프트</span>
+        <button onclick="resetGeminiPrompt()" style="background:none;border:none;color:var(--text3);font-size:9.5px;cursor:pointer;font-family:inherit;padding:0" onmouseover="this.style.color='var(--g)'" onmouseout="this.style.color='var(--text3)'">↺ 기본값으로</button>
+      </label>
+      <textarea id="inp-gemini-prompt" class="fg-input name-inp" rows="7" style="font-family:'Noto Sans KR',sans-serif;font-size:11px;line-height:1.6;resize:vertical;min-height:140px"></textarea>
+      <div class="fg-hint">⚡ {data} 위치에 성과 데이터가 자동으로 삽입됩니다</div>
+    </div>
+
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeGeminiModal()">취소</button>
-      <button class="btn-save" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)" onclick="saveGeminiKey()">저장 후 분석</button>
+      <button class="btn-save" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)" onclick="saveGeminiSettings()">저장</button>
     </div>
   </div>
 </div>
@@ -1542,7 +1559,7 @@ function updateKakaoPreview(cur,prev){
     c=Number(c||0); p=Number(p||0);
     if(p===0) return '';
     const d=c-p;
-    return ` (${d>=0?'+':'-'}${Math.abs(d).toFixed(dec)}%p)`;
+    return ` (${d>=0?'+':'-'}${Math.abs(d).toFixed(dec)}%)`;
   };
 
   let kwLine='';
@@ -1553,17 +1570,12 @@ function updateKakaoPreview(cur,prev){
 ` + [...selectedKws].map((k,i)=>`${i+1}. ${k}`).join('\n');
   }
 
-  // 포커스 중이면 해당 섹션 숨김
-  const commentEl = document.getElementById('comment');
-  const planEl    = document.getElementById('plan');
-  const commentFocused = document.activeElement === commentEl;
-  const planFocused    = document.activeElement === planEl;
+  // 숨기기 토글에 따라 섹션 표시 여부 결정
+  const commentVal = document.getElementById('comment').value.trim() || '성과 분석 내용이 없습니다.';
+  const planVal    = document.getElementById('plan').value.trim()    || '상시 모니터링 및 입찰가 최적화 진행 예정입니다.';
 
-  const commentVal = commentEl.value.trim() || '성과 분석 내용이 없습니다.';
-  const planVal    = planEl.value.trim()    || '상시 모니터링 및 입찰가 최적화 진행 예정입니다.';
-
-  const commentSection = commentFocused ? '' : `\n\n■ 마케터 코멘트\n${commentVal}`;
-  const planSection    = planFocused    ? '' : `\n\n■ 금일 운영 계획\n${planVal}`;
+  const commentSection = sectionHidden.comment ? '' : `\n\n■ 마케터 코멘트\n${commentVal}`;
+  const planSection    = sectionHidden.plan    ? '' : `\n\n■ 금일 운영 계획\n${planVal}`;
 
   const msg=
 `${advName} 네이버광고 성과 보고
@@ -1601,49 +1613,83 @@ function copyKakao(){
   });
 }
 
-// 실시간 미리보기 갱신 + 포커스/블러 이벤트
+// 실시간 미리보기 갱신
 ['comment','plan'].forEach(id=>{
   const el=document.getElementById(id);
   el.addEventListener('input',()=>{
     if(lastKakaoCur) updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0});
   });
-  el.addEventListener('focus',()=>{
-    if(lastKakaoCur) updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0});
-  });
-  el.addEventListener('blur',()=>{
-    if(lastKakaoCur) updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0});
-  });
 });
 
+// ══ 섹션 숨기기 토글 ══
+const sectionHidden={comment:false, plan:false};
+
+function toggleSectionHide(id){
+  sectionHidden[id]=!sectionHidden[id];
+  const btn=document.getElementById('btn-hide-'+id);
+  if(btn){
+    btn.textContent = sectionHidden[id] ? '🚫' : '👁';
+    btn.title       = sectionHidden[id] ? '표시하기' : '숨기기';
+    btn.style.borderColor = sectionHidden[id] ? 'var(--r)' : 'var(--border)';
+    btn.style.color       = sectionHidden[id] ? 'var(--r)' : 'var(--text3)';
+    btn.onmouseover = sectionHidden[id]
+      ? ()=>{btn.style.borderColor='var(--r)';btn.style.color='var(--r)';}
+      : ()=>{btn.style.borderColor='var(--text2)';btn.style.color='var(--text)';};
+    btn.onmouseout = ()=>{
+      btn.style.borderColor = sectionHidden[id]?'var(--r)':'var(--border)';
+      btn.style.color       = sectionHidden[id]?'var(--r)':'var(--text3)';
+    };
+  }
+  if(lastKakaoCur) updateKakaoPreview(lastKakaoCur, lastKakaoPrev||{cost:0,imp:0,click:0,conv:0,revenue:0,ctr:0,cvr:0,roas:0,cpc:0,cpa:0,aov:0,rpc:0});
+}
 
 // ══ GEMINI AI ══
-const GEMINI_KEY_STORE='adreport_gemini_key';
-let pendingAiTarget=null; // 'comment'
+const GEMINI_KEY_STORE    = 'adreport_gemini_key';
+const GEMINI_PROMPT_STORE = 'adreport_gemini_prompt';
+
+const DEFAULT_PROMPT =
+`당신은 네이버 검색광고 전문 마케터입니다.
+아래 광고 성과 데이터를 분석해서 카카오톡 보고 문자에 들어갈 마케터 코멘트를 작성해주세요.
+
+조건:
+- 3~5문장 이내로 간결하게
+- 긍정적 성과와 개선 필요 사항을 균형있게
+- 수치를 직접 언급하지 말고 흐름(증가/감소/유지)으로 표현
+- 전문적이고 자연스러운 한국어
+- 불필요한 인사말, 서론 없이 바로 분석 내용만
+
+{data}`;
 
 function getGeminiKey(){ try{ return localStorage.getItem(GEMINI_KEY_STORE)||''; }catch{return '';} }
+function getGeminiPrompt(){ try{ return localStorage.getItem(GEMINI_PROMPT_STORE)||DEFAULT_PROMPT; }catch{return DEFAULT_PROMPT;} }
 function saveGeminiKeyToStorage(k){ try{ localStorage.setItem(GEMINI_KEY_STORE,k); }catch{} }
+function saveGeminiPromptToStorage(p){ try{ localStorage.setItem(GEMINI_PROMPT_STORE,p); }catch{} }
 
-function openGeminiModal(target){
-  pendingAiTarget=target;
-  const k=getGeminiKey();
-  document.getElementById('inp-gemini-key').value=k||'';
+function openGeminiSettingsModal(){
+  document.getElementById('inp-gemini-key').value    = getGeminiKey();
+  document.getElementById('inp-gemini-prompt').value = getGeminiPrompt();
   document.getElementById('modal-gemini').classList.add('show');
 }
 function closeGeminiModal(){
   document.getElementById('modal-gemini').classList.remove('show');
 }
-function saveGeminiKey(){
+function resetGeminiPrompt(){
+  document.getElementById('inp-gemini-prompt').value = DEFAULT_PROMPT;
+}
+function saveGeminiSettings(){
   const k=document.getElementById('inp-gemini-key').value.trim();
+  const p=document.getElementById('inp-gemini-prompt').value.trim();
   if(!k){ showToast('⚠ API 키를 입력해주세요'); return; }
   saveGeminiKeyToStorage(k);
+  if(p) saveGeminiPromptToStorage(p);
   closeGeminiModal();
-  if(pendingAiTarget==='comment') doGeminiAnalysis(k);
+  showToast('✅ AI 설정이 저장되었습니다');
 }
 
 async function runAiAnalysis(){
   if(!lastKakaoCur){ showToast('⚠ 먼저 데이터를 불러와주세요'); return; }
   const key=getGeminiKey();
-  if(!key){ openGeminiModal('comment'); return; }
+  if(!key){ openGeminiSettingsModal(); showToast('💡 API 키를 먼저 입력해주세요'); return; }
   await doGeminiAnalysis(key);
 }
 
@@ -1658,9 +1704,10 @@ async function doGeminiAnalysis(apiKey){
     const cur=lastKakaoCur, prev=lastKakaoPrev||{};
     const pm=kakaoPeriodMeta||getPeriodDates(kakaoPeriod, kakaoCustomRange);
     const W=n=>Math.round(Number(n||0)).toLocaleString('ko-KR');
-    const pct=(c,p)=>p?((c-p)/p*100).toFixed(1)+'%':'데이터없음';
+    const pct=(c,p)=>p?((c-p)/p*100).toFixed(1)+'%':'이전 데이터 없음';
 
-    const dataStr=`네이버 검색광고 성과 데이터 (비교 기간: ${pm.prevLabel} → ${pm.curLabel})
+    const dataStr=
+`네이버 검색광고 성과 (${pm.prevLabel} → ${pm.curLabel})
 - 광고비: ${W(cur.cost)}원 (전기간 ${W(prev.cost)}원, ${pct(cur.cost,prev.cost)})
 - 노출수: ${W(cur.imp)}회 (${pct(cur.imp,prev.imp)})
 - 클릭수: ${W(cur.click)}회 (${pct(cur.click,prev.click)})
@@ -1668,24 +1715,17 @@ async function doGeminiAnalysis(apiKey){
 - 전환수: ${W(cur.conv)}건 (${pct(cur.conv,prev.conv)})
 - 전환율(CVR): ${Number(cur.cvr||0).toFixed(2)}% (전기간 ${Number(prev.cvr||0).toFixed(2)}%)
 - 매출액: ${W(cur.revenue)}원 (${pct(cur.revenue,prev.revenue)})
-- 광고수익률(ROAS): ${Math.round(cur.roas||0)}% (전기간 ${Math.round(prev.roas||0)}%)
-- 평균클릭비용(CPC): ${W(cur.cpc)}원 (${pct(cur.cpc,prev.cpc)})
-- 전환당비용(CPA): ${W(cur.cpa)}원 (${pct(cur.cpa,prev.cpa)})
+- ROAS: ${Math.round(cur.roas||0)}% (전기간 ${Math.round(prev.roas||0)}%)
+- CPC: ${W(cur.cpc)}원 (${pct(cur.cpc,prev.cpc)})
+- CPA: ${W(cur.cpa)}원 (${pct(cur.cpa,prev.cpa)})
 - 객단가: ${W(cur.aov)}원 (${pct(cur.aov,prev.aov)})`;
 
-    const prompt=`당신은 네이버 검색광고 전문 마케터입니다.
-아래 광고 성과 데이터를 분석해서 카카오톡 보고 문자에 들어갈 마케터 코멘트를 작성해주세요.
+    const promptTemplate = getGeminiPrompt();
+    const prompt = promptTemplate.includes('{data}')
+      ? promptTemplate.replace('{data}', dataStr)
+      : promptTemplate + '\n\n' + dataStr;
 
-조건:
-- 3~5문장 이내로 간결하게
-- 긍정적 성과와 개선 필요 사항을 균형있게
-- 수치를 직접 언급하지 말고 흐름(증가/감소/유지)으로 표현
-- 전문적이고 자연스러운 한국어
-- 불필요한 인사말, 서론 없이 바로 분석 내용만
-
-${dataStr}`;
-
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`,{
+    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',{
       method:'POST',
       headers:{'Content-Type':'application/json','X-goog-api-key':apiKey},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
@@ -1693,7 +1733,12 @@ ${dataStr}`;
 
     if(!resp.ok){
       const err=await resp.json().catch(()=>({}));
-      if(resp.status===400||resp.status===403){ saveGeminiKeyToStorage(''); openGeminiModal('comment'); showToast('⚠ API 키가 올바르지 않습니다'); return; }
+      if(resp.status===400||resp.status===403){
+        saveGeminiKeyToStorage('');
+        openGeminiSettingsModal();
+        showToast('⚠ API 키가 올바르지 않습니다');
+        return;
+      }
       throw new Error(err?.error?.message||'API 오류 '+resp.status);
     }
 
