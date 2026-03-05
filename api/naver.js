@@ -1,11 +1,11 @@
 // api/naver.js
-// advId로 ADVERTISER_KEYS_JSON에서 키를 조회하여 네이버 광고 API 호출
 
 const crypto = require('crypto');
 const API_BASE = 'https://api.searchad.naver.com';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ✅ 서명: 네이버 검색광고 API 공식 포맷 = {timestamp}.{METHOD}.{path}
 function makeSignature(secretKey, timestamp, method, path) {
   const m = String(method).toUpperCase();
   const message = `${timestamp}.${m}.${path}`;
@@ -181,7 +181,7 @@ async function getExpKeywordTerms(cid, lic, sec, startDate, endDate) {
     for (const r of rows) {
       const term = (iTerm>=0 ? r[iTerm] : '') || '';
       if (!term) continue;
-      if (!agg[term]) agg[term]={name:term,cost:0,imp:0,click:0,conv:0,revenue:0};
+      if (!agg[term]) agg[term] = { name:term, cost:0, imp:0, click:0, conv:0, revenue:0 };
       agg[term].imp     += Number(iImp>=0  ? r[iImp]  : 0) || 0;
       agg[term].click   += Number(iClk>=0  ? r[iClk]  : 0) || 0;
       agg[term].cost    += Number(iCost>=0 ? r[iCost] : 0) || 0;
@@ -189,7 +189,7 @@ async function getExpKeywordTerms(cid, lic, sec, startDate, endDate) {
       agg[term].revenue += Number(iRev>=0  ? r[iRev]  : 0) || 0;
     }
   }
-  return Object.values(agg).map(v => ({ ...v, roas: v.cost?Math.round(v.revenue/v.cost*100):0 }));
+  return Object.values(agg).map(v => ({ ...v, roas: v.cost ? Math.round(v.revenue/v.cost*100) : 0 }));
 }
 
 // ─── 메인 핸들러 ─────────────────────────────────────────────
@@ -210,33 +210,17 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const advId     = String(body?.advId     || '').trim();
+  // ✅ cid/lic/sec 직접 수신 (환경변수 미사용)
+  const cid       = String(body?.cid       || '').trim();
+  const lic       = String(body?.lic       || '').trim();
+  const sec       = String(body?.sec       || '').trim();
   const startDate = String(body?.startDate || '').trim();
   const endDate   = String(body?.endDate   || '').trim();
 
-  if (!advId || !startDate || !endDate)
-    return res.status(400).json({ error: '필수값 누락 (advId, startDate, endDate)' });
+  if (!cid || !lic || !sec || !startDate || !endDate)
+    return res.status(400).json({ error: '필수값 누락 (cid, lic, sec, startDate, endDate)' });
 
-  // ADVERTISER_KEYS_JSON에서 해당 광고주 키 조회
-  const raw = process.env.ADVERTISER_KEYS_JSON;
-  if (!raw) return res.status(500).json({ error: 'ADVERTISER_KEYS_JSON 환경변수가 설정되지 않았습니다' });
-
-  let allAdv;
-  try { allAdv = JSON.parse(raw); } catch (e) {
-    return res.status(500).json({ error: 'ADVERTISER_KEYS_JSON 파싱 실패' });
-  }
-
-  const adv = allAdv.find(a => a.id === advId);
-  if (!adv) return res.status(404).json({ error: `광고주를 찾을 수 없습니다: ${advId}` });
-
-  const cid = String(adv.cid || '').trim();
-  const lic = String(adv.lic || '').trim();
-  const sec = String(adv.sec || '').trim();
-
-  if (!cid || !lic || !sec)
-    return res.status(500).json({ error: `광고주 ${adv.name}의 API 키가 불완전합니다 (cid/lic/sec 확인)` });
-
-  console.log(`[req] advId=${advId} name=${adv.name} start=${startDate} end=${endDate}`);
+  console.log(`[req] cid=${cid} lic=${lic.slice(0,8)}... start=${startDate} end=${endDate}`);
 
   // 이전 기간 계산
   const curS  = parseYMD(startDate), curE = parseYMD(endDate);
@@ -266,10 +250,10 @@ module.exports = async function handler(req, res) {
     const groupIds = adgroups.map(g => g.nccAdgroupId || g.adGroupId || g.id).filter(Boolean);
 
     // 3. 통계 병렬 (현재+이전+최근8일+최근21일)
-    const curEDate  = parseYMD(endDate);
-    const rec8S     = new Date(curEDate - 7*86400000);
-    const rec8Start = fmtYMD(rec8S);
-    const rec21S    = new Date(curEDate - 20*86400000);
+    const curEDate   = parseYMD(endDate);
+    const rec8S      = new Date(curEDate - 7*86400000);
+    const rec8Start  = fmtYMD(rec8S);
+    const rec21S     = new Date(curEDate - 20*86400000);
     const rec21Start = fmtYMD(rec21S);
 
     const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
