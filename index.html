@@ -1082,6 +1082,7 @@ function launchAndInternalTab(appId, tabId, btnEl) {
   </div>
 
   <div id="ai-quick-btns">
+    <button class="ai-quick-btn" onclick="checkAiDataStatus()" style="border-color:rgba(54,214,142,0.4);background:rgba(54,214,142,0.08);color:#36d68e;">🔌 데이터 연결 확인</button>
     <button class="ai-quick-btn" onclick="askQuick('📊 지난주 성과 요약해줘')">📊 지난주 성과 요약</button>
     <button class="ai-quick-btn" onclick="askQuick('🔧 다음주 어떤 방향으로 보완하면 좋을까?')">🔧 다음주 보완 방향</button>
     <button class="ai-quick-btn" onclick="askQuick('📈 4주 동안 가장 개선된 지표는?')">📈 4주 트렌드</button>
@@ -1306,10 +1307,22 @@ function launchAndInternalTab(appId, tabId, btnEl) {
   // ── 데이터 추출 (4주 전체 + 탭별)
   function extractData() {
     try {
-      const win = document.getElementById('frame-1').contentWindow;
-      const rawRows  = win.rawRows  || [];
-      const raw2Rows = win.raw2Rows || [];
-      if (!rawRows.length) return null;
+      const frame = document.getElementById('frame-1');
+      if (!frame) { console.warn('[AI] frame-1 not found'); return null; }
+      const win = frame.contentWindow;
+      if (!win) { console.warn('[AI] contentWindow null'); return null; }
+
+      // rawRows는 iframe 전역변수 - 직접 접근
+      let rawRows  = [];
+      let raw2Rows = [];
+      try { rawRows  = win.rawRows  || []; } catch(e) { console.warn('[AI] rawRows access error', e); }
+      try { raw2Rows = win.raw2Rows || []; } catch(e) { console.warn('[AI] raw2Rows access error', e); }
+
+      console.log('[AI] rawRows length:', rawRows.length, '| raw2Rows:', raw2Rows.length);
+      if (!rawRows.length) {
+        console.warn('[AI] rawRows empty - data not loaded yet?');
+        return null;
+      }
 
       const weeks = win.weeks || [];
       const weekLabels = ['이번주(최신)','지난주','2주전','3주전'];
@@ -1430,6 +1443,33 @@ function launchAndInternalTab(appId, tabId, btnEl) {
     return html;
   }
 
+  // ── 데이터 연결 상태 확인
+  window.checkAiDataStatus = function() {
+    const frame = document.getElementById('frame-1');
+    const win = frame ? frame.contentWindow : null;
+    let lines = [];
+    try {
+      const isVisible = frame ? frame.classList.contains('visible') : false;
+      const rawRows   = win ? (win.rawRows  || []) : [];
+      const raw2Rows  = win ? (win.raw2Rows || []) : [];
+      const weeks     = win ? (win.weeks    || []) : [];
+      lines.push(`📁 데이터분석 솔루션 활성화: ${isVisible ? '✅' : '❌ (앱1을 먼저 열어주세요)'}`);
+      lines.push(`📊 rawRows: <strong>${rawRows.length.toLocaleString()}행</strong>${rawRows.length ? ' ✅' : ' ❌ (CSV 업로드 필요)'}`);
+      lines.push(`📋 raw2Rows: <strong>${raw2Rows.length.toLocaleString()}행</strong>${raw2Rows.length ? ' ✅' : ' (선택사항)'}`);
+      lines.push(`📅 주차 정보: <strong>${weeks.length}주</strong>${weeks.length ? ' (' + weeks.join(', ') + ')' : ' ❌'}`);
+      if (rawRows.length > 0 && weeks.length > 0) {
+        lines.push('');
+        lines.push('✅ <strong>AI 분석 준비 완료!</strong> 질문해 보세요.');
+      } else if (rawRows.length > 0 && weeks.length === 0) {
+        lines.push('');
+        lines.push('⚠️ 데이터는 있지만 <strong>week 컬럼</strong>을 인식 못했어요. CSV 형식을 확인해 주세요.');
+      }
+    } catch(e) {
+      lines.push('❌ 오류: ' + e.message);
+    }
+    addMsg('bot', lines.map(l => l ? `<p>${l}</p>` : '<br>').join(''));
+  };
+
   // ── 메시지 전송 (Gemini API)
   window.sendAiMessage = async function() {
     const input = document.getElementById('ai-input');
@@ -1454,7 +1494,28 @@ function launchAndInternalTab(appId, tabId, btnEl) {
 
     let prompt;
     if (!data) {
-      prompt = `사용자 질문: ${question}\n\n아직 CSV 데이터가 업로드되지 않았습니다. 데이터분석 솔루션에 CSV를 먼저 업로드해야 분석이 가능하다고 친근하게 안내해 주세요. 한국어로 답변하세요.`;
+      // 데이터 접근 디버그 정보 수집
+      let debugInfo = '';
+      try {
+        const frame = document.getElementById('frame-1');
+        const win = frame ? frame.contentWindow : null;
+        const rows = win ? (win.rawRows || []) : [];
+        const isVisible = frame ? frame.classList.contains('visible') : false;
+        debugInfo = `[디버그] frame존재:${!!frame} | visible:${isVisible} | rawRows:${rows.length}개 | currentApp:${window.currentApp}`;
+        console.log('[AI Debug]', debugInfo);
+      } catch(e) { debugInfo = '접근오류: ' + e.message; }
+
+      // 데이터는 있는데 null 반환된 경우
+      const frame2 = document.getElementById('frame-1');
+      const win2 = frame2 ? frame2.contentWindow : null;
+      const rowCount = win2 ? (win2.rawRows||[]).length : 0;
+
+      if (rowCount > 0) {
+        // 데이터는 있는데 extractData가 null 반환 → 주차 데이터 없는 경우
+        prompt = `사용자 질문: ${question}\n\n데이터(${rowCount}행)는 로드되어 있으나 주차(week) 정보 파싱에 문제가 있을 수 있습니다. 사용자에게 상황을 설명하고 CSV 파일의 week 컬럼 형식을 확인해달라고 안내해주세요. 한국어로 답변하세요.`;
+      } else {
+        prompt = `사용자 질문: ${question}\n\n아직 CSV 데이터가 업로드되지 않았습니다. 데이터분석 솔루션에 CSV를 먼저 업로드해야 분석이 가능하다고 친근하게 안내해 주세요. 한국어로 답변하세요.`;
+      }
     } else {
       const weeklyStr = Object.entries(data.weeklyAgg).map(([label, d]) =>
         `[${label} · ${d.weekName}] 비용 ${d.cost.toLocaleString()}원 | 노출 ${d.impressions.toLocaleString()} | 클릭 ${d.clicks.toLocaleString()} | 전환 ${d.conversions} | 매출 ${d.revenue.toLocaleString()}원 | CTR ${d.ctr}% | CVR ${d.cvr}% | CPC ${d.cpc.toLocaleString()}원 | CPA ${d.cpa.toLocaleString()}원 | ROAS ${d.roas}%`
