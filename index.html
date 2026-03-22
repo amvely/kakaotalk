@@ -688,6 +688,9 @@ function goHome() {
   document.getElementById('welcome').classList.remove('hidden');
   currentApp = null;
   closePopup();
+  // AI 챗봇 버튼 숨기기
+  const _fab = document.getElementById('ai-fab');
+  if (_fab) _fab.classList.remove('show');
 }
 let popupTimeout = null;
 let keepingOpen = null;
@@ -745,6 +748,10 @@ function launchApp(appId) {
   document.querySelector('.rail-item[data-app="' + appId + '"]').classList.add('active');
 
   closePopup();
+
+  // AI 챗봇 버튼 표시 (앱1 전용)
+  const _fab = document.getElementById('ai-fab');
+  if (_fab) _fab.classList.toggle('show', String(appId) === '1');
 }
 
 // ── 앱1: 탭 전환 (switchTab 함수 호출) ──
@@ -1581,9 +1588,7 @@ ${fmtDim(data.byDow,'요일')}`;
       const template = getGeminiPrompt();
       const basePrompt = template.includes('{data}')
         ? template.replace('{data}', dataStr)
-        : template + '
-
-' + dataStr;
+        : template + '\n\n' + dataStr;
 
       prompt = basePrompt + `
 
