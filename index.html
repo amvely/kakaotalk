@@ -1124,6 +1124,17 @@ function launchAndInternalTab(appId, tabId, btnEl) {
     </div>
 
     <div class="ai-modal-field">
+      <div class="ai-modal-label"><span>모델 선택</span></div>
+      <select class="ai-modal-input" id="ai-inp-model" style="cursor:pointer;background:#111318;color:#e8eaf0;">
+        <option value="gemini-flash-latest">gemini-flash-latest ✅ 기본 권장</option>
+        <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+        <option value="gemini-1.5-pro">gemini-1.5-pro (고품질)</option>
+        <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+      </select>
+      <div class="ai-modal-hint">카카오톡 보고서와 동일한 모델입니다.</div>
+    </div>
+
+    <div class="ai-modal-field">
       <div class="ai-modal-label">
         <span>AI 분석 프롬프트</span>
         <button onclick="resetAiPrompt()" style="background:none;border:none;color:#5a6070;font-size:10px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;padding:0;" onmouseover="this.style.color='#e8eaf0'" onmouseout="this.style.color='#5a6070'">↺ 기본값으로</button>
@@ -1147,7 +1158,8 @@ function launchAndInternalTab(appId, tabId, btnEl) {
   // ── 상수
   const GEMINI_KEY_STORE    = 'dataanalysis_gemini_key';
   const GEMINI_PROMPT_STORE = 'dataanalysis_gemini_prompt';
-  const GEMINI_API_URL      = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  const GEMINI_MODEL_STORE = 'dataanalysis_gemini_model';
+  const GEMINI_API_URL      = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
   const DEFAULT_PROMPT =
 `당신은 마케팅 성과 데이터 분석 전문가입니다.
@@ -1168,6 +1180,8 @@ function launchAndInternalTab(appId, tabId, btnEl) {
   function getGeminiPrompt() { try { return localStorage.getItem(GEMINI_PROMPT_STORE) || DEFAULT_PROMPT; } catch { return DEFAULT_PROMPT; } }
   function saveGeminiKey(k)  { try { localStorage.setItem(GEMINI_KEY_STORE, k); }    catch {} }
   function saveGeminiPrompt(p){ try { localStorage.setItem(GEMINI_PROMPT_STORE, p); } catch {} }
+  function getGeminiModel()  { try { return localStorage.getItem(GEMINI_MODEL_STORE) || 'gemini-flash-latest'; } catch { return 'gemini-flash-latest'; } }
+  function saveGeminiModel(m) { try { localStorage.setItem(GEMINI_MODEL_STORE, m); } catch {} }
 
   // ── 토스트
   function showAiToast(msg, duration) {
@@ -1181,6 +1195,7 @@ function launchAndInternalTab(appId, tabId, btnEl) {
   // ── 설정 모달
   window.openAiSettings = function() {
     document.getElementById('ai-inp-key').value    = getGeminiKey();
+    document.getElementById('ai-inp-model').value   = getGeminiModel();
     document.getElementById('ai-inp-prompt').value = getGeminiPrompt();
     document.getElementById('ai-gemini-modal-bg').classList.add('show');
   };
@@ -1195,6 +1210,7 @@ function launchAndInternalTab(appId, tabId, btnEl) {
     const p = document.getElementById('ai-inp-prompt').value.trim();
     if (!k) { showAiToast('⚠ API 키를 입력해주세요'); return; }
     saveGeminiKey(k);
+    saveGeminiModel(document.getElementById('ai-inp-model').value);
     if (p) saveGeminiPrompt(p);
     closeAiSettings();
     showAiToast('✅ AI 설정이 저장되었습니다');
@@ -1447,7 +1463,7 @@ function launchAndInternalTab(appId, tabId, btnEl) {
       const changeStr = Object.entries(data.changes)
         .map(([k,v]) => `${k}: ${v>0?'+':''}${v}%`).join(' | ');
 
-      const tabDataStr = JSON.stringify(data.tabData, null, 1).slice(0, 2500);
+      const tabDataStr = JSON.stringify(data.tabData, null, 1).slice(0, 1200);
 
       const dataStr =
 `## 현재 탭: ${data.activeTab.label}
@@ -1471,7 +1487,9 @@ ${tabDataStr}`;
     }
 
     try {
-      const resp = await fetch(`${GEMINI_API_URL}?key=${key}`, {
+      const model = getGeminiModel();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const resp = await fetch(`${apiUrl}?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
