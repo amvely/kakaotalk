@@ -54,6 +54,19 @@ async function fetchStatsMany(cid,lic,sec,ids,start,end,timeIncrement){
   const rows=[]; for(const part of chunk(ids,200)){ if(!part.length) continue; const r=await apiRequest(cid,lic,sec,'GET',statsUrl(part,start,end,timeIncrement)); if(r.status===200) rows.push(...flattenStats(r)); else throw new Error(`통계 API 오류 (${r.status}) ${JSON.stringify(r.data).slice(0,300)}`); } return rows;
 }
 
+async function fetchStatsManyDaily(cid,lic,sec,ids,start,end){
+  const rows=[];
+  let d=parseYMD(start), endD=parseYMD(end);
+  while(d<=endD){
+    const y=fmtYMD(d);
+    const dayRows=await fetchStatsMany(cid,lic,sec,ids,y,y,null).catch(()=>[]);
+    dayRows.forEach(r=>{ if(!r.statDate && !r.date && !r.period) r.statDate=y; });
+    rows.push(...dayRows);
+    d=addDays(d,1);
+  }
+  return rows;
+}
+
 function mediaNameOf(row){
   const v = row.mediaNm || row.mediaName || row.media || row.mediaType || row.platform || row.device || row.network || row.channel || row.publisher || row.placement;
   return v ? String(v) : '네이버 검색광고';
@@ -80,13 +93,20 @@ module.exports = async function handler(req,res){
     if(!campIds.length) return res.json({curAgg:calc(),prevAgg:calc(),days:[],recentDays:[],recent21Days:[],allCamps:[],allGroups:[]});
     let adgroups=[]; try{ const gr=await apiRequest(cid,lic,sec,'GET','/ncc/adgroups'); if(gr.status===200) adgroups=arrFrom(gr.data).filter(g=>!['DELETED'].includes(g.status)); }catch(e){}
     const groupIds=adgroups.map(g=>g.nccAdgroupId||g.adgroupId||g.id).filter(Boolean);
-    const [curCampRows,prevCampRows,recentRows,curGroupRows,prevGroupRows]=await Promise.all([
+    const [curCampRows,prevCampRows,recentRowsRaw,curGroupRows,prevGroupRows]=await Promise.all([
       fetchStatsMany(cid,lic,sec,campIds,startDate,endDate,null),
       fetchStatsMany(cid,lic,sec,campIds,prevStart,prevEnd,null),
       fetchStatsMany(cid,lic,sec,campIds,recentStart,endDate,1).catch(()=>[]),
       groupIds.length?fetchStatsMany(cid,lic,sec,groupIds,startDate,endDate,null):Promise.resolve([]),
       groupIds.length?fetchStatsMany(cid,lic,sec,groupIds,prevStart,prevEnd,null):Promise.resolve([]),
     ]);
+    let recentRows = recentRowsRaw;
+    // Some SearchAd accounts/endpoints do not return per-day rows with timeIncrement=1.
+    // When that happens, build daily rows by requesting one day at a time so the dashboard
+    // can still render 최근 7일간 성과 and 일간 지표 추이 from API data only.
+    if(!aggByDay(recentRows).length){
+      recentRows = await fetchStatsManyDaily(cid,lic,sec,campIds,recentStart,endDate);
+    }
     const curByCamp=aggById(curCampRows), prevByCamp=aggById(prevCampRows), curByGroup=aggById(curGroupRows), prevByGroup=aggById(prevGroupRows);
     const campNameById={}, campTypeById={};
     const allCamps=campaigns.map(c=>{ const id=c.nccCampaignId||c.campaignId||c.id; const name=c.name||c.campaignName||c.campNm||id; const type=campTypeLabel(c.campaignTp||c.type); campNameById[id]=name; campTypeById[id]=type; return {id,nccCampaignId:id,campId:id,campaignId:id,campNm:name,name,campaignName:name,campTp:c.campaignTp||c.type,type,...(curByCamp[id]||calc()),_prev:(prevByCamp[id]||calc())}; });
