@@ -64,7 +64,7 @@ function aggByMedia(rows){
   return Object.entries(map).map(([name,v])=>({name,media:name,...calc(v)})).sort((a,b)=>(b.cost||0)-(a.cost||0));
 }
 
-function campTypeLabel(tp){ const s=String(tp||''); return ({'1':'파워링크','2':'쇼핑검색','3':'파워컨텐츠','4':'브랜드검색','WEB_SITE':'파워링크','SHOPPING':'쇼핑검색','POWER_CONTENTS':'파워컨텐츠','BRAND_SEARCH':'브랜드검색'})[s] || s || '기타'; }
+function campTypeLabel(tp){ const s=String(tp||''); return ({'1':'파워링크','2':'쇼핑광고','3':'파워컨텐츠','4':'브랜드검색광고','WEB_SITE':'파워링크','SHOPPING':'쇼핑광고','POWER_CONTENTS':'파워컨텐츠','BRAND_SEARCH':'브랜드검색광고','쇼핑검색':'쇼핑광고','브랜드검색':'브랜드검색광고'})[s] || s || '기타'; }
 
 module.exports = async function handler(req,res){
   res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type');
