@@ -1,427 +1,98 @@
-// api/naver.js
-
+// api/naver.js ─ Vercel Serverless Function for Naver SearchAd dashboard
 const crypto = require('crypto');
 const API_BASE = 'https://api.searchad.naver.com';
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// ✅ 서명: 네이버 검색광고 API 공식 포맷 = {timestamp}.{METHOD}.{path}
 function makeSignature(secretKey, timestamp, method, path) {
-  const m = String(method).toUpperCase();
-  const message = `${timestamp}.${m}.${path}`;
+  const message = `${timestamp}.${String(method).toUpperCase()}.${path}`;
   return crypto.createHmac('sha256', secretKey).update(message, 'utf8').digest('base64');
 }
-
-async function apiRequest(cid, lic, sec, method, pathWithQuery, payload) {
+async function apiRequest(cid, lic, sec, method, pathWithQuery) {
   const m = String(method).toUpperCase();
-  const pathOnly  = pathWithQuery.split('?')[0];
+  const pathOnly = pathWithQuery.split('?')[0];
   const timestamp = Date.now().toString();
-  const sig       = makeSignature(sec, timestamp, m, pathOnly);
-
-  const headers = {
-    'X-Timestamp': timestamp,
-    'X-API-KEY'  : lic,
-    'X-Customer' : cid,
-    'X-Signature': sig,
-  };
-
-  if (m !== 'GET' && m !== 'DELETE') {
-    headers['Content-Type'] = 'application/json; charset=UTF-8';
-  }
-
-  const opts = { method: m, headers };
-  if (m !== 'GET' && m !== 'DELETE' && payload !== undefined) {
-    opts.body = JSON.stringify(payload);
-  }
-
-  const url = API_BASE + pathWithQuery;
-  const r = await fetch(url, opts);
+  const sig = makeSignature(sec, timestamp, m, pathOnly);
+  const r = await fetch(API_BASE + pathWithQuery, { method:m, headers:{ 'X-Timestamp':timestamp, 'X-API-KEY':lic, 'X-Customer':cid, 'X-Signature':sig }});
   const txt = await r.text();
-  let data;
-  try { data = txt ? JSON.parse(txt) : {}; } catch { data = txt; }
-  return { status: r.status, data };
+  let data; try { data = txt ? JSON.parse(txt) : {}; } catch { data = txt; }
+  return { status:r.status, data };
 }
-
-function parseYMD(s) {
-  s = String(s);
-  return new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00Z`);
-}
-function fmtYMD(d) { return d.toISOString().slice(0,10).replace(/-/g,''); }
-
-function statsUrl(ids, start, end, timeIncrement, breakdown) {
-  if (!ids || ids.length === 0) return null;
-
-  const idsQuery = ids
-    .slice(0, 200)
-    .map(id => `ids=${encodeURIComponent(id)}`)
-    .join("&");
-
-  const fields = encodeURIComponent(
-    JSON.stringify(["impCnt","clkCnt","salesAmt","ccnt","convAmt"])
-  );
-
-  const timeRange = encodeURIComponent(
-    JSON.stringify({
-      since: `${start.slice(0,4)}-${start.slice(4,6)}-${start.slice(6,8)}`,
-      until: `${end.slice(0,4)}-${end.slice(4,6)}-${end.slice(6,8)}`
-    })
-  );
-
-  let url = `/stats?${idsQuery}&fields=${fields}&timeRange=${timeRange}`;
-
-  if (typeof timeIncrement !== "undefined" && timeIncrement !== null) {
-    url += `&timeIncrement=${encodeURIComponent(String(timeIncrement))}`;
-  }
-
-  if (typeof breakdown !== "undefined" && breakdown !== null) {
-    url += `&breakdown=${encodeURIComponent(String(breakdown))}`;
-  }
-
+const ymdToISO = s => `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+const parseYMD = s => new Date(`${ymdToISO(String(s))}T00:00:00Z`);
+const fmtYMD = d => d.toISOString().slice(0,10).replace(/-/g,'');
+function addDays(d,n){ const x=new Date(d); x.setUTCDate(x.getUTCDate()+n); return x; }
+function prevRange(startDate,endDate){ const s=parseYMD(startDate), e=parseYMD(endDate); const pe=addDays(s,-1); const span=Math.round((e-s)/86400000); const ps=addDays(pe,-span); return [fmtYMD(ps),fmtYMD(pe)]; }
+function chunk(arr,n=200){ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+function statsUrl(ids,start,end,timeIncrement){
+  const idsQuery=ids.slice(0,200).map(id=>`ids=${encodeURIComponent(id)}`).join('&');
+  const fields=encodeURIComponent(JSON.stringify(['impCnt','clkCnt','salesAmt','ccnt','convAmt','purchaseCcnt','purchaseConvAmt']));
+  const timeRange=encodeURIComponent(JSON.stringify({since:ymdToISO(start),until:ymdToISO(end)}));
+  let url=`/stats?${idsQuery}&fields=${fields}&timeRange=${timeRange}`;
+  if(timeIncrement) url += `&timeIncrement=${timeIncrement}`;
   return url;
 }
-
-function aggRow(map, id, row) {
-  if (!id) return;
-  if (!map[id]) map[id] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
-  map[id].cost    += Number(row.salesAmt || row.cost    || 0);
-  map[id].imp     += Number(row.impCnt   || 0);
-  map[id].click   += Number(row.clkCnt   || row.click   || 0);
-  map[id].conv    += Number(row.ccnt     || row.ctcCnt  || row.convCnt || 0);
-  map[id].revenue += Number(row.convAmt  || row.revenue || 0);
-}
-
-function calcMetrics(v) {
-  return { ...v,
-    roas: v.cost  ? Math.round(v.revenue / v.cost * 100)             : 0,
-    ctr : v.imp   ? parseFloat((v.click / v.imp * 100).toFixed(2))   : 0,
-    cvr : v.click ? parseFloat((v.conv  / v.click * 100).toFixed(2)) : 0,
-    cpc : v.click ? Math.round(v.cost / v.click)                     : 0,
-    cpa : v.conv  ? Math.round(v.cost / v.conv)                      : 0,
-    aov : v.conv  ? Math.round(v.revenue / v.conv)                   : 0,
-    rpc : v.click ? Math.round(v.revenue / v.click)                  : 0,
-  };
-}
-
-async function createStatReport(cid, lic, sec, statDtYYYYMMDD, reportTp) {
-  const payload = { statDt: statDtYYYYMMDD, reportTp };
-  return apiRequest(cid, lic, sec, 'POST', '/stat-reports', payload);
-}
-async function getStatReport(cid, lic, sec, jobId) {
-  return apiRequest(cid, lic, sec, 'GET', `/stat-reports/${encodeURIComponent(jobId)}`);
-}
-async function tryDownloadText(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('다운로드 실패('+r.status+')');
-  const buf = await r.arrayBuffer();
-  const sig = new Uint8Array(buf).slice(0,4);
-  const isZip = sig.length>=2 && sig[0]===0x50 && sig[1]===0x4B;
-  if (isZip) return null;
-  return new TextDecoder('utf-8').decode(buf);
-}
-function parseCsvLines(text) {
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return { header:[], rows:[] };
-  const split = (line) => {
-    const out=[]; let cur=''; let q=false;
-    for (let i=0; i<line.length; i++) {
-      const ch=line[i];
-      if (ch==='"') { q=!q; continue; }
-      if (ch===',' && !q) { out.push(cur); cur=''; continue; }
-      cur+=ch;
-    }
-    out.push(cur);
-    return out.map(s=>s.trim());
-  };
-  const header = split(lines[0]);
-  const rows = lines.slice(1).map(split);
-  return { header, rows };
-}
-
-async function getExpKeywordTerms(cid, lic, sec, startDate, endDate) {
-  const s = parseYMD(startDate), e = parseYMD(endDate);
-  const days=[];
-  for (let d=new Date(s); d<=e; d=new Date(d.getTime()+86400000)) {
-    days.push(fmtYMD(d));
+function arrFrom(data){ if(Array.isArray(data)) return data; if(Array.isArray(data?.data)) return data.data; if(Array.isArray(data?.items)) return data.items; if(Array.isArray(data?.campaigns)) return data.campaigns; if(Array.isArray(data?.adgroups)) return data.adgroups; return []; }
+function flattenStats(resp){
+  const base=arrFrom(resp?.data ?? resp); const out=[];
+  for(const item of base){
+    const parentId=item.id||item.nccCampaignId||item.campaignId||item.nccAdgroupId||item.adgroupId;
+    const nested = Array.isArray(item.data) ? item.data : Array.isArray(item.rows) ? item.rows : Array.isArray(item.stats) ? item.stats : Array.isArray(item.items) ? item.items : null;
+    if(nested){ for(const r of nested){ out.push({ ...r, id:r.id||parentId, statDate:r.statDate||r.date||r.period||item.statDate||item.date||item.period }); } }
+    else out.push(item);
   }
-  const limited = days.slice(0, 31);
-
-  const agg = {};
-  for (const dt of limited) {
-    const crt = await createStatReport(cid, lic, sec, dt, 'EXPKEYWORD');
-    if (crt.status!==201 && crt.status!==200) continue;
-    const jobId = crt.data?.reportJobId || crt.data?.id || crt.data?.reportId;
-    if (!jobId) continue;
-
-    let info=null;
-    for (let i=0; i<12; i++) {
-      const r = await getStatReport(cid, lic, sec, jobId);
-      if (r.status!==200) { await sleep(250); continue; }
-      const st = (r.data?.status || r.data?.reportStatus || '').toString();
-      info=r.data;
-      if (st==='BUILT' || st==='COMPLETED' || st==='DONE') break;
-      if (st==='ERROR' || st==='FAILED') { info=null; break; }
-      await sleep(350);
-    }
-    if (!info) continue;
-    const url = info.downloadUrl || info.downloadURL || info.downloadLink;
-    if (!url) continue;
-
-    const text = await tryDownloadText(url);
-    if (!text) continue;
-    const { header, rows } = parseCsvLines(text);
-    const idx = (name) => header.findIndex(h=>h.toLowerCase()===name.toLowerCase());
-
-    const iTerm = idx('Keyword')>=0 ? idx('Keyword') : idx('Search term');
-    const iImp  = idx('Impression')>=0 ? idx('Impression') : idx('impCnt');
-    const iClk  = idx('Click')>=0 ? idx('Click') : idx('clkCnt');
-    const iCost = idx('Cost')>=0 ? idx('Cost') : idx('salesAmt');
-    const iConv = idx('Conversion count')>=0 ? idx('Conversion count') : idx('ccnt');
-    const iRev  = idx('Sales by conversion')>=0 ? idx('Sales by conversion') : idx('convAmt');
-
-    for (const r of rows) {
-      const term = (iTerm>=0 ? r[iTerm] : '') || '';
-      if (!term) continue;
-      if (!agg[term]) agg[term] = { name:term, cost:0, imp:0, click:0, conv:0, revenue:0 };
-      agg[term].imp     += Number(iImp>=0  ? r[iImp]  : 0) || 0;
-      agg[term].click   += Number(iClk>=0  ? r[iClk]  : 0) || 0;
-      agg[term].cost    += Number(iCost>=0 ? r[iCost] : 0) || 0;
-      agg[term].conv    += Number(iConv>=0 ? r[iConv] : 0) || 0;
-      agg[term].revenue += Number(iRev>=0  ? r[iRev]  : 0) || 0;
-    }
-  }
-  return Object.values(agg).map(v => ({ ...v, roas: v.cost ? Math.round(v.revenue/v.cost*100) : 0 }));
+  return out;
+}
+function getStat(row){ return row.stat || row; }
+function rowId(row){ return row.id||row.nccCampaignId||row.campaignId||row.nccAdgroupId||row.adgroupId||row.nccAdgroupId; }
+function rowDate(row){ const s=String(row.statDate||row.date||row.period||'').replace(/-/g,''); return s.length>=8?s.slice(0,8):''; }
+function blank(){ return {cost:0,imp:0,click:0,conv:0,revenue:0,purchaseCcnt:0,purchaseConvAmt:0}; }
+function addMetric(obj,row){ const s=getStat(row); obj.cost+=Number(s.salesAmt||s.cost||0); obj.imp+=Number(s.impCnt||s.imp||0); obj.click+=Number(s.clkCnt||s.click||0); obj.conv+=Number(s.ccnt||s.ctcCnt||s.convCnt||s.conv||0); obj.revenue+=Number(s.convAmt||s.revenue||0); obj.purchaseCcnt+=Number(s.purchaseCcnt||0); obj.purchaseConvAmt+=Number(s.purchaseConvAmt||0); }
+function calc(v){ v={...blank(),...(v||{})}; const cart=Math.max(0,v.conv-v.purchaseCcnt); return {...v,cart,ctr:v.imp?v.click/v.imp*100:0,cvr:v.click?v.conv/v.click*100:0,roas:v.cost?v.revenue/v.cost*100:0,cpc:v.click?Math.round(v.cost/v.click):0,cpa:v.conv?Math.round(v.cost/v.conv):0,aov:v.conv?Math.round(v.revenue/v.conv):0}; }
+function aggRows(rows){ const v=blank(); rows.forEach(r=>addMetric(v,r)); return calc(v); }
+function aggById(rows){ const map={}; rows.forEach(r=>{ const id=rowId(r); if(!id) return; if(!map[id]) map[id]=blank(); addMetric(map[id],r); }); const out={}; Object.entries(map).forEach(([k,v])=>out[k]=calc(v)); return out; }
+function aggByDay(rows){ const map={}; rows.forEach(r=>{ const d=rowDate(r); if(!d) return; if(!map[d]) map[d]=blank(); addMetric(map[d],r); }); return Object.entries(map).sort(([a],[b])=>a.localeCompare(b)).map(([dt,v])=>({...calc(v),dt,dateRaw:dt,date:`${dt.slice(4,6)}/${dt.slice(6,8)}`})); }
+async function fetchStatsMany(cid,lic,sec,ids,start,end,timeIncrement){
+  const rows=[]; for(const part of chunk(ids,200)){ if(!part.length) continue; const r=await apiRequest(cid,lic,sec,'GET',statsUrl(part,start,end,timeIncrement)); if(r.status===200) rows.push(...flattenStats(r)); else throw new Error(`통계 API 오류 (${r.status}) ${JSON.stringify(r.data).slice(0,300)}`); } return rows;
 }
 
-// ─── 메인 핸들러 ─────────────────────────────────────────────
-module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
+function mediaNameOf(row){
+  const v = row.mediaNm || row.mediaName || row.media || row.mediaType || row.platform || row.device || row.network || row.channel || row.publisher || row.placement;
+  return v ? String(v) : '네이버 검색광고';
+}
+function aggByMedia(rows){
+  const map={};
+  rows.forEach(r=>{ const k=mediaNameOf(r); if(!map[k]) map[k]=blank(); addMetric(map[k],r); });
+  return Object.entries(map).map(([name,v])=>({name,media:name,...calc(v)})).sort((a,b)=>(b.cost||0)-(a.cost||0));
+}
 
-  // body 파싱
-  let body = req.body;
-  if (!body || typeof body === 'string' || Object.keys(body || {}).length === 0) {
-    body = await new Promise(resolve => {
-      let raw = '';
-      req.on('data', c => raw += c);
-      req.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
-    });
-  }
+function campTypeLabel(tp){ const s=String(tp||''); return ({'1':'파워링크','2':'쇼핑검색','3':'파워컨텐츠','4':'브랜드검색','WEB_SITE':'파워링크','SHOPPING':'쇼핑검색','POWER_CONTENTS':'파워컨텐츠','BRAND_SEARCH':'브랜드검색'})[s] || s || '기타'; }
 
-  // ✅ cid/lic/sec 직접 수신 (환경변수 미사용)
-  const cid       = String(body?.cid       || '').trim();
-  const lic       = String(body?.lic       || '').trim();
-  const sec       = String(body?.sec       || '').trim();
-  const startDate = String(body?.startDate || '').trim();
-  const endDate   = String(body?.endDate   || '').trim();
-
-  if (!cid || !lic || !sec || !startDate || !endDate)
-    return res.status(400).json({ error: '필수값 누락 (cid, lic, sec, startDate, endDate)' });
-
-  console.log(`[req] cid=${cid} lic=${lic.slice(0,8)}... start=${startDate} end=${endDate}`);
-
-  // 이전 기간 계산
-  const curS  = parseYMD(startDate), curE = parseYMD(endDate);
-  const prevE = new Date(curS - 86400000);
-  const prevS = new Date(prevE - (curE - curS));
-  const prevStart = fmtYMD(prevS), prevEnd = fmtYMD(prevE);
-
-  try {
-    // 1. 캠페인
-    const campRes = await apiRequest(cid, lic, sec, 'GET', '/ncc/campaigns');
-    if (campRes.status !== 200)
-      return res.status(campRes.status).json({ error: `캠페인 API 오류 (${campRes.status})`, detail: campRes.data });
-
-    const campaigns = (campRes.data?.campaigns || campRes.data || [])
-      .filter(c => !['DELETED', 'PAUSED_BY_BUDGET'].includes(c.status));
-    const campIds = campaigns.map(c => c.nccCampaignId || c.campaignId || c.id).filter(Boolean);
-
-    if (!campIds.length)
-      return res.json({ days:[], convKws:[], spendKws:[], clickKws:[], allCamps:[], allGroups:[], _warn:'활성 캠페인 없음' });
-
-    // 2. 광고그룹
-    const grpRes   = await apiRequest(cid, lic, sec, 'GET', '/ncc/adgroups');
-    const grpRaw   = grpRes.data;
-    const adgroups = Array.isArray(grpRaw)
-      ? grpRaw
-      : (grpRaw?.adGroups || grpRaw?.items || grpRaw?.data || []);
-    const groupIds = adgroups.map(g => g.nccAdgroupId || g.adGroupId || g.id).filter(Boolean);
-
-    // 3. 통계 병렬 (현재+이전+최근8일+최근21일)
-    const curEDate   = parseYMD(endDate);
-    const rec8S      = new Date(curEDate - 7*86400000);
-    const rec8Start  = fmtYMD(rec8S);
-    const rec21S     = new Date(curEDate - 20*86400000);
-    const rec21Start = fmtYMD(rec21S);
-
-    const [dailyCurR, campCurR, grpCurR, campPrevR, daily8R, daily21R] = await Promise.all([
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate, 1)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, startDate, endDate)),
-      groupIds.length
-        ? apiRequest(cid, lic, sec, 'GET', statsUrl(groupIds, startDate, endDate))
-        : { data: [] },
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, prevStart, prevEnd)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec8Start, endDate, 1)),
-      apiRequest(cid, lic, sec, 'GET', statsUrl(campIds, rec21Start, endDate, 1)),
+module.exports = async function handler(req,res){
+  res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  if(req.method==='OPTIONS') return res.status(200).end(); if(req.method!=='POST') return res.status(405).json({error:'Method not allowed'});
+  let body=req.body; if(!body || typeof body==='string' || Object.keys(body||{}).length===0){ body=await new Promise(resolve=>{ let raw=''; req.on('data',c=>raw+=c); req.on('end',()=>{ try{resolve(JSON.parse(raw))}catch{resolve({})} }); }); }
+  const cid=String(body?.cid||'').trim(), lic=String(body?.lic||'').trim(), sec=String(body?.sec||'').trim(), startDate=String(body?.startDate||'').trim(), endDate=String(body?.endDate||'').trim();
+  if(!cid||!lic||!sec||!startDate||!endDate) return res.status(400).json({error:'필수값 누락 (cid, lic, sec, startDate, endDate)'});
+  try{
+    const [prevStart,prevEnd]=prevRange(startDate,endDate); const recentStart=fmtYMD(addDays(parseYMD(endDate),-20));
+    const campRes=await apiRequest(cid,lic,sec,'GET','/ncc/campaigns'); if(campRes.status!==200) return res.status(campRes.status).json({error:`캠페인 API 오류 (${campRes.status})`,detail:campRes.data});
+    const campaigns=arrFrom(campRes.data).filter(c=>!['DELETED','PAUSED_BY_BUDGET'].includes(c.status));
+    const campIds=campaigns.map(c=>c.nccCampaignId||c.campaignId||c.id).filter(Boolean);
+    if(!campIds.length) return res.json({curAgg:calc(),prevAgg:calc(),days:[],recentDays:[],recent21Days:[],allCamps:[],allGroups:[]});
+    let adgroups=[]; try{ const gr=await apiRequest(cid,lic,sec,'GET','/ncc/adgroups'); if(gr.status===200) adgroups=arrFrom(gr.data).filter(g=>!['DELETED'].includes(g.status)); }catch(e){}
+    const groupIds=adgroups.map(g=>g.nccAdgroupId||g.adgroupId||g.id).filter(Boolean);
+    const [curCampRows,prevCampRows,recentRows,curGroupRows,prevGroupRows]=await Promise.all([
+      fetchStatsMany(cid,lic,sec,campIds,startDate,endDate,null),
+      fetchStatsMany(cid,lic,sec,campIds,prevStart,prevEnd,null),
+      fetchStatsMany(cid,lic,sec,campIds,recentStart,endDate,1).catch(()=>[]),
+      groupIds.length?fetchStatsMany(cid,lic,sec,groupIds,startDate,endDate,null):Promise.resolve([]),
+      groupIds.length?fetchStatsMany(cid,lic,sec,groupIds,prevStart,prevEnd,null):Promise.resolve([]),
     ]);
-
-    // 4. 일별
-    const toSafeArr = v => Array.isArray(v) ? v : [];
-    const dailyMap = {};
-    toSafeArr(dailyCurR?.data?.data || dailyCurR?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || startDate;
-      const key = String(d).replace(/-/g, '');
-      if (!dailyMap[key]) dailyMap[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
-      aggRow(dailyMap, key, row);
-    });
-    if (Object.keys(dailyMap).length === 0) {
-      const tmp = {};
-      toSafeArr(campCurR?.data?.data || campCurR?.data).forEach(r => aggRow(tmp, 'total', r));
-      dailyMap[String(endDate)] = tmp.total || { cost:0, imp:0, click:0, conv:0, revenue:0 };
-    }
-    const formattedDays = Object.entries(dailyMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([ds, v]) => ({
-        date   : `${ds.slice(4,6)}/${ds.slice(6,8)}`,
-        dateRaw: ds,
-        ...calcMetrics(v),
-      }));
-
-    // 5. 캠페인별
-    const campCurMap = {};
-    toSafeArr(campCurR?.data?.data || campCurR?.data).forEach(r => {
-      aggRow(campCurMap, r.nccCampaignId || r.campaignId || r.id, r);
-    });
-    const allCamps = campaigns.map(c => {
-      const id = c.nccCampaignId || c.campaignId || c.id;
-      return { id, name: c.name, ...calcMetrics(campCurMap[id] || { cost:0, imp:0, click:0, conv:0, revenue:0 }) };
-    }).sort((a, b) => b.cost - a.cost);
-
-    // 6. 그룹별
-    const grpCurMap = {};
-    toSafeArr(grpCurR?.data?.data || grpCurR?.data).forEach(r => {
-      aggRow(grpCurMap, r.nccAdgroupId || r.adGroupId || r.id, r);
-    });
-    const allGroups = adgroups.map(g => {
-      const id = g.nccAdgroupId || g.adGroupId || g.id;
-      return { id, name: g.name, ...calcMetrics(grpCurMap[id] || { cost:0, imp:0, click:0, conv:0, revenue:0 }) };
-    }).sort((a, b) => b.cost - a.cost);
-
-    // 6b. prevAgg
-    const prevAggMap = {};
-    toSafeArr(campPrevR?.data?.data || campPrevR?.data).forEach(r => aggRow(prevAggMap, 'total', r));
-    const prevAgg = calcMetrics(prevAggMap['total'] || { cost:0, imp:0, click:0, conv:0, revenue:0 });
-
-    // 6c. 최근 8일
-    const daily8Map = {};
-    toSafeArr(daily8R?.data?.data || daily8R?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || rec8Start;
-      const key = String(d).replace(/-/g, '');
-      if (!daily8Map[key]) daily8Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
-      aggRow(daily8Map, key, row);
-    });
-    const recentDays = Object.entries(daily8Map)
-      .sort(([a],[b]) => a.localeCompare(b))
-      .map(([ds, v]) => ({
-        date   : `${ds.slice(4,6)}/${ds.slice(6,8)}`,
-        dateRaw: ds,
-        ...calcMetrics(v),
-      }));
-
-    // 6d. 최근 21일
-    const daily21Map = {};
-    toSafeArr(daily21R?.data?.data || daily21R?.data).forEach(row => {
-      const d = row.period || row.date || row.statDate || row.statDt || rec21Start;
-      const key = String(d).replace(/-/g, '');
-      if (!daily21Map[key]) daily21Map[key] = { cost:0, imp:0, click:0, conv:0, revenue:0 };
-      aggRow(daily21Map, key, row);
-    });
-    const recent21Days = Object.entries(daily21Map)
-      .sort(([a],[b]) => a.localeCompare(b))
-      .map(([ds, v]) => ({
-        date   : `${ds.slice(4,6)}/${ds.slice(6,8)}`,
-        dateRaw: ds,
-        ...calcMetrics(v),
-      }));
-
-    // 7. 키워드
-    const activeGroupIds = allGroups
-      .filter(g => g.imp > 0 || g.cost > 0)
-      .slice(0, 10)
-      .map(g => g.id);
-    const topGroupIds = activeGroupIds.length ? activeGroupIds : groupIds.slice(0, 5);
-    const kwResponses = await Promise.all(
-      topGroupIds.map(gid => apiRequest(cid, lic, sec, 'GET', `/ncc/keywords?nccAdgroupId=${gid}&returnPause=true`))
-    );
-    const kwRaw = kwResponses.flatMap(r => {
-      const d = r.data;
-      return Array.isArray(d) ? d : (d?.keywords || d?.items || d?.data || []);
-    });
-    const keywords = kwRaw;
-    const kwIds = keywords.map(k => k.nccKeywordId || k.keywordId || k.id).filter(Boolean).slice(0, 200);
-
-    let convKws = [], spendKws = [], clickKws = [];
-    if (kwIds.length > 0) {
-      const [kwCurR, kwPrevR] = await Promise.all([
-        apiRequest(cid, lic, sec, 'GET', statsUrl(kwIds, startDate, endDate)),
-        apiRequest(cid, lic, sec, 'GET', statsUrl(kwIds, prevStart, prevEnd)),
-      ]);
-      const kwCurMap = {}, kwPrevMap = {};
-      const extractKwId = r => r.nccKeywordId || r.keywordId || r.id;
-      const toArr = v => Array.isArray(v) ? v : [];
-      toArr(kwCurR?.data?.data  || kwCurR?.data ).forEach(r => aggRow(kwCurMap,  extractKwId(r), r));
-      toArr(kwPrevR?.data?.data || kwPrevR?.data).forEach(r => aggRow(kwPrevMap, extractKwId(r), r));
-
-      const kwNameMap = {};
-      keywords.forEach(k => {
-        kwNameMap[k.nccKeywordId || k.keywordId || k.id] = k.keyword || k.keyword_text || k.keywordName || k.name || '';
-      });
-
-      const kwList = kwIds.map(id => {
-        const cur  = kwCurMap[id]  || { cost:0, click:0, conv:0, revenue:0 };
-        const prev = kwPrevMap[id] || { cost:0, click:0, conv:0, revenue:0 };
-        return {
-          name     : kwNameMap[id] || id,
-          cost     : cur.cost,  click: cur.click, conv: cur.conv, revenue: cur.revenue,
-          prevCost : prev.cost, prevClick: prev.click, prevConv: prev.conv,
-          roas     : cur.cost ? Math.round(cur.revenue / cur.cost * 100) : 0,
-        };
-      });
-
-      convKws  = kwList.filter(k => k.conv  > 0).sort((a, b) => b.conv  - a.conv).slice(0, 200);
-      spendKws = [...kwList].sort((a, b) => b.cost  - a.cost).slice(0, 10);
-      clickKws = [...kwList].sort((a, b) => b.click - a.click).slice(0, 10);
-    }
-
-    // 8. 전환 검색어 (best effort)
-    let convTerms = [];
-    try {
-      const [curTerms, prevTerms] = await Promise.all([
-        getExpKeywordTerms(cid, lic, sec, startDate, endDate),
-        getExpKeywordTerms(cid, lic, sec, prevStart, prevEnd),
-      ]);
-      const prevMap = {};
-      (prevTerms||[]).forEach(t => { prevMap[t.name]=t; });
-      convTerms = (curTerms||[]).map(t => {
-        const p = prevMap[t.name] || { conv:0, cost:0, click:0 };
-        return { ...t, prevConv: p.conv||0, prevCost: p.cost||0, prevClick: p.click||0 };
-      }).filter(t => Number(t.conv||0) > 0)
-        .sort((a, b) => (b.conv||0) - (a.conv||0))
-        .slice(0, 200);
-    } catch(e) {
-      console.warn('[expkeyword] skip:', e.message);
-      convTerms = [];
-    }
-
-    return res.json({
-      days: formattedDays, recentDays, recent21Days, prevAgg, convKws, convTerms, spendKws, clickKws, allCamps, allGroups,
-      _meta: { period: `${startDate}~${endDate}`, campCount: campaigns.length, kwCount: keywords.length },
-    });
-
-  } catch (err) {
-    console.error('[naver] error:', err);
-    return res.status(500).json({ error: err.message, stack: err.stack });
-  }
+    const curByCamp=aggById(curCampRows), prevByCamp=aggById(prevCampRows), curByGroup=aggById(curGroupRows), prevByGroup=aggById(prevGroupRows);
+    const campNameById={}, campTypeById={};
+    const allCamps=campaigns.map(c=>{ const id=c.nccCampaignId||c.campaignId||c.id; const name=c.name||c.campaignName||c.campNm||id; const type=campTypeLabel(c.campaignTp||c.type); campNameById[id]=name; campTypeById[id]=type; return {id,nccCampaignId:id,campId:id,campaignId:id,campNm:name,name,campaignName:name,campTp:c.campaignTp||c.type,type,...(curByCamp[id]||calc()),_prev:(prevByCamp[id]||calc())}; });
+    const allGroups=adgroups.map(g=>{ const id=g.nccAdgroupId||g.adgroupId||g.id; const campId=g.nccCampaignId||g.campaignId||g.campId; const groupNm=g.name||g.adgroupName||g.groupNm||id; return {id,nccAdgroupId:id,groupId:id,adgroupId:id,groupNm,name:groupNm,campId,campaignId:campId,nccCampaignId:campId,campNm:campNameById[campId]||campId,_campName:campNameById[campId]||campId,_type:campTypeById[campId]||'기타',type:campTypeById[campId]||'기타',...(curByGroup[id]||calc()),_prev:(prevByGroup[id]||calc())}; });
+    const recent21Days=aggByDay(recentRows); const days=recent21Days.filter(d=>d.dt>=startDate && d.dt<=endDate); const recentDays=recent21Days.slice(-7);
+    const allMedia=aggByMedia(curGroupRows.length ? curGroupRows : curCampRows);
+    return res.json({curAgg:aggRows(curCampRows),prevAgg:aggRows(prevCampRows),days,recentDays,recent21Days,allCamps,allGroups,allMedia,prevStart,prevEnd});
+  }catch(err){ console.error('[naver]',err); return res.status(500).json({error:err.message}); }
 };
