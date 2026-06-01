@@ -10990,254 +10990,85 @@ function dbDownloadReportHtml(){
 </script>
 
 <!-- ════════════════════════════════════════════════════════
-     v19 fixes
-     1. 긴급 점검 안내: v10 타이머 훅이 올바른 _prev 비교를 덮어쓰는 문제 수정
-     2. 캡처 버튼: 광고 성과 데이터(db-top-row) 섹션만 캡처
-     3. 임계값 초과 항목 없음 메시지 제거 (패널 숨김 처리)
-     4. HTML 다운로드: 마케터 코멘트/금일 운영 계획 상단 여백 추가
-     5. 최근 7일간 성과: daily data 오류 시 안내 메시지 개선
+     v19 final API/day/alert/capture fixes
+     - API 일자별 데이터 렌더 강제 갱신
+     - 판매 12개 / 비판매 8개 차트 고정 노출
+     - 긴급 점검 안내: 캠페인/광고그룹별 _prev 직접 비교만 사용, 비례추정 제거
+     - 빈 임계값 문구 제거
+     - 캡처는 광고 성과 데이터 영역만 저장
+     - HTML 다운로드 코멘트/계획 여백 보정
    ════════════════════════════════════════════════════════ -->
-<script id="gpt-v19-fixes-js">
+<style id="gpt-v19-final-fixes-css">
+#db-trend-lines-card{display:flex;min-height:360px;}
+#db-tlines-grid{min-height:300px;}
+.db-report-html #db-comment-output{padding-top:18px!important;}
+.db-report-html #db-comment-display,.db-report-html #db-plan-display{padding-top:4px!important;line-height:1.85!important;}
+.db-report-html #db-capture-area{max-width:none!important;width:100%!important;}
+</style>
+<script id="gpt-v19-final-fixes-js">
 (function(){
   'use strict';
-  const $ = id => document.getElementById(id);
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const $=id=>document.getElementById(id);
+  const esc=v=>(typeof dbHtmlEscape==='function')?dbHtmlEscape(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const SALE_KEYS=['cost','imp','click','purchaseCcnt','purchaseConvAmt','cart','cpc','ctr','cvr','roas','cpa','aov'];
+  const NONSALE_KEYS=['cost','imp','click','conv','cpc','ctr','cvr','cpa'];
+  const COLORS=['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#eab308','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8'];
+  function raw(){try{if(typeof _dbRawData!=='undefined'&&_dbRawData)return _dbRawData;}catch(e){} return window._dbRawData||null;}
+  function cur(){try{if(typeof _dbCur!=='undefined'&&_dbCur)return _dbCur;}catch(e){} return window._dbCur||null;}
+  function prev(){try{if(typeof _dbPrev!=='undefined'&&_dbPrev)return _dbPrev;}catch(e){} return window._dbPrev||null;}
+  function sale(){try{if(typeof dbCurrentSaleType!=='undefined')return dbCurrentSaleType;}catch(e){} return window.dbCurrentSaleType||'sale';}
+  function keyDate(r){return String(r?.dt||r?.dateRaw||r?.statDate||r?.date||'').replace(/-/g,'').replace(/\//g,'');}
+  function dshort(v){const s=String(v||''); if(/^\d{8}$/.test(s))return s.slice(4,6)+'/'+s.slice(6,8); if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(5,7)+'/'+s.slice(8,10); if(/^\d{4}\d{2}\d{2}$/.test(s))return s.slice(4,6)+'/'+s.slice(6,8); return s||'-';}
+  function label(k){try{if(typeof dbTblLabel==='function'){const t=dbTblLabel(k); if(t&&t!==k)return t;}}catch(e){} return ({cost:'광고비',imp:'노출수',click:'클릭수',purchaseCcnt:'전환수(구매)',purchaseConvAmt:'매출액(구매)',cart:'장바구니',cpc:'평균클릭비용(CPC)',ctr:'클릭율(CTR)',cvr:'전환율(CVR)',roas:'광고수익률(ROAS)',cpa:'전환당비용(CPA)',aov:'객단가',conv:'전환수',revenue:'매출액'}[k]||k);}
+  function agg(row,k){try{return Number((typeof dbAggCamp==='function'?dbAggCamp(row||{}):(row||{}))[k]||0);}catch(e){return Number((row||{})[k]||0);}}
+  function fmt(k,v){try{if(typeof dbFmt==='function')return dbFmt(k,Number(v||0));}catch(e){} v=Number(v||0); if(['ctr','cvr','roas'].includes(k))return v.toFixed(k==='roas'?1:2)+'%'; return Math.round(v).toLocaleString('ko-KR');}
+  function diffClass(k,d){try{if(typeof dbDiffClass==='function')return dbDiffClass(k,d);}catch(e){} const lowGood=['cost','cpc','cpa'].includes(k); return d===0?'neu':(lowGood?(d<0?'up':'dn'):(d>0?'up':'dn'));}
+  function dayRows(){const rd=raw()||{}; let src=[]; if(Array.isArray(rd.days)&&rd.days.length)src=rd.days; else if(Array.isArray(rd.recentDays)&&rd.recentDays.length)src=rd.recentDays; else if(Array.isArray(rd.recent21Days)&&rd.recent21Days.length)src=rd.recent21Days; return src.slice().filter(r=>keyDate(r)).sort((a,b)=>keyDate(a).localeCompare(keyDate(b))).slice(-7);}
+  function trendKeys(){return sale()==='nonsale'?NONSALE_KEYS:SALE_KEYS;}
+  function ensureChart(cb){if(window.Chart)return cb(); if(!document.getElementById('db-chartjs-loader-v19')){const s=document.createElement('script');s.id='db-chartjs-loader-v19';s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';s.onload=cb;s.onerror=()=>{const sub=$('db-tlines-subtitle'); if(sub)sub.textContent+=' · Chart.js 로드 실패';};document.head.appendChild(s);}else setTimeout(()=>window.Chart&&cb(),200);}
 
-  /* ══════════════════════════════════════════════════════
-     FIX 1: 긴급 점검 안내 — v10 훅 덮어쓰기 방지
-     v10의 dbRenderV10Alerts가 비중 역산 방식을 사용해
-     모든 행의 ROAS 변화율이 동일하게 나오는 문제 수정.
-     window.dbRenderV10Alerts를 올바른 _prev 비교 버전으로 교체.
-  ══════════════════════════════════════════════════════ */
-  function agg(row, key){
-    try{ return Number((typeof dbAggCamp==='function' ? dbAggCamp(row||{}) : (row||{}))[key] || 0); }
-    catch(e){ return Number((row||{})[key]||0); }
-  }
-  function label(key){
-    try{ if(typeof dbTblLabel==='function') return dbTblLabel(key); }catch(e){}
-    return ({cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',revenue:'매출액',
-      cart:'장바구니',cpc:'CPC',ctr:'CTR',cvr:'CVR',roas:'ROAS',cpa:'CPA',aov:'객단가',
-      purchaseCcnt:'전환수(구매)',purchaseConvAmt:'매출액(구매)'}[key] || key);
-  }
-  function fmt(key, v){
-    try{ if(typeof dbFmt==='function') return dbFmt(key, Number(v||0)); }catch(e){}
-    v=Number(v||0);
-    if(['ctr','cvr'].includes(key)) return v.toFixed(2)+'%';
-    if(key==='roas') return Math.round(v)+'%';
-    return Math.round(v).toLocaleString('ko-KR');
-  }
-  function getRaw(){
-    try{ if(typeof _dbRawData!=='undefined' && _dbRawData) return _dbRawData; }catch(e){}
-    return window._dbRawData || null;
-  }
-
-  function correctAlertsRender(){
-    const list = $('db-threshold-list'); if(!list) return;
-    const rd = getRaw();
-    if(!rd){ list.innerHTML='<div class="db-v14-empty">데이터 조회 후 표시됩니다.</div>'; return; }
-
-    let thr = {};
-    try{ const raw=localStorage.getItem('dbV11Thr'); if(raw) thr=JSON.parse(raw)||{}; }catch(e){}
-    thr = thr || window.__dbV11Thr || {};
-
-    let defs = [];
-    try{ defs = METRIC_DEFS.filter(m => thr[m.key]?.on); }catch(e){ defs=[]; }
-    if(!defs.length){
-      // 임계값 ON 항목 없으면 패널 자체를 숨김 처리
-      list.innerHTML = '';
-      const panel = $('db-threshold-panel');
-      if(panel) panel.style.display = 'none';
-      return;
-    }
-
-    const badWhenIncrease = new Set(['cost','cpc','cpa']);
-    const rows = [];
-    const seen = new Set();
-
-    function rowIdOf(row, kind){
-      return String(row?.id||row?.nccCampaignId||row?.campaignId||row?.nccAdgroupId||row?.adgroupId||row?.campNm||row?.groupNm||kind);
-    }
-    function prevOf(row){ return row?._prev || row?.prev || row?.previous || null; }
-
-    function scan(arr, kind){
-      (arr||[]).forEach(row=>{
-        const pv = prevOf(row); if(!pv) return;
-        const camp = kind==='group'
-          ? (row._campName||row.campNm||row.campaignName||'-')
-          : (row.campNm||row.campaignName||row.name||'-');
-        const grp = kind==='group' ? (row.groupNm||row.adgroupName||row.name||'-') : '-';
-        const id = rowIdOf(row, kind);
-
-        defs.forEach(m=>{
-          const cur=agg(row,m.key), pre=agg(pv,m.key);
-          if(!Number.isFinite(cur)||!Number.isFinite(pre)||pre===0) return;
-          const pct=(cur-pre)/Math.abs(pre)*100;
-          const limit=Number(thr[m.key]?.pct||30);
-          if(Math.abs(pct)<limit) return;
-          const key=`${kind}|${id}|${m.key}`; if(seen.has(key)) return; seen.add(key);
-          const isBad = badWhenIncrease.has(m.key) ? pct>0 : pct<0;
-          rows.push({kind,camp,grp,metric:m.key,metricLabel:m.label||label(m.key),cur,pre,pct,isBad});
-        });
-      });
-    }
-    scan(rd.allCamps||[], 'camp');
-    scan(rd.allGroups||[], 'group');
-    rows.sort((a,b)=>(b.isBad-a.isBad)||Math.abs(b.pct)-Math.abs(a.pct));
-
-    // 항목 없으면 패널 숨김 (메시지 표시 안 함)
-    if(!rows.length){
-      list.innerHTML = '';
-      const panel = $('db-threshold-panel');
-      if(panel) panel.style.display = 'none';
-      return;
-    }
-
-    // 패널 다시 표시
-    const panel = $('db-threshold-panel');
-    if(panel) panel.style.display = '';
-
-    list.innerHTML = '<div class="db-v14-alert-head"><div>캠페인</div><div>광고그룹</div><div>내용</div></div>'
-      + rows.slice(0,120).map(r=>{
-          const sign=r.pct>0?'+':''; const word=r.pct>0?'증가':'감소';
-          const detail=`${r.metricLabel} ${sign}${r.pct.toFixed(1)}% ${word} · 현재 ${fmt(r.metric,r.cur)} / 이전 ${fmt(r.metric,r.pre)}`;
-          return `<div class="db-v14-alert-row">`
-            +`<div class="db-v14-c-camp" title="${esc(r.camp)}">${esc(r.camp)}</div>`
-            +`<div class="db-v14-c-grp" title="${esc(r.grp)}">${esc(r.grp)}</div>`
-            +`<div class="db-v14-c-msg ${r.isBad?'bad':'ok'}" title="${esc(detail)}">${esc(detail)}</div>`
-            +`</div>`;
-        }).join('');
-  }
-
-  // v10의 dbRenderV10Alerts를 올바른 버전으로 교체 (타이머 훅 재정의)
-  window.dbRenderV10Alerts = correctAlertsRender;
-  window.dbRenderThresholdAlerts = correctAlertsRender;
-
-  /* ══════════════════════════════════════════════════════
-     FIX 2: 캡처 버튼 — 광고 성과 데이터(db-top-row)만 캡처
-  ══════════════════════════════════════════════════════ */
-  window.dbCapture = async function(){
-    if(typeof html2canvas === 'undefined'){
-      if(typeof showToast==='function') showToast('캡처 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요');
-      return;
-    }
-
-    if(typeof dbPrepareCommentOutput === 'function') dbPrepareCommentOutput();
-
-    document.body.classList.add('db-capturing');
-    const _collapsedCharts=[...document.querySelectorAll('.db-metric-chart-collapsed')];
-    _collapsedCharts.forEach(el=>{el.dataset.wasCollapsed='1';el.style.display='none';});
-    const settingsPanel = $('db-settings-panel');
-    if(settingsPanel) settingsPanel.style.display='none';
-    const captureBtn = $('db-capture-btn-top');
-    if(captureBtn) captureBtn.style.display='none';
-
-    // 광고 성과 데이터 섹션(스코어카드 + 지표 비교 + 추이)만 캡처
-    const el = $('db-top-row') || $('db-capture-area');
-
-    try{
-      if(!el){ if(typeof showToast==='function') showToast('캡처할 영역을 찾을 수 없습니다'); return; }
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117',
-        useCORS: true,
-        logging: false,
-        scrollY: -window.scrollY,
-      });
-      const link = document.createElement('a');
-      const advName = (typeof dbActiveAdv==='function' ? dbActiveAdv() : window.currentAdv)?.name || '성과';
-      const pm = (typeof dbPeriodMeta !== 'undefined' ? dbPeriodMeta : null);
-      const pad = n => String(n).padStart(2,'0');
-      const dateStr = pm
-        ? pad(pm.curS.getMonth()+1)+pad(pm.curS.getDate())+'-'+pad(pm.curE.getMonth()+1)+pad(pm.curE.getDate())
-        : new Date().toISOString().slice(0,10);
-      link.download = `${advName}_광고성과데이터_${dateStr}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      if(typeof showToast==='function') showToast('✅ 이미지 저장 완료');
-    } catch(e){
-      console.error(e);
-      if(typeof showToast==='function') showToast('❌ 캡처 오류: '+e.message);
-    } finally{
-      document.body.classList.remove('db-capturing');
-      _collapsedCharts.forEach(el=>{ if(el.dataset.wasCollapsed) el.style.display=''; delete el.dataset.wasCollapsed; });
-      if(settingsPanel) settingsPanel.style.display='';
-      if(captureBtn) captureBtn.style.display='';
-      try{
-        const commentOut=document.getElementById('db-comment-output');
-        const commentDisplay=document.getElementById('db-comment-display');
-        const planDisplay=document.getElementById('db-plan-display');
-        if(commentOut) commentOut.style.display='none';
-        if(commentDisplay) commentDisplay.innerHTML='';
-        if(planDisplay) planDisplay.innerHTML='';
-      }catch(e){}
-    }
+  window.dbRenderTrendLines=function(){
+    const card=$('db-trend-lines-card'),grid=$('db-tlines-grid'); if(!card||!grid)return;
+    const rows=dayRows(), keys=trendKeys();
+    card.style.display='flex'; card.style.minHeight='360px';
+    const sub=$('db-tlines-subtitle');
+    if(sub)sub.textContent=rows.length?`(${dshort(keyDate(rows[0]))} ~ ${dshort(keyDate(rows[rows.length-1]))}, 최근 ${rows.length}일 · ${keys.length}개)`:'(API 일자별 데이터 대기 중)';
+    if(!rows.length){grid.innerHTML='<div class="db-empty" style="grid-column:1/-1;padding:42px 10px;">API 일자별 데이터를 불러오는 중입니다. 조회 후에도 계속 비어 있으면 서버 일자별 통계 호출을 확인하세요.</div>';return;}
+    grid.innerHTML=keys.map(k=>{const vals=rows.map(r=>agg(r,k)); const cv=vals.at(-1)||0,pv=vals.length>1?(vals.at(-2)||0):0,avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1); const pct=pv?((cv-pv)/Math.abs(pv)*100):0; return `<div class="db-tline-card" data-metric="${esc(k)}"><div class="db-tline-title">${esc(label(k))}</div><div class="db-tline-meta">현재 <b>${fmt(k,cv)}</b> · 이전 ${fmt(k,pv)} · 평균 ${fmt(k,avg)} <span class="${diffClass(k,cv-pv)}" style="font-weight:900;">${pv?(pct>0?'+':'')+Math.round(pct)+'%':'-'}</span></div><div style="flex:1;min-height:92px;"><canvas id="db-tl-cv-${esc(k)}"></canvas></div></div>`;}).join('');
+    ensureChart(()=>requestAnimationFrame(()=>{window.__dbTrendCharts=window.__dbTrendCharts||{};keys.forEach((k,i)=>{const cv=$(`db-tl-cv-${k}`); if(!cv||!window.Chart)return; try{window.__dbTrendCharts[k]?.destroy();}catch(e){} const color=COLORS[i%COLORS.length]; window.__dbTrendCharts[k]=new Chart(cv.getContext('2d'),{type:'line',data:{labels:rows.map(r=>dshort(keyDate(r))),datasets:[{label:label(k),data:rows.map(r=>agg(r,k)),borderColor:color,backgroundColor:color+'30',tension:.28,fill:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.97)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:ctx=>`${label(k)}: ${fmt(k,ctx.parsed.y)}`}},datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#dbe7f5',font:{size:10,weight:'700'},maxRotation:0,minRotation:0,autoSkip:false}},y:{beginAtZero:false,grace:'24%',grid:{display:false},ticks:{display:false}}}}});});}));
   };
 
-  /* ══════════════════════════════════════════════════════
-     FIX 3: HTML 다운로드 — 마케터 코멘트/금일 운영 계획 상단 여백
-     db-comment-report-label 의 음수 margin 제거 및 padding-top 추가
-  ══════════════════════════════════════════════════════ */
-  (function patchCommentLabelStyle(){
-    const styleId = 'v19-comment-label-fix';
-    if(document.getElementById(styleId)) return;
-    const s = document.createElement('style');
-    s.id = styleId;
-    s.textContent = `
-      /* v19: 마케터 코멘트/금일 운영 계획 레이블 상단 여백 수정 */
-      #tab-dashboard .db-comment-report-label,
-      .db-report-html #tab-dashboard .db-comment-report-label {
-        display: block !important;
-        margin: 0 0 9px 0 !important;
-        padding: 14px 14px 9px !important;
-        background: #314159 !important;
-        color: #f8fafc !important;
-        font-size: 11px !important;
-        font-weight: 950 !important;
-        letter-spacing: .05em !important;
-      }
-      /* 임계값 초과 없음 텍스트 숨김 */
-      .db-threshold-empty,
-      .db-v14-empty {
-        display: none !important;
-      }
-    `;
-    document.head.appendChild(s);
-  })();
+  function thr(){try{return JSON.parse(localStorage.getItem('dbV11Thr')||'{}')||{};}catch(e){return window.__dbV11Thr||{};}}
+  function pOf(row){return row?._prev||row?.prev||row?.previous||null;}
+  function idOf(row,kind){return String(row?.id||row?.nccCampaignId||row?.campaignId||row?.nccAdgroupId||row?.adgroupId||row?.groupId||row?.campNm||row?.groupNm||kind);}
+  window.dbRenderThresholdAlerts=function(){
+    const list=$('db-threshold-list'); if(!list)return; const rd=raw(); if(!rd){list.innerHTML='';return;}
+    const cfg=thr(); let defs=[]; try{defs=(typeof METRIC_DEFS!=='undefined'?METRIC_DEFS:[]).filter(m=>cfg[m.key]?.on);}catch(e){}
+    if(!defs.length){list.innerHTML='';return;}
+    const badUp=new Set(['cost','cpc','cpa']); const rows=[],seen=new Set();
+    const scan=(arr,kind)=>{(arr||[]).forEach(row=>{const pv=pOf(row); if(!pv)return; const camp=kind==='group'?(row._campName||row.campNm||row.campaignName||'-'):(row.campNm||row.campaignName||row.name||'-'); const grp=kind==='group'?(row.groupNm||row.adgroupName||row.name||'-'):'-'; const id=idOf(row,kind); defs.forEach(m=>{const a=agg(row,m.key),b=agg(pv,m.key); if(!Number.isFinite(a)||!Number.isFinite(b)||b===0)return; const pct=(a-b)/Math.abs(b)*100,lim=Number(cfg[m.key]?.pct||30); if(Math.abs(pct)<lim)return; const uniq=`${kind}|${id}|${m.key}`; if(seen.has(uniq))return; seen.add(uniq); const isBad=badUp.has(m.key)?pct>0:pct<0; rows.push({camp,grp,key:m.key,ml:m.label||label(m.key),cur:a,pre:b,pct,isBad});});});};
+    scan(rd.allCamps||[],'camp'); scan(rd.allGroups||[],'group'); rows.sort((a,b)=>(b.isBad-a.isBad)||Math.abs(b.pct)-Math.abs(a.pct));
+    if(!rows.length){list.innerHTML='';return;}
+    list.innerHTML='<div class="db-v14-alert-head"><div>캠페인</div><div>광고그룹</div><div>내용</div></div>'+rows.slice(0,150).map(r=>{const sign=r.pct>0?'+':'',word=r.pct>0?'증가':'감소'; const detail=`${r.ml} ${sign}${r.pct.toFixed(1)}% ${word} · 현재 ${fmt(r.key,r.cur)} / 이전 ${fmt(r.key,r.pre)}`; return `<div class="db-v14-alert-row"><div class="db-v14-c-camp" title="${esc(r.camp)}">${esc(r.camp)}</div><div class="db-v14-c-grp" title="${esc(r.grp)}">${esc(r.grp)}</div><div class="db-v14-c-msg ${r.isBad?'bad':'ok'}" title="${esc(detail)}">${esc(detail)}</div></div>`;}).join('');
+  };
+  window.dbRenderV11Alerts=window.dbRenderV10Alerts=window.dbRenderThresholdAlerts;
 
-  /* ══════════════════════════════════════════════════════
-     FIX 4: HTML 다운로드 — 코멘트 라벨 여백 적용 (buildReportHeaderHTML 오버라이드 불필요)
-     dbDownloadReportHtml 의 CSS 인라인 스타일에 여백 추가
-  ══════════════════════════════════════════════════════ */
-  const _origDownload = window.dbDownloadReportHtml;
-  if(typeof _origDownload === 'function'){
-    window.dbDownloadReportHtml = function(){
-      // 원본 호출 전에 CSS 패치 포함 (style 태그에 반영됨)
-      return _origDownload.apply(this, arguments);
-    };
-  }
+  function refresh(){try{ if(raw()){ window.dbRenderDailyTbl?.(dayRows()); } window.dbRenderTrendLines?.(); window.dbRenderThresholdAlerts?.(); }catch(e){console.warn('[v19 refresh]',e);}}
+  const oldLoad=window.dbLoad||null; if(typeof oldLoad==='function'&&!oldLoad.__v19Wrapped){const wrapped=async function(){const r=await oldLoad.apply(this,arguments); [120,450,1000,1800].forEach(t=>setTimeout(refresh,t)); return r;}; wrapped.__v19Wrapped=true; window.dbLoad=wrapped; try{dbLoad=wrapped;}catch(e){}}
 
-  /* ══════════════════════════════════════════════════════
-     FIX 5: dbLoad 훅 — 데이터 로드 후 올바른 렌더러 호출
-  ══════════════════════════════════════════════════════ */
-  const _prevLoad = window.dbLoad;
-  if(typeof _prevLoad === 'function' && !_prevLoad.__v19Wrapped){
-    window.dbLoad = async function(){
-      const r = await _prevLoad.apply(this, arguments);
-      // v10 훅이 잘못된 버전을 재호출하는 것을 방지하기 위해 딜레이 후 올바른 렌더러 재실행
-      setTimeout(correctAlertsRender, 300);
-      setTimeout(correctAlertsRender, 800);
-      setTimeout(correctAlertsRender, 1500);
-      return r;
-    };
-    window.dbLoad.__v19Wrapped = true;
-  }
+  const oldSale=window.dbSetSaleType||null; if(typeof oldSale==='function'&&!oldSale.__v19Wrapped){const w=function(t){const r=oldSale.apply(this,arguments); setTimeout(refresh,80); setTimeout(refresh,300); return r;}; w.__v19Wrapped=true; window.dbSetSaleType=w; try{dbSetSaleType=w;}catch(e){}}
 
-  /* 부팅 시 초기 적용 */
-  function boot(){
-    correctAlertsRender();
-  }
-  document.addEventListener('DOMContentLoaded', ()=>{ boot(); setTimeout(boot,600); setTimeout(boot,1800); });
-  [400, 1000, 2500, 5000].forEach(t => setTimeout(boot, t));
+  window.dbCapture=async function(){
+    if(typeof html2canvas==='undefined'){if(typeof showToast==='function')showToast('캡처 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요');return;}
+    try{if(typeof dbPrepareCommentOutput==='function')dbPrepareCommentOutput();}catch(e){}
+    document.body.classList.add('db-capturing');
+    const btn=$('db-capture-btn-top'); if(btn)btn.style.display='none';
+    try{const el=$('db-capture-area'); if(!el)return; const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY}); const a=document.createElement('a'); const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{}; const nm=adv.name||'스탁사인'; a.download=`${nm}_광고_성과_데이터_${new Date().toISOString().slice(0,10)}.png`; a.href=canvas.toDataURL('image/png'); a.click(); if(typeof showToast==='function')showToast('✅ 광고 성과 데이터 캡처 완료');}
+    catch(e){console.error(e); if(typeof showToast==='function')showToast('❌ 캡처 오류: '+e.message);} finally{document.body.classList.remove('db-capturing'); if(btn)btn.style.display='';}
+  };
+
+  document.addEventListener('DOMContentLoaded',()=>{refresh(); setTimeout(refresh,600); setTimeout(refresh,1800);});
+  [300,1000,2500,5000].forEach(t=>setTimeout(refresh,t));
 })();
 </script>
 
