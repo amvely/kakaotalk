@@ -11726,5 +11726,161 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
 })();
 </script>
 
+
+<!-- ChatGPT v26 final layout: options column restored, comment/plan stacked, stable 100% chart -->
+<style id="gpt-v26-final-layout-css">
+/* 상단 설정: 1열 성과항목, 2열 옵션, 3열 코멘트/계획 */
+#gpt-v9-settings-body,
+#db-settings-panel .gpt-v25-settings-body{
+  display:grid!important;
+  grid-template-columns:minmax(300px,.95fr) minmax(220px,.58fr) minmax(420px,1.25fr)!important;
+  gap:0!important;
+  align-items:stretch!important;
+  border-top:1px solid var(--border2)!important;
+}
+#db-v26-options-col,
+#db-v26-comment-plan-col,
+#gpt-v9-settings-body > .gpt-v26-metric-col{
+  min-width:0!important;
+  padding:12px 14px!important;
+  box-sizing:border-box!important;
+}
+#gpt-v9-settings-body > .gpt-v26-metric-col,
+#db-v26-options-col{border-right:1px solid var(--border2)!important;}
+#db-v26-options-col{display:flex!important;flex-direction:column!important;gap:10px!important;background:rgba(255,255,255,.006)!important;}
+.db-v26-option-box{background:#111827!important;border:1px solid #2b374b!important;border-radius:10px!important;padding:10px!important;}
+.db-v26-option-title{font-size:9.5px!important;font-weight:950!important;color:#cbd5e1!important;letter-spacing:.1em!important;text-transform:uppercase!important;margin-bottom:8px!important;display:flex!important;align-items:center!important;gap:6px!important;}
+.db-v26-option-body{display:flex!important;flex-wrap:wrap!important;gap:7px!important;align-items:center!important;}
+.db-v26-option-body label{display:flex!important;align-items:center!important;gap:5px!important;color:#cbd5e1!important;font-size:10.5px!important;font-weight:900!important;white-space:nowrap!important;}
+#db-v26-comment-plan-col{display:grid!important;grid-template-rows:1fr 1fr!important;gap:10px!important;}
+.db-v26-comment-section,.db-v26-plan-section{display:flex!important;flex-direction:column!important;min-height:0!important;background:transparent!important;}
+.db-v26-plan-section{border-top:1px solid var(--border2)!important;padding-top:10px!important;}
+.db-v26-section-title{font-size:9.5px!important;font-weight:950!important;color:var(--text3)!important;letter-spacing:.1em!important;text-transform:uppercase!important;margin-bottom:8px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;}
+#db-v26-comment-plan-col #db-comment,
+#db-v26-comment-plan-col #db-plan{flex:1!important;min-height:92px!important;resize:none!important;font-size:12px!important;line-height:1.7!important;}
+/* 긴급점검/임계값 완전 제거 */
+#db-threshold-panel,#db-threshold-list,#db-threshold-output,#db-v9-thr-host,#db-threshold-settings-btn,
+.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v10-thr-row,.db-v20-target-toggle-wrap{display:none!important;}
+/* 워터폴 위 코멘트/계획 출력: 가로 2개 카드 */
+#db-comment-output-top{margin:0 0 12px!important;border:none!important;background:transparent!important;overflow:visible!important;}
+#db-comment-output-top .db-comment-top-grid,
+.db-report-html #db-comment-output-top .db-comment-top-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important;}
+#db-comment-output-top .db-comment-report-card,
+.db-report-html #db-comment-output-top .db-comment-report-card{display:grid!important;grid-template-columns:126px minmax(0,1fr)!important;min-height:90px!important;border:1px solid #273244!important;border-radius:12px!important;overflow:hidden!important;background:#10141d!important;padding:0!important;}
+#db-comment-output-top .db-comment-report-label,
+.db-report-html #db-comment-output-top .db-comment-report-label{display:flex!important;align-items:flex-start!important;justify-content:flex-start!important;margin:0!important;padding:13px 12px!important;background:#243044!important;color:#f8fafc!important;font-size:11px!important;font-weight:950!important;line-height:1.45!important;}
+#db-comment-output-top .db-comment-report-text,
+.db-report-html #db-comment-output-top .db-comment-report-text{padding:13px 14px!important;min-height:90px!important;font-size:12.3px!important;line-height:1.72!important;color:#eaf1fb!important;white-space:pre-wrap!important;}
+/* 100% 비중 차트 깜빡임 완화 */
+#db-stack-card canvas,#db-stack-canvas{animation:none!important;transition:none!important;}
+@media(max-width:1100px){#gpt-v9-settings-body,#db-settings-panel .gpt-v25-settings-body{grid-template-columns:1fr!important;}#db-v26-options-col,#gpt-v9-settings-body > .gpt-v26-metric-col{border-right:none!important;border-bottom:1px solid var(--border2)!important;}#db-v26-comment-plan-col{grid-template-rows:auto auto!important;}#db-comment-output-top .db-comment-top-grid,.db-report-html #db-comment-output-top .db-comment-top-grid{grid-template-columns:1fr!important;}}
+</style>
+<script id="gpt-v26-final-layout-js">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  function removeBadPanels(){
+    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-v9-thr-host','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el){const grp=el.closest&&el.closest('.db-v9-grp'); (grp||el).remove();}});
+    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v10-thr-row,.db-v20-target-toggle-wrap').forEach(el=>el.remove());
+    document.querySelectorAll('#db-settings-panel *').forEach(el=>{
+      const t=(el.textContent||'').trim();
+      if(t.includes('긴급 점검 안내') || t.includes('주요지표 임계값') || t.includes('임계값 설정') || t.includes('임계값 초과')){
+        const box=el.closest('.db-v9-grp')||el.closest('.db-threshold-panel')||el.closest('.db-v26-option-box')||el.parentElement;
+        if(box && !box.contains($('db-comment')) && !box.contains($('db-plan')) && !box.contains($('db-metric-toggle-grid'))) box.remove();
+      }
+    });
+  }
+  function directChild(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
+  function ensureDiffButton(host){
+    let btn=$('db-diff-rate-toggle')||document.querySelector('.gpt-v25-diff-btn');
+    if(!btn){btn=document.createElement('button'); btn.type='button'; btn.id='db-diff-rate-toggle'; btn.className='db-diff-toggle-btn gpt-v25-diff-btn on'; btn.textContent='증감률 ON';}
+    btn.onclick=function(){
+      const on=!(window.__dbDiffRateOn!==false);
+      if(typeof window.dbV25SetDiff==='function') window.dbV25SetDiff(on); else { window.__dbDiffRateOn=on; document.querySelectorAll('.db-diff-rate-th,.db-diff-rate-td').forEach(el=>el.style.display=on?'':'none'); }
+      document.querySelectorAll('#db-diff-rate-toggle,.gpt-v25-diff-btn').forEach(b=>{b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF');});
+    };
+    host.appendChild(btn);
+  }
+  function finalTopLayout(){
+    const ctrl=$('db-ctrl-area'); const body=ctrl&&ctrl.nextElementSibling; if(!body) return;
+    body.id='gpt-v9-settings-body'; body.classList.add('gpt-v25-settings-body');
+    removeBadPanels();
+
+    const metricGrid=$('db-metric-toggle-grid');
+    const comment=$('db-comment'); const plan=$('db-plan');
+    if(!metricGrid || !comment || !plan) return;
+    const metricCol=directChild(body,metricGrid) || body.children[0];
+    metricCol.classList.add('gpt-v26-metric-col');
+
+    // 옵션 컬럼 생성 및 컨트롤 이동
+    let optCol=$('db-v26-options-col');
+    if(!optCol){optCol=document.createElement('div'); optCol.id='db-v26-options-col';}
+    optCol.innerHTML='<div class="db-v26-option-box"><div class="db-v26-option-title">📌 캠페인/광고그룹 노출행</div><div class="db-v26-option-body" id="db-v26-row-host"></div></div><div class="db-v26-option-box"><div class="db-v26-option-title">📈 증감률 표시</div><div class="db-v26-option-body" id="db-v26-diff-host"></div></div>';
+    ['db-camp-row-limit','db-group-row-limit'].forEach(id=>{const sel=$(id); if(sel){const lab=sel.closest('label')||sel; $('db-v26-row-host')?.appendChild(lab);}});
+    ensureDiffButton($('db-v26-diff-host')||optCol);
+
+    // 코멘트/계획 컬럼: 한 컬럼에서 위아래 배치
+    let cpCol=$('db-v26-comment-plan-col');
+    if(!cpCol){cpCol=document.createElement('div'); cpCol.id='db-v26-comment-plan-col';}
+    cpCol.innerHTML='';
+    const cSec=document.createElement('div'); cSec.className='db-v26-comment-section';
+    const pSec=document.createElement('div'); pSec.className='db-v26-plan-section';
+    const aiRow=document.querySelector('#db-settings-panel .db-ai-row');
+    if(aiRow) cSec.appendChild(aiRow); else cSec.innerHTML='<div class="db-v26-section-title">✏️ 마케터 코멘트</div>';
+    cSec.appendChild(comment);
+    const planTitle=document.createElement('div'); planTitle.className='db-v26-section-title'; planTitle.innerHTML='🎯 금일 운영 계획';
+    const hidePlan=$('db-v23-hide-plan'); if(hidePlan) planTitle.appendChild(hidePlan);
+    pSec.appendChild(planTitle); pSec.appendChild(plan);
+    cpCol.appendChild(cSec); cpCol.appendChild(pSec);
+
+    // 본문을 딱 3컬럼으로 재구성. 기존 이벤트 연결된 노드는 위에서 이동된 상태라 보존됨.
+    body.innerHTML='';
+    body.appendChild(metricCol); body.appendChild(optCol); body.appendChild(cpCol);
+    body.style.display='grid';
+    body.style.gridTemplateColumns='minmax(300px,.95fr) minmax(220px,.58fr) minmax(420px,1.25fr)';
+    body.style.gap='0'; body.style.alignItems='stretch';
+
+    removeBadPanels();
+  }
+  function ensureCommentOutputPosition(){
+    let top=$('db-comment-output-top'); const wf=$('db-waterfall-card'); const topRow=$('db-top-row');
+    if(!top && topRow){
+      top=document.createElement('div'); top.id='db-comment-output-top';
+      top.innerHTML='<div class="db-comment-top-grid"><div class="db-comment-report-card"><div class="db-comment-report-label">✏️ 마케터 코멘트</div><div id="db-comment-display-top" class="db-comment-report-text"></div></div><div class="db-comment-report-card"><div class="db-comment-report-label">🎯 금일 운영 계획</div><div id="db-plan-display-top" class="db-comment-report-text"></div></div></div>';
+    }
+    if(top && wf && top.nextElementSibling!==wf){ wf.parentElement.insertBefore(top,wf); }
+    const thr=$('db-threshold-output'); if(thr) thr.remove();
+    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
+  }
+  function patchStackStability(){
+    const old=window.dbRenderStackChart;
+    if(typeof old!=='function' || old.__v26Stable) return;
+    let lastSig='', lastAt=0;
+    const wrapped=function(force){
+      let rd=null; try{rd=window._dbRawData||_dbRawData;}catch(e){rd=window._dbRawData;}
+      const dim=$('db-stack-dim')?.value||'campaign'; const lim=$('db-stack-limit')?.value||'0';
+      const camps=(rd&&rd.allCamps)||[], groups=(rd&&rd.allGroups)||[];
+      const sig=dim+'|'+lim+'|'+camps.length+'|'+groups.length+'|'+camps.slice(0,20).map(x=>[x.campNm||x.name,x.cost,x.imp,x.click,x.conv,x.revenue].join(':')).join('|')+'|'+groups.slice(0,20).map(x=>[x.groupNm||x.name,x.cost,x.imp,x.click,x.conv,x.revenue].join(':')).join('|');
+      const now=Date.now();
+      if(!force && sig===lastSig && now-lastAt<2500 && window.__dbStackChart) return window.__dbStackChart;
+      lastSig=sig; lastAt=now;
+      try{ if(window.Chart) Chart.defaults.animation=false; }catch(e){}
+      const r=old.apply(this,arguments);
+      try{ if(window.__dbStackChart){ window.__dbStackChart.options.animation=false; window.__dbStackChart.update('none'); }}catch(e){}
+      return r;
+    };
+    wrapped.__v26Stable=true; window.dbRenderStackChart=wrapped; try{dbRenderStackChart=wrapped;}catch(e){}
+  }
+  function boot(){ finalTopLayout(); ensureCommentOutputPosition(); patchStackStability(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [150,500,1100,2200].forEach(t=>setTimeout(boot,t));});
+  else {boot(); [150,500,1100,2200].forEach(t=>setTimeout(boot,t));}
+  if(window.MutationObserver){
+    const mo=new MutationObserver(()=>{clearTimeout(window.__v26mo); window.__v26mo=setTimeout(boot,120);});
+    setTimeout(()=>{const root=$('tab-dashboard'); if(root) mo.observe(root,{childList:true,subtree:true});},400);
+  }
+  setInterval(()=>{try{removeBadPanels(); ensureCommentOutputPosition();}catch(e){}},2500);
+})();
+</script>
+
 </body>
 </html>
