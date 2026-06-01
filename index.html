@@ -10826,5 +10826,168 @@ function dbDownloadReportHtml(){
 })();
 </script>
 
+
+
+<!-- ════════════════════════════════════════════════════════
+     v18 final dashboard fixes
+     - 일간 지표 추이: 판매 12개 / 비판매 8개 고정 노출
+     - Chart.js 지연/실패 시에도 차트 카드 공간 유지
+     - 긴급 점검 안내: 캠페인/광고그룹 행별 현재값·이전값 기준으로 중복 제거
+   ════════════════════════════════════════════════════════ -->
+<script id="gpt-v18-final-dashboard-fixes-js">
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = v => (typeof dbHtmlEscape === 'function') ? dbHtmlEscape(v) : String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const SALE_TREND_KEYS = ['cost','imp','click','purchaseCcnt','purchaseConvAmt','cart','cpc','ctr','cvr','roas','cpa','aov'];
+  const NONSALE_TREND_KEYS = ['cost','imp','click','conv','cpc','ctr','cvr','cpa'];
+  const TREND_COLORS = ['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#eab308','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8'];
+
+  function getRaw(){
+    try{ if(typeof _dbRawData !== 'undefined' && _dbRawData) return _dbRawData; }catch(e){}
+    return window._dbRawData || null;
+  }
+  function getSaleType(){
+    try{ if(typeof dbCurrentSaleType !== 'undefined') return dbCurrentSaleType; }catch(e){}
+    return window.dbCurrentSaleType || 'sale';
+  }
+  function dateKey(r){ return String(r?.dt || r?.dateRaw || r?.statDate || r?.date || '').replace(/-/g,''); }
+  function dateShort(v){
+    const s=String(v||'');
+    if(/^\d{8}$/.test(s)) return s.slice(4,6)+'/'+s.slice(6,8);
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(5,7)+'/'+s.slice(8,10);
+    if(/^\d{2}\/\d{2}$/.test(s)) return s;
+    return s || '-';
+  }
+  function label(k){
+    try{ if(typeof dbTblLabel==='function') return dbTblLabel(k); }catch(e){}
+    try{ const m=METRIC_DEFS.find(x=>x.key===k); if(m) return m.label; }catch(e){}
+    return ({purchaseCcnt:'전환수(구매)',purchaseConvAmt:'매출액(구매)',cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',revenue:'매출액',cart:'장바구니',cpc:'평균클릭비용(CPC)',ctr:'클릭율(CTR)',cvr:'전환율(CVR)',roas:'광고수익률(ROAS)',cpa:'전환당비용(CPA)',aov:'객단가'}[k] || k);
+  }
+  function fmt(k,v){
+    try{ if(typeof dbFmt==='function') return dbFmt(k, Number(v||0)); }catch(e){}
+    v=Number(v||0);
+    if(['ctr','cvr'].includes(k)) return v.toFixed(2)+'%';
+    if(k==='roas') return Math.round(v)+'%';
+    return Math.round(v).toLocaleString('ko-KR');
+  }
+  function diffCls(k,d){
+    try{ if(typeof dbDiffClass==='function') return dbDiffClass(k,d); }catch(e){}
+    const lowerGood = ['cost','cpc','cpa'].includes(k);
+    return d===0 ? 'neu' : (lowerGood ? (d<0?'up':'dn') : (d>0?'up':'dn'));
+  }
+  function agg(row,k){
+    try{ return Number((typeof dbAggCamp==='function' ? dbAggCamp(row||{}) : (row||{}))[k] || 0); }catch(e){ return Number((row||{})[k]||0); }
+  }
+  function dailyRows(){
+    const rd=getRaw() || {};
+    const src = (Array.isArray(rd.recentDays) && rd.recentDays.length) ? rd.recentDays
+      : (Array.isArray(rd.recent21Days) && rd.recent21Days.length) ? rd.recent21Days
+      : (Array.isArray(rd.days) ? rd.days : []);
+    return src.slice().filter(r=>dateKey(r)).sort((a,b)=>dateKey(a).localeCompare(dateKey(b))).slice(-7);
+  }
+  function trendKeys(){ return getSaleType()==='nonsale' ? NONSALE_TREND_KEYS : SALE_TREND_KEYS; }
+
+  function ensureChartJs(cb){
+    if(window.Chart) return cb && cb();
+    if(!document.getElementById('db-chartjs-loader-v18')){
+      const sc=document.createElement('script');
+      sc.id='db-chartjs-loader-v18';
+      sc.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+      sc.onload=()=>cb&&cb();
+      sc.onerror=()=>console.warn('[v18] Chart.js 로드 실패: 차트 카드/수치는 표시하고 그래프만 생략합니다.');
+      document.head.appendChild(sc);
+    }else{
+      setTimeout(()=>{ if(window.Chart && cb) cb(); },150);
+    }
+  }
+
+  window.dbRenderTrendLines = function(){
+    const card=$('db-trend-lines-card'), grid=$('db-tlines-grid');
+    if(!card || !grid) return;
+    const rows=dailyRows();
+    const keys=trendKeys();
+    card.style.display='flex';
+    card.style.minHeight='360px';
+    const sub=$('db-tlines-subtitle');
+    if(sub) sub.textContent = rows.length ? `(${dateShort(dateKey(rows[0]))} ~ ${dateShort(dateKey(rows[rows.length-1]))}, 최근 ${rows.length}일 · ${getSaleType()==='nonsale'?'8개':'12개'})` : '(API 일자별 데이터 없음)';
+    if(!rows.length){
+      grid.innerHTML='<div class="db-empty" style="grid-column:1/-1;padding:42px 10px;">API 일자별 데이터가 없어 일간 지표 추이를 표시할 수 없습니다.</div>';
+      return;
+    }
+    grid.innerHTML=keys.map((k,i)=>{
+      const vals=rows.map(d=>agg(d,k));
+      const cur=vals[vals.length-1]||0, prev=vals.length>1?(vals[vals.length-2]||0):0;
+      const avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1);
+      const pct=prev ? ((cur-prev)/Math.abs(prev)*100) : 0;
+      return `<div class="db-tline-card" data-metric="${esc(k)}"><div class="db-tline-title">${esc(label(k))}</div><div class="db-tline-meta">현재 <b>${fmt(k,cur)}</b> · 이전 ${fmt(k,prev)} · 평균 ${fmt(k,avg)} <span class="${diffCls(k,cur-prev)}" style="font-weight:900;">${prev ? (pct>0?'+':'')+Math.round(pct)+'%' : '-'}</span></div><div style="flex:1;min-height:92px;"><canvas id="db-tl-cv-${esc(k)}"></canvas></div></div>`;
+    }).join('');
+    ensureChartJs(()=>requestAnimationFrame(()=>{
+      window.__dbTrendCharts = window.__dbTrendCharts || {};
+      keys.forEach((k,i)=>{
+        const cv=$(`db-tl-cv-${k}`); if(!cv || !window.Chart) return;
+        try{ window.__dbTrendCharts[k]?.destroy(); }catch(e){}
+        const color=TREND_COLORS[i%TREND_COLORS.length];
+        window.__dbTrendCharts[k]=new Chart(cv.getContext('2d'),{
+          type:'line',
+          data:{labels:rows.map(r=>dateShort(dateKey(r))),datasets:[{label:label(k),data:rows.map(r=>agg(r,k)),borderColor:color,backgroundColor:color+'30',tension:.28,fill:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.2}]},
+          options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:100,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.97)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:ctx=>`${label(k)}: ${fmt(k,ctx.parsed.y)}`}},datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#dbe7f5',font:{size:10,weight:'700'},maxRotation:0,minRotation:0,autoSkip:false}},y:{beginAtZero:false,grace:'24%',grid:{display:false},ticks:{display:false}}}}
+        });
+      });
+    }));
+  };
+
+  function thresholdSettings(){
+    try{ const raw=localStorage.getItem('dbV11Thr'); if(raw) return JSON.parse(raw)||{}; }catch(e){}
+    return window.__dbV11Thr || {};
+  }
+  function rowId(row,kind){ return String(row?.id || row?.nccCampaignId || row?.campaignId || row?.nccAdgroupId || row?.adgroupId || row?.groupId || row?.campNm || row?.groupNm || kind); }
+  function prevOf(row){ return row?._prev || row?.prev || row?.previous || null; }
+
+  window.dbRenderThresholdAlerts = function(){
+    const list=$('db-threshold-list'); if(!list) return;
+    const rd=getRaw();
+    if(!rd){ list.innerHTML='<div class="db-v14-empty">데이터 조회 후 표시됩니다.</div>'; return; }
+    const thr=thresholdSettings();
+    let defs=[];
+    try{ defs=METRIC_DEFS.filter(m=>thr[m.key]?.on); }catch(e){ defs=[]; }
+    if(!defs.length){ list.innerHTML='<div class="db-v14-empty">임계값 설정에서 ON 된 지표가 없습니다.</div>'; return; }
+    const rows=[]; const seen=new Set();
+    const badWhenIncrease = new Set(['cost','cpc','cpa']);
+    const scan=(arr,kind)=>{
+      (arr||[]).forEach(row=>{
+        const pv=prevOf(row); if(!pv) return;
+        const camp = kind==='group' ? (row._campName || row.campNm || row.campaignName || '-') : (row.campNm || row.campaignName || row.name || '-');
+        const grp  = kind==='group' ? (row.groupNm || row.adgroupName || row.name || '-') : '-';
+        const id=rowId(row,kind);
+        defs.forEach(m=>{
+          const cur=agg(row,m.key), pre=agg(pv,m.key);
+          if(!Number.isFinite(cur) || !Number.isFinite(pre) || pre===0) return;
+          const pct=(cur-pre)/Math.abs(pre)*100;
+          const limit=Number(thr[m.key]?.pct || 30);
+          if(Math.abs(pct) < limit) return;
+          const key=`${kind}|${id}|${m.key}`; if(seen.has(key)) return; seen.add(key);
+          const isBad = badWhenIncrease.has(m.key) ? pct>0 : pct<0;
+          rows.push({kind,camp,grp,metric:m.key,metricLabel:m.label||label(m.key),cur,pre,pct,isBad});
+        });
+      });
+    };
+    scan(rd.allCamps||[],'camp');
+    scan(rd.allGroups||[],'group');
+    rows.sort((a,b)=>(b.isBad-a.isBad)||Math.abs(b.pct)-Math.abs(a.pct));
+    if(!rows.length){ list.innerHTML='<div class="db-v14-empty">API 이전기간 기준 임계값 초과 항목이 없습니다.</div>'; return; }
+    list.innerHTML='<div class="db-v14-alert-head"><div>캠페인</div><div>광고그룹</div><div>내용</div></div>'+rows.slice(0,120).map(r=>{
+      const sign=r.pct>0?'+':''; const word=r.pct>0?'증가':'감소';
+      const detail=`${r.metricLabel} ${sign}${r.pct.toFixed(1)}% ${word} · 현재 ${fmt(r.metric,r.cur)} / 이전 ${fmt(r.metric,r.pre)}`;
+      return `<div class="db-v14-alert-row"><div class="db-v14-c-camp" title="${esc(r.camp)}">${esc(r.camp)}</div><div class="db-v14-c-grp" title="${esc(r.grp)}">${esc(r.grp)}</div><div class="db-v14-c-msg ${r.isBad?'bad':'ok'}" title="${esc(detail)}">${esc(detail)}</div></div>`;
+    }).join('');
+  };
+
+  const refresh=()=>{ try{ window.dbRenderTrendLines?.(); window.dbRenderThresholdAlerts?.(); }catch(e){ console.warn('[v18 refresh]',e); } };
+  document.addEventListener('DOMContentLoaded',()=>{ refresh(); setTimeout(refresh,500); setTimeout(refresh,1500); });
+  [300,900,2200,4500].forEach(t=>setTimeout(refresh,t));
+})();
+</script>
+
 </body>
 </html>
