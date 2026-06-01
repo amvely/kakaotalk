@@ -2580,10 +2580,14 @@ async function loadKakaoData(){
 // 캠페인 유형 한글 매핑
 const CAMP_TP_LABEL = {
   '1': '파워링크',
-  '2': '쇼핑검색',
+  '2': '쇼핑광고',
   '3': '파워컨텐츠',
-  '4': '브랜드검색',
+  '4': '브랜드검색광고',
   '5': '플레이스',
+  'WEB_SITE': '파워링크',
+  'SHOPPING': '쇼핑광고',
+  'POWER_CONTENTS': '파워컨텐츠',
+  'BRAND_SEARCH': '브랜드검색광고',
 };
 function campTpLabel(tp) {
   return CAMP_TP_LABEL[String(tp||'')] || (tp ? String(tp) : '기타');
@@ -10630,6 +10634,195 @@ function dbDownloadReportHtml(){
   function boot(){ applyV16ThresholdDefaults(); }
   document.addEventListener('DOMContentLoaded',()=>{ boot(); setTimeout(boot,700); setTimeout(boot,1800); });
   [300,900,2200,4000].forEach(t=>setTimeout(boot,t));
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════
+     v17 finalization patch
+     - API 원본 데이터만 사용하도록 긴급점검/최근7일/12개 차트 재정의
+     - 캠페인 유형 코드 한글명 통일
+     - 성과대시보드 조회 후 네이버 보고서 탭으로 튀는 현상 방지
+   ════════════════════════════════════════════════════════ -->
+<script id="gpt-v17-api-only-final-js">
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = v => (typeof dbHtmlEscape==='function') ? dbHtmlEscape(v) : String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const TYPE_LABEL = {
+    '1':'파워링크','2':'쇼핑광고','3':'파워컨텐츠','4':'브랜드검색광고','5':'플레이스',
+    WEB_SITE:'파워링크', SHOPPING:'쇼핑광고', POWER_CONTENTS:'파워컨텐츠', BRAND_SEARCH:'브랜드검색광고',
+    '쇼핑검색':'쇼핑광고', '브랜드검색':'브랜드검색광고', '파워링크':'파워링크', '쇼핑광고':'쇼핑광고', '파워컨텐츠':'파워컨텐츠', '브랜드검색광고':'브랜드검색광고'
+  };
+  function typeLabel(v){ const s=String(v??'').trim(); return TYPE_LABEL[s] || (s || '기타'); }
+  window.campTpLabel = typeLabel;
+  try{ campTpLabel = typeLabel; }catch(e){}
+  window.dbTypeOfCamp = function(c){ return typeLabel(c?.campTp || c?.type || c?._type); };
+  try{ dbTypeOfCamp = window.dbTypeOfCamp; }catch(e){}
+
+  function agg(row,key){
+    try{ return Number((typeof dbAggCamp==='function'?dbAggCamp(row||{}):(row||{}))[key]||0); }catch(e){ return Number((row||{})[key]||0); }
+  }
+  function label(key){ try{ return typeof dbTblLabel==='function'?dbTblLabel(key):(METRIC_DEFS.find(m=>m.key===key)?.label||key); }catch(e){ return key; } }
+  function fmt(key,v){ try{ return typeof dbFmt==='function'?dbFmt(key,v):Math.round(Number(v||0)).toLocaleString('ko-KR'); }catch(e){ return String(v??'-'); } }
+  function diffClass(key,diff){ try{ return typeof dbDiffClass==='function'?dbDiffClass(key,diff):(diff>0?'up':diff<0?'dn':'neu'); }catch(e){ return diff>0?'up':diff<0?'dn':'neu'; } }
+  function dateShort(v){ const s=String(v||''); if(/^\d{8}$/.test(s)) return s.slice(4,6)+'/'+s.slice(6,8); if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(5,7)+'/'+s.slice(8,10); return s||'-'; }
+  function visibleCols(){ try{ const c=(typeof dbVisibleTblCols==='function'?dbVisibleTblCols():[]).filter(x=>x&&x.key); return c.length?c:METRIC_DEFS.map(m=>({key:m.key})); }catch(e){ return []; } }
+  function rawData(){ try{ return (typeof _dbRawData!=='undefined' && _dbRawData) ? _dbRawData : (window._dbRawData||null); }catch(e){ return window._dbRawData||null; } }
+  function curAgg(){ try{ return (typeof _dbCur!=='undefined' && _dbCur) ? _dbCur : window._dbCur; }catch(e){ return window._dbCur; } }
+  function prevAgg(){ try{ return (typeof _dbPrev!=='undefined' && _dbPrev) ? _dbPrev : window._dbPrev; }catch(e){ return window._dbPrev; } }
+  function normalizeData(data){
+    if(!data) return data;
+    (data.allCamps||[]).forEach(c=>{ c.campTp = typeLabel(c.campTp || c.type || c._type); c.type = c.campTp; });
+    (data.allGroups||[]).forEach(g=>{ g.campTp = typeLabel(g.campTp || g.type || g._type); g.type = g.campTp; g._type = g.campTp; });
+    return data;
+  }
+  function syncGlobals(){
+    try{ if(typeof _dbRawData!=='undefined' && _dbRawData){ normalizeData(_dbRawData); window._dbRawData=_dbRawData; } }catch(e){}
+    try{ if(typeof _dbCur!=='undefined') window._dbCur=_dbCur; }catch(e){}
+    try{ if(typeof _dbPrev!=='undefined') window._dbPrev=_dbPrev; }catch(e){}
+  }
+  function activateDashboardOnly(){
+    const dash=$('tab-dashboard'); if(!dash) return;
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    dash.classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.textContent.includes('성과 대시보드')));
+    const sel=$('tab-mobile-sel'); if(sel) sel.value='dashboard';
+  }
+
+  /* API 응답도 유형명을 즉시 한글로 정규화 */
+  const oldFetch = window.fetchNaverData || (typeof fetchNaverData==='function'?fetchNaverData:null);
+  if(typeof oldFetch==='function' && !oldFetch.__v17Wrapped){
+    const wrapped = async function(){ const data=await oldFetch.apply(this,arguments); return normalizeData(data); };
+    wrapped.__v17Wrapped = true;
+    window.fetchNaverData = wrapped;
+    try{ fetchNaverData = wrapped; }catch(e){}
+  }
+
+  /* 새 버전 배포 후 사용자 브라우저의 이전 ON/10% 저장값을 한 번 더 OFF/30%로 정리 */
+  function resetThresholdOnce(){
+    try{
+      if(localStorage.getItem('dbV17ThresholdDefaultApplied')==='1') return;
+      const defs=(typeof METRIC_DEFS!=='undefined'?METRIC_DEFS:[]);
+      const next={}; defs.forEach(m=>{ next[m.key]={pct:30,on:false}; });
+      localStorage.setItem('dbV11Thr', JSON.stringify(next));
+      localStorage.setItem('dbV17ThresholdDefaultApplied','1');
+      window.__dbV11Thr=next;
+    }catch(e){}
+  }
+
+  function dailyRows(){
+    const rd=rawData()||{};
+    const src=(rd.recentDays&&rd.recentDays.length?rd.recentDays:(rd.recent21Days&&rd.recent21Days.length?rd.recent21Days:rd.days||[]));
+    return (src||[]).slice().sort((a,b)=>String(a.dt||a.date||'').localeCompare(String(b.dt||b.date||''))).slice(-7);
+  }
+
+  window.dbRenderDailyTbl = function(days){
+    const tbl=$('db-daily-tbl'), empty=$('db-daily-empty'), thead=tbl?.querySelector('thead tr'), tbody=$('db-daily-body');
+    if(!tbl||!empty||!thead||!tbody) return;
+    const rows=((days&&days.length)?days:dailyRows()).slice().sort((a,b)=>String(a.dt||a.date||'').localeCompare(String(b.dt||b.date||''))).slice(-7);
+    if(!rows.length){ empty.style.display='flex'; empty.textContent='API 일자별 데이터 없음'; tbl.style.display='none'; return; }
+    const cols=visibleCols();
+    const showRate = (()=>{ try{ return typeof window.__dbShowDiffRate==='undefined' ? true : !!window.__dbShowDiffRate; }catch(e){ return true; } })();
+    thead.innerHTML='<th class="db-date-head">날짜</th>'+cols.map(c=>`<th>${esc(label(c.key))}</th>${showRate?'<th class="db-diff-rate-th">증감률</th>':''}`).join('');
+    tbody.innerHTML=rows.map((r,i)=>{
+      const p=i>0?rows[i-1]:null;
+      const cells=cols.map(c=>{
+        const cv=agg(r,c.key), pv=p?agg(p,c.key):0;
+        const pct=pv?((cv-pv)/Math.abs(pv)*100):0;
+        const txt=p?(pv?`${pct>0?'+':''}${Math.round(pct)}%`:'-'):'-';
+        return `<td>${fmt(c.key,cv)}</td>${showRate?`<td class="db-diff-rate-td ${diffClass(c.key,cv-pv)}">${txt}</td>`:''}`;
+      }).join('');
+      return `<tr><td class="db-date-cell">${esc(dateShort(r.dt||r.date))}</td>${cells}</tr>`;
+    }).join('');
+    empty.style.display='none'; tbl.style.display='table';
+  };
+
+  function renderWhenChart(fn){ if(window.Chart) return fn(); setTimeout(()=>renderWhenChart(fn),100); }
+  window.dbRenderTrendLines = function(){
+    renderWhenChart(()=>{
+      const card=$('db-trend-lines-card'), grid=$('db-tlines-grid'); if(!card||!grid) return;
+      const rows=dailyRows();
+      if(!rows.length){ card.style.display='none'; return; }
+      card.style.display='flex';
+      const sub=$('db-tlines-subtitle'); if(sub) sub.textContent=`(${dateShort(rows[0].dt||rows[0].date)} ~ ${dateShort(rows[rows.length-1].dt||rows[rows.length-1].date)}, 최근 ${rows.length}일)`;
+      const keys=['cost','imp','click','conv','revenue','cart','ctr','cvr','cpc','cpa','roas','aov'];
+      const colors=['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#eab308','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8'];
+      grid.innerHTML=keys.map(k=>{
+        const vals=rows.map(d=>agg(d,k)); const cur=vals.at(-1)||0, prev=vals.length>1?(vals.at(-2)||0):0, avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1);
+        const pct=prev?((cur-prev)/Math.abs(prev)*100):0;
+        return `<div class="db-tline-card"><div class="db-tline-title">${esc(label(k))}</div><div class="db-tline-meta">현재 <b>${fmt(k,cur)}</b> · 이전 ${fmt(k,prev)} · 평균 ${fmt(k,avg)} <span class="${diffClass(k,cur-prev)}" style="font-weight:900;">${prev?(pct>0?'+':'')+Math.round(pct)+'%':'-'}</span></div><div style="flex:1;min-height:84px;"><canvas id="db-tl-cv-${k}"></canvas></div></div>`;
+      }).join('');
+      window.__dbTrendCharts=window.__dbTrendCharts||{};
+      requestAnimationFrame(()=>keys.forEach((k,i)=>{
+        const cv=$(`db-tl-cv-${k}`); if(!cv) return;
+        try{ window.__dbTrendCharts[k]?.destroy(); }catch(e){}
+        const color=colors[i%colors.length];
+        window.__dbTrendCharts[k]=new Chart(cv.getContext('2d'),{
+          type:'line', data:{labels:rows.map(d=>dateShort(d.dt||d.date)), datasets:[{label:label(k),data:rows.map(d=>agg(d,k)),borderColor:color,backgroundColor:color+'30',tension:.28,fill:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.2}]},
+          options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:100,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.97)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:ctx=>`${label(k)}: ${fmt(k,ctx.parsed.y)}`}},datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#dbe7f5',font:{size:11,weight:'400'},maxRotation:0,minRotation:0,autoSkip:false}},y:{beginAtZero:false,grace:'24%',grid:{display:false},ticks:{display:false}}}}
+        });
+      }));
+    });
+  };
+
+  /* 긴급점검은 캠페인/광고그룹별 API 현재값과 API 이전기간(_prev)만 비교. 전체 합계로 역산하지 않음. */
+  window.dbRenderThresholdAlerts = function(){
+    const list=$('db-threshold-list'); if(!list) return;
+    const rd=rawData(); if(!rd){ list.innerHTML='<div class="db-v14-empty">데이터 조회 후 표시됩니다.</div>'; return; }
+    const thr=window.__dbV11Thr||{};
+    const defs=(typeof METRIC_DEFS!=='undefined'?METRIC_DEFS:[]).filter(m=>thr[m.key]?.on);
+    if(!defs.length){ list.innerHTML='<div class="db-v14-empty">임계값 설정에서 ON 된 지표가 없습니다.</div>'; return; }
+    const rows=[];
+    const badDir={cost:1,cpc:1,cpa:1,roas:-1,ctr:-1,cvr:-1,click:-1,conv:-1,purchaseCcnt:-1,revenue:-1,purchaseConvAmt:-1,cart:-1,imp:-1};
+    function scan(arr,isGroup){
+      (arr||[]).forEach(row=>{
+        const pvObj=row._prev; if(!pvObj) return;
+        const camp=isGroup?(row._campName||row.campNm||row.campaignName||'-'):(row.campNm||row.campaignName||row.name||'-');
+        const grp=isGroup?(row.groupNm||row.name||'-'):'-';
+        defs.forEach(m=>{
+          const cur=agg(row,m.key), prev=agg(pvObj,m.key); if(!prev) return;
+          const pct=(cur-prev)/Math.abs(prev)*100, limit=Number(thr[m.key]?.pct||30);
+          if(Math.abs(pct)<limit) return;
+          const dir=badDir[m.key]??-1; const isBad=(dir===1&&pct>0)||(dir===-1&&pct<0);
+          rows.push({camp,grp,label:m.label||label(m.key),pct,isBad});
+        });
+      });
+    }
+    scan(rd.allCamps||[],false); scan(rd.allGroups||[],true);
+    rows.sort((a,b)=>(b.isBad-a.isBad)||Math.abs(b.pct)-Math.abs(a.pct));
+    if(!rows.length){ list.innerHTML='<div class="db-v14-empty">API 이전기간 기준 임계값 초과 항목이 없습니다.</div>'; return; }
+    list.innerHTML='<div class="db-v14-alert-head"><div>캠페인</div><div>광고그룹</div><div>내용</div></div>'+rows.map(r=>{
+      const sign=r.pct>0?'+':''; const word=r.pct>0?'증가':'감소';
+      return `<div class="db-v14-alert-row"><div class="db-v14-c-camp" title="${esc(r.camp)}">${esc(r.camp)}</div><div class="db-v14-c-grp" title="${esc(r.grp)}">${esc(r.grp)}</div><div class="db-v14-c-msg ${r.isBad?'bad':'ok'}">${esc(r.label)} ${sign}${r.pct.toFixed(1)}% ${word}</div></div>`;
+    }).join('');
+  };
+
+  const oldLoad = window.dbLoad || (typeof dbLoad==='function'?dbLoad:null);
+  if(typeof oldLoad==='function' && !oldLoad.__v17Wrapped){
+    const wrappedLoad = async function(){
+      activateDashboardOnly();
+      const r = await oldLoad.apply(this,arguments);
+      syncGlobals();
+      try{ if(rawData()){
+        window.dbRenderTypeTbl?.(rawData(), (typeof dbPeriodMeta!=='undefined'&&dbPeriodMeta?.curLabel)||'');
+        window.dbRenderCampTbl?.(rawData(), (typeof dbPeriodMeta!=='undefined'&&dbPeriodMeta?.curLabel)||'');
+        window.dbRenderGroupTbl?.(rawData(), (typeof dbPeriodMeta!=='undefined'&&dbPeriodMeta?.curLabel)||'');
+        window.dbRenderDailyTbl?.(dailyRows());
+        window.dbRenderTrendLines?.();
+        window.dbRenderThresholdAlerts?.();
+      }}catch(e){ console.warn('[v17 dashboard refresh]', e); }
+      activateDashboardOnly();
+      return r;
+    };
+    wrappedLoad.__v17Wrapped = true;
+    window.dbLoad = wrappedLoad;
+    try{ dbLoad = wrappedLoad; }catch(e){}
+  }
+
+  function boot(){ resetThresholdOnce(); syncGlobals(); try{ if(rawData()){ normalizeData(rawData()); window.dbRenderThresholdAlerts?.(); window.dbRenderDailyTbl?.(dailyRows()); window.dbRenderTrendLines?.(); } }catch(e){} }
+  document.addEventListener('DOMContentLoaded',()=>{ boot(); setTimeout(boot,500); setTimeout(boot,1500); });
+  [300,900,2200,4500].forEach(t=>setTimeout(boot,t));
 })();
 </script>
 
