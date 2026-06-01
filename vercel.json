@@ -1,7 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/advertisers", "destination": "/api/advertisers" },
-    { "source": "/api/naver", "destination": "/api/naver" },
-    { "source": "/(.*)", "destination": "/public/index.html" }
-  ]
-}
