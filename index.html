@@ -6535,183 +6535,7 @@ function dbDownloadReportHtml(){
   const styles=[...document.querySelectorAll('style')].map(x=>x.innerHTML).join('\n');
   const adv=dbActiveAdv(),pm=dbPeriodMeta;
   const stamp=pm?`${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`:new Date().toISOString().slice(0,10);
-  const htmlOut='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+dbHtmlEscape(adv.name)+' 성과 대시보드</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}#db-top-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important;gap:12px!important}.db-dtrend12-section{display:flex!important;flex-direction:column!important}.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}.db-clickable{cursor:default!important}.db-ichrt{pointer-events:none!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div>
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+  const htmlOut='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+dbHtmlEscape(adv.name)+' 성과 대시보드</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}#db-top-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important;gap:12px!important}.db-dtrend12-section{display:flex!important;flex-direction:column!important}.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}.db-clickable{cursor:default!important}.db-ichrt{pointer-events:none!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div></body></html>';
   const blob=new Blob([htmlOut],{type:'text/html;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`;
@@ -7056,183 +6880,7 @@ function dbDownloadReportHtml(){
   const styles=[...document.querySelectorAll('style')].map(x=>x.innerHTML).join('\n');
   const adv=dbActiveAdv(),pm=dbPeriodMeta;
   const stamp=pm?`${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`:new Date().toISOString().slice(0,10);
-  const htmlOut='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+dbHtmlEscape(adv.name)+' 성과 대시보드</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}#db-top-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important;gap:12px!important}.db-dtrend12-section{display:flex!important;flex-direction:column!important}.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}.db-clickable{cursor:default!important}.db-ichrt{pointer-events:none!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div>
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+  const htmlOut='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+dbHtmlEscape(adv.name)+' 성과 대시보드</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}#db-top-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important;gap:12px!important}.db-dtrend12-section{display:flex!important;flex-direction:column!important}.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}.db-clickable{cursor:default!important}.db-ichrt{pointer-events:none!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div></body></html>';
   const blob=new Blob([htmlOut],{type:'text/html;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`;
@@ -7985,183 +7633,7 @@ function dbDownloadReportHtml(){
       dst.forEach((c,i)=>{ const img=document.createElement('img'); try{ img.src=src[i]?.toDataURL('image/png')||''; }catch(e){ img.src=''; } img.style.cssText='width:100%;height:auto;display:block;'; c.replaceWith(img); });
       const css=[...document.querySelectorAll('style')].map(s=>s.textContent||'').join('\n');
       const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{}; const pm=window.dbPeriodMeta; const stamp=pm?`${String(pm.curS.getMonth()+1).padStart(2,'0')}${String(pm.curS.getDate()).padStart(2,'0')}-${String(pm.curE.getMonth()+1).padStart(2,'0')}${String(pm.curE.getDate()).padStart(2,'0')}`:new Date().toISOString().slice(0,10);
-      const parts=['<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>',esc(adv.name||'성과'),' 성과 대시보드</title><style>',css,'\nbody{padding:0;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0!important;display:flex!important;flex-direction:column!important}.db-clickable{cursor:default!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">',clone.outerHTML,'</div>
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>'];
+      const parts=['<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>',esc(adv.name||'성과'),' 성과 대시보드</title><style>',css,'\nbody{padding:0;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0!important;display:flex!important;flex-direction:column!important}.db-clickable{cursor:default!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">',clone.outerHTML,'</div></body></html>'];
       const blob=new Blob([parts.join('')],{type:'text/html;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); showToast&&showToast('✅ 리포트 HTML 저장 완료');
     },180);
   };
@@ -10474,183 +9946,7 @@ function dbDownloadReportHtml(){
         +'<div id="tab-dashboard" class="active">'
         + headerHtml
         + '<div id="db-capture-area">' + clone.innerHTML + '</div>'
-        +'</div>
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+        +'</div></body></html>';
 
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const a=document.createElement('a');
@@ -11056,183 +10352,7 @@ function dbDownloadReportHtml(){
         +'<div id="tab-dashboard" class="active">'
         + headerHtml
         + clone.outerHTML       /* ← innerHTML 래핑 대신 outerHTML 로 폭/스타일 보존 */
-        +'</div>
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+        +'</div></body></html>';
 
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const a=document.createElement('a');
@@ -11503,183 +10623,7 @@ function dbDownloadReportHtml(){
         +'<title>'+esc(adv.name||'성과')+' 성과 대시보드</title><style>'+css
         +'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0!important}.db-v16-export-header{max-width:none!important;width:100%!important;box-sizing:border-box!important}.db-clickable{cursor:pointer!important}.db-selected{outline:2px solid rgba(96,165,250,.75)!important;outline-offset:-2px!important;background:rgba(59,130,246,.16)!important}'
         +'</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'
-        +buildReportHeaderHTML()+clone.outerHTML+'</div>'+makeExportRuntime(chartConfigs)+'
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+        +buildReportHeaderHTML()+clone.outerHTML+'</div>'+makeExportRuntime(chartConfigs)+'</body></html>';
       const blob=new Blob([html],{type:'text/html;charset=utf-8'});
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`; a.click();
       setTimeout(()=>URL.revokeObjectURL(a.href),1000);
@@ -12295,183 +11239,7 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
     const src=[...area.querySelectorAll('canvas')], dst=[...clone.querySelectorAll('canvas')]; dst.forEach((c,i)=>{const img=document.createElement('img'); try{img.src=src[i]?.toDataURL('image/png')||'';}catch(e){} img.style.cssText='width:100%;height:auto;display:block;'; c.replaceWith(img);});
     clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el=>{el.removeAttribute('onclick');el.removeAttribute('onmouseenter');el.removeAttribute('onmousemove');el.removeAttribute('onmouseleave');});
     const styles=[...document.querySelectorAll('style')].map(x=>x.innerHTML).join('\n'); const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{}; const stamp=new Date().toISOString().slice(0,10);
-    const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+esc((adv.name||'광고')+' 성과 대시보드')+'</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}.db-ui-only{display:flex!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div>'+htmlEnhanceScript()+'
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+    const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+esc((adv.name||'광고')+' 성과 대시보드')+'</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}.db-ui-only{display:flex!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div>'+htmlEnhanceScript()+'</body></html>';
     const blob=new Blob([html],{type:'text/html;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(adv.name||'성과')+'_성과대시보드_'+stamp+'.html'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); showToast?.('✅ 리포트 HTML 저장 완료');
   };
 
@@ -12610,183 +11378,7 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
     clone.querySelectorAll('.dbc-tip,#db-threshold-output,.db-v14-empty,.db-v12-empty,.db-threshold-empty').forEach(el=>el.remove());
     clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el=>{el.removeAttribute('onclick');el.removeAttribute('onmouseenter');el.removeAttribute('onmousemove');el.removeAttribute('onmouseleave');});
     const styles=[...document.querySelectorAll('style')].map(x=>x.innerHTML).join('\n'); const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{}; const stamp=new Date().toISOString().slice(0,10);
-    const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+esc((adv.name||'광고')+' 성과 대시보드')+'</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}.db-ui-only{display:flex!important}.db-ichrt{pointer-events:auto!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div>'+chartExportScript(trendPayload())+htmlFilterScript()+'
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+    const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+esc((adv.name||'광고')+' 성과 대시보드')+'</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}.db-ui-only{display:flex!important}.db-ichrt{pointer-events:auto!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div>'+chartExportScript(trendPayload())+htmlFilterScript()+'</body></html>';
     const blob=new Blob([html],{type:'text/html;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(adv.name||'성과')+'_성과대시보드_'+stamp+'.html'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); showToast?.('✅ 리포트 HTML 저장 완료');
   };
 
@@ -12987,183 +11579,7 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
         clone.querySelectorAll('.db-threshold-empty').forEach(el=>{ if((el.textContent||'').includes('임계값 초과 항목이 없습니다')) el.remove(); });
         const css=[...document.querySelectorAll('style')].map(s=>s.textContent||'').join('\n');
         const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{}; const pm=window.dbPeriodMeta; const stamp=pm?`${String(pm.curS.getMonth()+1).padStart(2,'0')}${String(pm.curS.getDate()).padStart(2,'0')}-${String(pm.curE.getMonth()+1).padStart(2,'0')}${String(pm.curE.getDate()).padStart(2,'0')}`:new Date().toISOString().slice(0,10);
-        const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+esc(adv.name||'성과')+' 성과 대시보드</title><style>'+css+'\nbody{padding:0;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:18px!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0!important;display:flex!important;flex-direction:column!important}.db-clickable{cursor:default!important}.db-v16-export-author{font-family:\'Pretendard\',\'Noto Sans KR\',sans-serif!important;font-size:12px;color:#cbd5e1;display:flex;gap:12px;flex-wrap:wrap}.db-v16-export-author *{font-family:inherit!important}.db-v16-export-author strong,.db-v16-export-author em{color:#fff;font-style:normal}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+reportHeader()+clone.outerHTML+'</div>'+exportRuntime(configs)+'
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
-#db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
-}
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
-</style>
-<script id="gpt-v24-clean-top-js">
-(function(){
-  'use strict';
-  const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
-    });
-  }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
-  }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
-  }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
-  }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
-  async function captureTopRow(){
-    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
-    try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
-      const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
-      toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
-  }
-  captureTopRow.__v24=true;
-  window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
-})();
-</script>
-
-</body></html>';
+        const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+esc(adv.name||'성과')+' 성과 대시보드</title><style>'+css+'\nbody{padding:0;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:18px!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0!important;display:flex!important;flex-direction:column!important}.db-clickable{cursor:default!important}.db-v16-export-author{font-family:\'Pretendard\',\'Noto Sans KR\',sans-serif!important;font-size:12px;color:#cbd5e1;display:flex;gap:12px;flex-wrap:wrap}.db-v16-export-author *{font-family:inherit!important}.db-v16-export-author strong,.db-v16-export-author em{color:#fff;font-style:normal}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+reportHeader()+clone.outerHTML+'</div>'+exportRuntime(configs)+'</body></html>';
         const blob=new Blob([html],{type:'text/html;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); toast('✅ 리포트 HTML 저장 완료');
       },220);
     };
@@ -13176,179 +11592,137 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
 })();
 </script>
 
-
-
-<!-- ════════════════════════════════════════════════════════
-     v24 safe cleanup
-     - 긴급점검/주요지표 임계값 제거
-     - 상단 설정 레이아웃 재정리
-     - 상세 테이블 증감률 ON/OFF 버튼
-     - 캡처: 광고 성과 데이터 + 일간 지표 추이
-   ════════════════════════════════════════════════════════ -->
-<style id="gpt-v24-clean-top-css">
-/* 긴급 점검/임계값 관련 UI 완전 제거 */
-#db-threshold-panel,
-#db-threshold-list,
-#db-threshold-output,
-#db-v9-thr-host,
-#db-threshold-settings-btn,
-.db-threshold-panel,
-.db-threshold-list,
-.db-threshold-empty,
-.db-v10-thr-grid,
-.db-v11-thr-list,
-.db-v20-scope-row{display:none!important;}
+<style id="gpt-v25-clean-safe-style">
+/* v25: 긴급점검/임계값 UI만 제거하고 기존 상단 3컬럼 구조 유지 */
+#db-threshold-panel,#db-threshold-list,#db-threshold-output,#db-v9-thr-host,
+.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v14-empty,.db-v12-empty,.db-v20-target-toggle-wrap{display:none!important;}
 #db-v9-col2 .db-v9-grp:has(#db-v9-thr-host){display:none!important;}
-
-/* 상단 설정: 임계값/긴급점검 제거 후 깔끔한 3컬럼 */
-#gpt-v9-settings-body{
-  display:grid!important;
-  grid-template-columns:minmax(280px,.95fr) minmax(320px,1.05fr) minmax(320px,1.05fr)!important;
-  gap:0!important;
-  align-items:stretch!important;
+#db-settings-panel #gpt-v9-settings-body,#db-settings-panel .gpt-v25-settings-body{
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)!important;gap:0!important;border-top:1px solid var(--border2)!important;
 }
-#gpt-v9-settings-body>.db-v24-comment-col,
-#gpt-v9-settings-body>.db-v24-plan-col,
-#gpt-v9-settings-body>.db-v24-metric-col{
-  min-width:0!important;
-  padding:12px 14px!important;
-  display:flex!important;
-  flex-direction:column!important;
-  border-right:1px solid var(--border2)!important;
-}
-#gpt-v9-settings-body>.db-v24-plan-col{border-right:none!important;}
-#gpt-v9-settings-body textarea.kk-inp{min-height:132px!important;}
-#db-v24-plan-title{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
-#db-v24-table-diff-toolbar{display:none!important;}
-.db-v24-diff-btn{background:var(--g);border:1px solid rgba(3,199,90,.35);color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:900;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer;white-space:nowrap;}
-.db-v24-diff-btn.off{background:#334155;color:#cbd5e1;border-color:#475569;}
-.db-v24-table-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;background:rgba(255,255,255,.012);border-bottom:1px solid var(--border2);}
-.db-v24-table-tools .db-filter-label{font-size:9px;font-weight:900;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
-
-/* 다운로드 HTML에서는 기존 원본 필터는 숨기고, 다운로드 전용 작동 필터만 표시 */
-.db-report-html .db-tbl-card > .db-ui-only:not(.db-v23-html-filter){display:none!important;}
-.db-report-html .db-v23-html-filter{display:flex!important;}
-.db-report-html #db-threshold-panel,
-.db-report-html #db-threshold-output,
-.db-report-html #db-v9-col2,
-.db-report-html #db-v9-thr-host{display:none!important;}
-@media(max-width:1100px){#gpt-v9-settings-body{grid-template-columns:1fr!important;}#gpt-v9-settings-body>*{border-right:none!important;border-bottom:1px solid var(--border2)!important;}}
+#db-settings-panel #db-v9-col2{display:none!important;}
+#db-settings-panel .gpt-v25-col{padding:12px 14px!important;display:flex!important;flex-direction:column!important;min-width:0!important;}
+#db-settings-panel .gpt-v25-col:not(:last-child){border-right:1px solid var(--border2)!important;}
+#db-settings-panel .gpt-v25-title{font-size:9.5px!important;font-weight:700!important;color:var(--text3)!important;letter-spacing:.1em!important;text-transform:uppercase!important;margin-bottom:8px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;}
+#db-settings-panel .gpt-v25-title-left{display:flex!important;align-items:center!important;gap:6px!important;min-width:0!important;}
+#db-settings-panel #db-comment,#db-settings-panel #db-plan{min-height:0!important;flex:1!important;font-size:12px!important;line-height:1.7!important;resize:none!important;}
+#tab-dashboard .gpt-v25-detail-controls{display:flex!important;align-items:center!important;gap:6px!important;flex-wrap:wrap!important;padding:7px 10px!important;background:rgba(255,255,255,.012)!important;border-bottom:1px solid var(--border2)!important;}
+#tab-dashboard .gpt-v25-diff-btn{border:1.5px solid #2b374b!important;border-radius:999px!important;background:#1a2535!important;color:#94a3b8!important;padding:5px 10px!important;font-size:10.5px!important;font-weight:900!important;font-family:'Pretendard','Noto Sans KR',sans-serif!important;cursor:pointer!important;transition:all .15s!important;white-space:nowrap!important;}
+#tab-dashboard .gpt-v25-diff-btn.on{background:rgba(56,189,248,.14)!important;border-color:rgba(56,189,248,.5)!important;color:#38bdf8!important;}
+#tab-dashboard .db-diff-rate-th,#tab-dashboard .db-diff-rate-td{transition:opacity .15s!important;}
+#tab-dashboard.gpt-v25-hide-diff .db-diff-rate-th,#tab-dashboard.gpt-v25-hide-diff .db-diff-rate-td{display:none!important;}
+.db-report-html .gpt-v25-detail-controls{display:flex!important;}
+.db-report-html .db-ui-only.gpt-v25-detail-controls{display:flex!important;}
+.db-report-html.gpt-v25-hide-diff .db-diff-rate-th,.db-report-html.gpt-v25-hide-diff .db-diff-rate-td,
+.db-report-html #tab-dashboard.gpt-v25-hide-diff .db-diff-rate-th,.db-report-html #tab-dashboard.gpt-v25-hide-diff .db-diff-rate-td{display:none!important;}
 </style>
-<script id="gpt-v24-clean-top-js">
+<script id="gpt-v25-clean-safe-js">
 (function(){
   'use strict';
   const $=id=>document.getElementById(id);
-  const toast=msg=>{try{(window.showToast||console.log)(msg);}catch(e){console.log(msg)}};
-  function directChildOf(body, el){let n=el; while(n && n.parentElement!==body) n=n.parentElement; return n||null;}
-  function removeThresholdUi(){
-    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el) el.remove();});
-    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v10-thr-grid,.db-v11-thr-list,.db-v20-scope-row').forEach(el=>el.remove());
-    const thrHost=$('db-v9-thr-host'); if(thrHost){ const grp=thrHost.closest('.db-v9-grp'); if(grp) grp.remove(); else thrHost.remove(); }
-    document.querySelectorAll('.db-v9-grp-label').forEach(label=>{ if((label.textContent||'').includes('임계')){ const grp=label.closest('.db-v9-grp'); if(grp) grp.remove(); }});
-  }
-  function restoreTopLayout(){
-    const body=$('gpt-v9-settings-body') || $('db-ctrl-area')?.nextElementSibling;
-    if(!body) return;
-    removeThresholdUi();
-    body.id='gpt-v9-settings-body';
-    body.dataset.v24Clean='1';
-    const metricCol=body.children[0];
-    if(metricCol){ metricCol.classList.add('db-v24-metric-col'); metricCol.style.borderRight='1px solid var(--border2)'; }
-    /* v9 표시옵션 컬럼은 제거. 행수 선택은 날짜 행으로 되돌림 */
-    const dateControls=document.querySelector('#db-ctrl-area .db-row-limit-controls');
-    const rowHost=$('db-v9-rowlimit-host');
-    if(dateControls && rowHost){ Array.from(rowHost.children).forEach(ch=>dateControls.appendChild(ch)); }
-    const col2=$('db-v9-col2'); if(col2) col2.remove();
-    const comment=$('db-comment'), plan=$('db-plan');
-    let commentCol=comment?directChildOf(body,comment):null;
-    let planCol=plan?directChildOf(body,plan):null;
-    if(commentCol){
-      commentCol.classList.add('db-v24-comment-col');
-      commentCol.style.borderRight='1px solid var(--border2)';
-      commentCol.style.padding='12px 14px';
-      commentCol.style.display='flex'; commentCol.style.flexDirection='column';
-    }
-    if(plan){
-      if(!planCol || planCol===commentCol){
-        const oldParent=plan.parentElement;
-        planCol=document.createElement('div');
-        planCol.className='db-v24-plan-col';
-        planCol.innerHTML='<div id="db-v24-plan-title">🎯 금일 운영 계획</div>';
-        planCol.appendChild(plan);
-        if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
-        if(oldParent && oldParent!==commentCol && oldParent.children.length===0) oldParent.remove();
-        if(oldParent && oldParent!==planCol && oldParent.id!=='db-v24-plan-title'){
-          const txt=(oldParent.textContent||'').replace(/\s+/g,'');
-          if(!oldParent.querySelector('textarea') && txt.length<12) oldParent.remove();
-        }
-      }else{
-        planCol.classList.add('db-v24-plan-col');
-        planCol.style.padding='12px 14px';
-        planCol.style.display='flex'; planCol.style.flexDirection='column';
-      }
-      plan.style.flex='1'; plan.style.resize='none';
-    }
-    /* 빈 컬럼 제거 */
-    Array.from(body.children).forEach(ch=>{
-      if(ch.id==='db-threshold-panel' || ch.id==='db-v9-col2') ch.remove();
-      else if(!ch.querySelector('textarea') && !ch.querySelector('#db-metric-toggle-grid') && (ch.textContent||'').trim()==='') ch.remove();
+  const toast=msg=>{try{(window.showToast||window.toast||function(){console.log(msg)})(msg)}catch(e){console.log(msg)}};
+  function directCol(body,el){let n=el; while(n&&n.parentElement!==body)n=n.parentElement; return n||null;}
+  function textHas(el,kw){return !!(el&&(el.textContent||'').indexOf(kw)>-1)}
+  function removeThresholdAndUrgent(){
+    ['db-threshold-panel','db-threshold-list','db-threshold-output','db-v9-thr-host','db-threshold-settings-btn'].forEach(id=>{const el=$(id); if(el){const grp=el.closest&&el.closest('.db-v9-grp'); (grp||el).remove();}});
+    document.querySelectorAll('.db-threshold-panel,.db-threshold-list,.db-threshold-empty,.db-v14-empty,.db-v12-empty,.db-v20-target-toggle-wrap').forEach(el=>el.remove());
+    document.querySelectorAll('#db-settings-panel *').forEach(el=>{
+      const t=(el.textContent||'').trim();
+      if(t==='⚠️ 주요지표 임계값'||t==='주요지표 임계값'||t.includes('주요지표 임계값')){const grp=el.closest('.db-v9-grp')||el.closest('.kk-field')||el.parentElement; if(grp)grp.remove();}
+    });
+    document.querySelectorAll('#tab-dashboard *').forEach(el=>{
+      if(el.id==='db-settings-panel')return;
+      const t=(el.textContent||'').trim();
+      if((t.includes('긴급 점검 안내')||t.includes('임계값 초과')) && (el.id==='db-threshold-panel'||el.className&&String(el.className).includes('threshold'))){el.remove();}
     });
   }
-  function syncDiffButtons(){
-    const on=(window.__dbDiffRateOn!==false);
-    document.querySelectorAll('.db-v24-diff-btn,#db-diff-rate-toggle').forEach(b=>{ if(!b) return; b.classList.toggle('off',!on); b.classList.toggle('on',on); b.textContent='증감률 '+(on?'ON':'OFF'); });
+  function restoreTopLayout(){
+    const ctrl=$('db-ctrl-area'); const body=ctrl&&ctrl.nextElementSibling; if(!body)return;
+    body.id='gpt-v9-settings-body'; body.classList.add('gpt-v25-settings-body'); body.dataset.v9Ready='1';
+    body.style.display='grid'; body.style.gridTemplateColumns='minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)'; body.style.gap='0'; body.style.borderTop='1px solid var(--border2)';
+    const dateRow=document.querySelector('#db-ctrl-area .db-date-row');
+    let rowWrap=document.querySelector('#db-ctrl-area .db-row-limit-controls');
+    if(!rowWrap&&dateRow){rowWrap=document.createElement('div'); rowWrap.className='db-row-limit-controls'; dateRow.appendChild(rowWrap);}    
+    ['db-camp-row-limit','db-group-row-limit'].forEach(id=>{const sel=$(id); if(sel&&rowWrap){const lab=sel.closest('label')||sel; rowWrap.appendChild(lab);}});
+    const oldDiff=$('db-diff-rate-toggle'); if(oldDiff)oldDiff.remove();
+    const col2=$('db-v9-col2'); if(col2)col2.remove();
+    removeThresholdAndUrgent();
+    const metricCol=body.children[0];
+    if(metricCol){metricCol.classList.add('gpt-v25-col'); metricCol.style.borderRight='1px solid var(--border2)';}
+    const comment=$('db-comment'), plan=$('db-plan');
+    let commentCol=comment?directCol(body,comment):null;
+    let planCol=plan?directCol(body,plan):null;
+    if(commentCol){commentCol.classList.add('gpt-v25-col'); commentCol.style.borderRight='1px solid var(--border2)'; commentCol.style.display='flex'; commentCol.style.flexDirection='column';}
+    if(!planCol||planCol===commentCol){
+      planCol=document.createElement('div'); planCol.className='gpt-v25-col';
+      planCol.innerHTML='<div class="gpt-v25-title"><span class="gpt-v25-title-left">🎯 금일 운영 계획</span></div>';
+      if(commentCol) commentCol.after(planCol); else body.appendChild(planCol);
+      if(plan) planCol.appendChild(plan);
+      const oldPlanBoxes=[...commentCol?.querySelectorAll('div')||[]].filter(d=>d!==commentCol&&d.textContent&&d.textContent.includes('🎯 금일 운영 계획')&&!d.contains(plan));
+      oldPlanBoxes.forEach(d=>d.remove());
+    }else{planCol.classList.add('gpt-v25-col');}
+    const children=[...body.children].filter(el=>el&&el.style.display!=='none'&&el.id!=='db-v9-col2'&&el.id!=='db-threshold-panel');
+    children.slice(3).forEach(el=>{ if(textHas(el,'긴급 점검')||textHas(el,'주요지표 임계값')||el.id==='db-threshold-panel') el.remove(); });
+    if(body.children.length>3){[...body.children].forEach((el,i)=>{if(i>2&&(textHas(el,'긴급')||textHas(el,'임계값')))el.remove();});}
   }
-  const oldToggle=window.dbToggleDiffRate;
-  window.dbToggleDiffRate=function(){
-    if(typeof oldToggle==='function' && oldToggle!==window.dbToggleDiffRate){ try{ oldToggle.apply(this,arguments); }catch(e){ window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false); } }
-    else window.__dbDiffRateOn=!(window.__dbDiffRateOn!==false);
-    syncDiffButtons();
-    try{ if(typeof dbRenderDailyTable==='function') dbRenderDailyTable(); }catch(e){}
-    try{ if(typeof dbRenderTypeTable==='function') dbRenderTypeTable(); }catch(e){}
-    try{ if(typeof dbRenderCampTable==='function') dbRenderCampTable(); }catch(e){}
-    try{ if(typeof dbRenderGroupTable==='function') dbRenderGroupTable(); }catch(e){}
-  };
-  function addDiffButtonToCard(tblId,label){
-    const tbl=$(tblId); if(!tbl) return;
-    const card=tbl.closest('.db-tbl-card,.db-pivot-card'); if(!card || card.querySelector('.db-v24-diff-btn')) return;
-    let host=card.querySelector(':scope > .db-ui-only');
-    if(!host){ host=document.createElement('div'); host.className='db-v24-table-tools db-ui-only'; host.innerHTML='<span class="db-filter-label">'+label+'</span>'; card.insertBefore(host, card.firstChild); }
-    const btn=document.createElement('button'); btn.type='button'; btn.className='db-v24-diff-btn'; btn.textContent='증감률 ON'; btn.onclick=function(){ window.dbToggleDiffRate(); };
-    host.appendChild(btn);
+  function setDiff(on){
+    window.__dbDiffRateOn=!!on;
+    const tab=$('tab-dashboard'); if(tab)tab.classList.toggle('gpt-v25-hide-diff',!on);
+    document.body.classList.toggle('gpt-v25-hide-diff',!on);
+    document.querySelectorAll('.gpt-v25-diff-btn,#db-diff-rate-toggle').forEach(b=>{b.classList.toggle('on',!!on); b.textContent='증감률 '+(on?'ON':'OFF');});
+    try{ if(typeof window.dbRefreshAllViews==='function') window.dbRefreshAllViews(); else if(window._dbRawData){
+      if(window.dbRenderDailyTbl) dbRenderDailyTbl(_dbRawData.recentDays||_dbRawData.days||[]);
+      if(window.dbRenderTypeTbl) dbRenderTypeTbl(_dbRawData,window.dbPeriodMeta?.curLabel||'');
+      if(window.dbRenderCampTbl) dbRenderCampTbl(_dbRawData,window.dbPeriodMeta?.curLabel||'');
+      if(window.dbRenderGroupTbl) dbRenderGroupTbl(_dbRawData,window.dbPeriodMeta?.curLabel||'');
+    }}catch(e){console.warn('[v25 diff refresh]',e)}
+    setTimeout(()=>{const tab=$('tab-dashboard'); if(tab)tab.classList.toggle('gpt-v25-hide-diff',!on);},80);
   }
-  function addDetailedDiffButtons(){
-    addDiffButtonToCard('db-daily-tbl','최근 7일');
-    addDiffButtonToCard('db-type-tbl','유형별');
-    addDiffButtonToCard('db-camp-tbl','캠페인별');
-    addDiffButtonToCard('db-group-tbl','광고그룹별');
-    syncDiffButtons();
+  window.dbV25SetDiff=setDiff;
+  function addControlsToCard(card,label){
+    if(!card||card.querySelector('.gpt-v25-detail-controls'))return;
+    const bar=document.createElement('div'); bar.className='gpt-v25-detail-controls db-ui-only';
+    bar.innerHTML='<span class="db-filter-label">'+label+'</span><button type="button" class="gpt-v25-diff-btn '+(window.__dbDiffRateOn===false?'':'on')+'">증감률 '+(window.__dbDiffRateOn===false?'OFF':'ON')+'</button>';
+    const existing=card.querySelector('.db-ui-only');
+    if(existing){existing.appendChild(bar.querySelector('.gpt-v25-diff-btn')); return;}
+    const hd=card.querySelector('.db-tbl-hd,.db-pivot-hd');
+    if(hd) card.insertBefore(bar,hd.nextSibling); else card.insertBefore(bar,card.firstChild);
+    const btn=bar.querySelector('.gpt-v25-diff-btn'); if(btn)btn.onclick=()=>setDiff(!(window.__dbDiffRateOn!==false));
   }
-  /* 긴급점검 로직은 더 이상 화면을 만들지 않도록 no-op */
-  window.dbRenderThresholdAlerts=function(){ removeThresholdUi(); };
-  window.buildThresholdAlerts=function(){ return []; };
-  window.dbEditThresholds=function(){ toast('주요지표 임계값 설정은 제거되었습니다.'); };
+  function ensureDetailButtons(){
+    addControlsToCard($('db-daily-tbl')?.closest('.db-tbl-card'),'상세 표시');
+    ['db-type-tbl','db-camp-tbl','db-group-tbl'].forEach(id=>{
+      const card=$(id)?.closest('.db-tbl-card'); if(!card)return;
+      let btn=card.querySelector('.gpt-v25-diff-btn');
+      if(!btn){
+        const bar=card.querySelector('.db-ui-only')||card.querySelector('.db-tbl-hd');
+        btn=document.createElement('button'); btn.type='button'; btn.className='gpt-v25-diff-btn '+(window.__dbDiffRateOn===false?'':'on'); btn.textContent='증감률 '+(window.__dbDiffRateOn===false?'OFF':'ON'); btn.onclick=()=>setDiff(!(window.__dbDiffRateOn!==false));
+        if(bar)bar.appendChild(btn);
+      }
+    });
+    setDiff(window.__dbDiffRateOn!==false);
+  }
   async function captureTopRow(){
+    const btn=$('db-capture-btn-top');
+    if(typeof html2canvas==='undefined'){toast('캡처 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요');return;}
     try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
-    document.body.classList.add('db-capturing');
-    const btn=$('db-capture-btn-top'); if(btn) btn.style.display='none';
+    document.body.classList.add('db-capturing'); if(btn)btn.style.display='none';
     try{
-      const el=$('db-top-row') || $('db-capture-area');
-      if(!el || !window.html2canvas){ toast('캡처할 영역을 찾을 수 없습니다'); return; }
-      try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-      await new Promise(r=>setTimeout(r,220));
+      const el=$('db-top-row')||$('db-capture-area'); if(!el)return;
       const canvas=await html2canvas(el,{scale:2,backgroundColor:'#08090c',useCORS:true,logging:false,scrollY:-window.scrollY});
-      const a=document.createElement('a');
-      a.download='스탁사인_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png';
-      a.href=canvas.toDataURL('image/png'); a.click();
+      const a=document.createElement('a'); const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{};
+      a.download=(adv.name||'스탁사인')+'_광고_성과_데이터_일간지표_'+new Date().toISOString().slice(0,10)+'.png'; a.href=canvas.toDataURL('image/png'); a.click();
       toast('✅ 광고 성과 데이터와 일간 지표 추이 캡처 완료');
-    }catch(e){ console.error(e); toast('❌ 캡처 오류: '+(e.message||e)); }
-    finally{ document.body.classList.remove('db-capturing'); if(btn) btn.style.display=''; }
+    }catch(e){console.error(e);toast('❌ 캡처 오류: '+e.message);}finally{document.body.classList.remove('db-capturing'); if(btn)btn.style.display='';}
   }
-  captureTopRow.__v24=true;
   window.dbCapture=captureTopRow; try{dbCapture=captureTopRow;}catch(e){}
-  function boot(){ restoreTopLayout(); addDetailedDiffButtons(); removeThresholdUi(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));});
-  else {boot(); [200,700,1500,3000].forEach(t=>setTimeout(boot,t));}
+  function boot(){restoreTopLayout(); ensureDetailButtons(); removeThresholdAndUrgent();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{boot(); [200,600,1200,2200].forEach(t=>setTimeout(boot,t));});
+  else{boot(); [200,600,1200,2200].forEach(t=>setTimeout(boot,t));}
+  if(window.MutationObserver){
+    const mo=new MutationObserver(()=>{clearTimeout(window.__v25mo); window.__v25mo=setTimeout(boot,80);});
+    setTimeout(()=>{const root=$('tab-dashboard'); if(root)mo.observe(root,{childList:true,subtree:true});},300);
+  }
 })();
 </script>
 
