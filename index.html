@@ -12441,5 +12441,114 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
 })();
 </script>
 
+
+<!-- GPT v36 final dashboard fixes: row limit controls, waterfall metrics/title, stack campaign drilldown/highlight -->
+<style id="gpt-v36-dashboard-final-css">
+#db-settings-panel .db-v26-option-title{letter-spacing:-.01em;}
+#db-wf-metric-label{display:inline-flex;align-items:center;gap:5px;margin-right:auto;padding:4px 9px;border:1px solid rgba(96,165,250,.28);border-radius:999px;background:rgba(37,99,235,.12);color:#dbeafe;font-size:11px;font-weight:900;white-space:nowrap;}
+#db-stack-campaign-select{background:#1a2535;border:1px solid #2b374b;color:#e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;max-width:240px;}
+#db-stack-campaign-select:disabled{opacity:.45;cursor:not-allowed;}
+#db-stack-legend .db-stack-legend-item{cursor:pointer;}
+</style>
+<script id="gpt-v36-dashboard-final-js">
+(function(){
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const raw=()=>{try{return (typeof _dbRawData!=='undefined'&&_dbRawData)||window._dbRawData||null;}catch(e){return window._dbRawData||null;}};
+  const meta=()=>{try{return (typeof dbPeriodMeta!=='undefined'&&dbPeriodMeta)||window.dbPeriodMeta||{};}catch(e){return window.dbPeriodMeta||{};}};
+  function label(k){try{if(typeof dbTblLabel==='function')return dbTblLabel(k);}catch(e){} return ({cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',purchaseCcnt:'전환수(구매)',revenue:'매출액',purchaseConvAmt:'매출액(구매)',cart:'장바구니',cpc:'평균클릭비용(CPC)',ctr:'클릭율(CTR)',cvr:'전환율(CVR)',roas:'광고수익률(ROAS)',cpa:'전환당비용(CPA)',aov:'객단가'}[k]||k);}
+  function fmt(k,v){try{if(typeof dbFmt==='function')return dbFmt(k,Number(v||0));}catch(e){} v=Number(v||0); if(['ctr','cvr','roas'].includes(k)) return (k==='roas'?Math.round(v):v.toFixed(2))+'%'; return Math.round(v).toLocaleString('ko-KR');}
+  function agg(row,k){try{const a=(typeof dbAggCamp==='function')?dbAggCamp(row||{}):(row||{}); return Number(a[k]??0)||0;}catch(e){return Number((row||{})[k]??0)||0;}}
+  function campId(c){try{if(typeof dbCampIdOf==='function')return String(dbCampIdOf(c)||'');}catch(e){} return String(c?.id||c?.nccCampaignId||c?.campaignId||c?.campId||c?.customerId||c?.campNm||c?.campaignName||c?.name||'');}
+  function campName(c){return String(c?.campNm||c?.campaignName||c?.name||'(이름없음)');}
+  function groupCampId(g){return String(g?._campId||g?.nccCampaignId||g?.campaignId||g?.campId||g?.campaignIdOfAdgroup||'');}
+  function groupCampName(g){return String(g?._campName||g?.campNm||g?.campaignName||g?.campaign||'');}
+  function refreshTables(){const rd=raw(), m=meta(); if(!rd) return; try{window.dbRenderCampTbl?.(rd,m.curLabel||'');}catch(e){} try{window.dbRenderGroupTbl?.(rd,m.curLabel||'');}catch(e){} try{window.dbRenderMediaTbl?.(rd,m.curLabel||'');}catch(e){} try{window.dbRenderThresholdAlerts?.();}catch(e){} }
+  function normalizeRowLimitValue(v){return v==='all'?Infinity:(Number(v)||10);}
+  window.dbSetCampLimit=function(v){window.dbCampRowLimit=normalizeRowLimitValue(v); try{dbCampRowLimit=window.dbCampRowLimit;}catch(e){} refreshTables();};
+  window.dbSetGroupLimit=function(v){window.dbGroupRowLimit=normalizeRowLimitValue(v); try{dbGroupRowLimit=window.dbGroupRowLimit;}catch(e){} refreshTables();};
+  function ensureRowLimitControls(){
+    document.querySelectorAll('.db-v26-option-title,.db-v9-grp-label').forEach(el=>{if((el.textContent||'').includes('캠페인/광고그룹 노출행')) el.textContent='📌 캠페인/광고그룹 노출 행 설정';});
+    const c=$('db-camp-row-limit'), g=$('db-group-row-limit');
+    if(c){window.dbCampRowLimit=normalizeRowLimitValue(c.value); try{dbCampRowLimit=window.dbCampRowLimit;}catch(e){} c.onchange=function(){window.dbSetCampLimit(this.value);};}
+    if(g){window.dbGroupRowLimit=normalizeRowLimitValue(g.value); try{dbGroupRowLimit=window.dbGroupRowLimit;}catch(e){} g.onchange=function(){window.dbSetGroupLimit(this.value);};}
+  }
+  function ensureWaterfallControls(){
+    const sel=$('db-wf-metric'); if(sel){
+      const cur=sel.value||'cost';
+      const opts=[['cost','광고비'],['imp','노출수'],['click','클릭수'],['conv','전환수'],['purchaseCcnt','전환수(구매)'],['revenue','매출액'],['purchaseConvAmt','매출액(구매)']];
+      sel.innerHTML=opts.map(([v,t])=>`<option value="${v}" ${v===cur?'selected':''}>${t}</option>`).join('');
+      sel.onchange=function(){updateWaterfallMetricLabel(); try{window.dbRenderWaterfall?.();}catch(e){}};
+      const holder=sel.parentElement;
+      if(holder && !$('db-wf-metric-label')){const badge=document.createElement('span'); badge.id='db-wf-metric-label'; holder.insertBefore(badge, holder.firstChild);} 
+      updateWaterfallMetricLabel();
+    }
+  }
+  function updateWaterfallMetricLabel(){const b=$('db-wf-metric-label'), sel=$('db-wf-metric'); if(b&&sel)b.textContent='현재 지표: '+label(sel.value||'cost');}
+  const oldWf=window.dbRenderWaterfall;
+  if(typeof oldWf==='function' && !oldWf.__v36MetricBadge){
+    const wf=function(){ensureWaterfallControls(); updateWaterfallMetricLabel(); const r=oldWf.apply(this,arguments); setTimeout(updateWaterfallMetricLabel,0); return r;};
+    wf.__v36MetricBadge=true; window.dbRenderWaterfall=wf; try{dbRenderWaterfall=wf;}catch(e){}
+  }
+  function ensureStackControls(){
+    const dim=$('db-stack-dim'), lim=$('db-stack-limit'); if(!dim) return;
+    if(!$('db-stack-campaign-select')){
+      const sel=document.createElement('select'); sel.id='db-stack-campaign-select'; sel.title='캠페인 선택';
+      sel.onchange=function(){window.__dbStackSelectedCampaign=this.value||''; window.__dbStackHighlight=''; try{window.dbRenderStackChart?.(true);}catch(e){}};
+      (lim?.parentElement||dim.parentElement)?.insertBefore(sel, lim?lim.nextSibling:dim.nextSibling);
+    }
+    dim.onchange=function(){window.__dbStackHighlight=''; try{window.dbRenderStackChart?.(true);}catch(e){}};
+    if(lim) lim.onchange=function(){try{window.dbRenderStackChart?.(true);}catch(e){}};
+  }
+  function populateStackCampaigns(){
+    const sel=$('db-stack-campaign-select'); if(!sel) return;
+    const rd=raw()||{}, camps=rd.allCamps||[]; const prev=window.__dbStackSelectedCampaign||sel.value||'';
+    const opts=['<option value="">전체 캠페인</option>'].concat(camps.map(c=>`<option value="${esc(campId(c))}">${esc(campName(c))}</option>`));
+    const html=opts.join(''); if(sel.innerHTML!==html) sel.innerHTML=html;
+    if([...sel.options].some(o=>o.value===prev)) sel.value=prev; else {sel.value=''; window.__dbStackSelectedCampaign='';}
+    const dim=$('db-stack-dim')?.value||'campaign'; sel.disabled=(dim==='type'); sel.style.display=(dim==='type')?'none':'';
+  }
+  function rowMetrics(row){return {cost:agg(row,'cost'),imp:agg(row,'imp'),click:agg(row,'click'),conv:agg(row,'conv'),purchaseCcnt:agg(row,'purchaseCcnt'),revenue:agg(row,'revenue'),purchaseConvAmt:agg(row,'purchaseConvAmt')};}
+  function groupMatchesCampaign(g,selectedId,selectedName){if(!selectedId&&!selectedName)return true; const gid=groupCampId(g), gn=groupCampName(g); return (!!selectedId&&gid===selectedId)|| (!!selectedName&&gn===selectedName);}
+  function stackItems(){
+    const rd=raw()||{}, dim=$('db-stack-dim')?.value||'campaign', selected=$('db-stack-campaign-select')?.value||'';
+    const selectedCamp=(rd.allCamps||[]).find(c=>campId(c)===selected); const selectedName=selectedCamp?campName(selectedCamp):'';
+    let items=[];
+    if(dim==='type'){
+      const m={}; (rd.allCamps||[]).forEach(c=>{let t=''; try{t=typeof dbTypeOfCamp==='function'?dbTypeOfCamp(c):(c.type||c.kind||'기타');}catch(e){t=c.type||'기타';} t=t||'기타'; if(!m[t])m[t]={name:t,cost:0,imp:0,click:0,conv:0,purchaseCcnt:0,revenue:0,purchaseConvAmt:0}; const r=rowMetrics(c); Object.keys(r).forEach(k=>m[t][k]+=r[k]);}); items=Object.values(m);
+    }else if(selected){
+      items=(rd.allGroups||[]).filter(g=>groupMatchesCampaign(g,selected,selectedName)).map(g=>({name:String(g.groupNm||g.adgroupName||g.name||'(광고그룹)').slice(0,26),...rowMetrics(g)}));
+    }else if(dim==='adgroup'){
+      items=(rd.allGroups||[]).map(g=>({name:String(g.groupNm||g.adgroupName||g.name||'(광고그룹)').slice(0,26),...rowMetrics(g)}));
+    }else{
+      items=(rd.allCamps||[]).map(c=>({name:campName(c).slice(0,26),...rowMetrics(c)}));
+    }
+    items.sort((a,b)=>(b.cost||0)-(a.cost||0));
+    const limit=Number($('db-stack-limit')?.value||0); if(limit>0&&items.length>limit){const top=items.slice(0,limit), rest=items.slice(limit), etc={name:'기타',cost:0,imp:0,click:0,conv:0,purchaseCcnt:0,revenue:0,purchaseConvAmt:0}; rest.forEach(it=>Object.keys(etc).forEach(k=>{if(k!=='name')etc[k]+=Number(it[k]||0);})); items=[...top,etc];}
+    return items;
+  }
+  window.dbRenderStackChart=function(){
+    ensureStackControls(); populateStackCampaigns();
+    if(!window.Chart) return;
+    const card=$('db-stack-card'), canvas=$('db-stack-canvas'); if(!card||!canvas) return;
+    const items=stackItems(); if(!items.length){card.style.display='none'; return;} card.style.display='block';
+    const metrics=[{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'conv',label:'전환수'},{key:'purchaseCcnt',label:'전환수(구매)'},{key:'revenue',label:'매출액'},{key:'purchaseConvAmt',label:'매출액(구매)'}];
+    const colors=(typeof chartColors==='function'?chartColors():['#22c55e','#3b82f6','#f59e0b','#a855f7','#ef4444','#14b8a6','#eab308','#818cf8','#f472b6']);
+    const totals={}; metrics.forEach(m=>totals[m.key]=items.reduce((s,it)=>s+Number(it[m.key]||0),0)||1);
+    const hi=window.__dbStackHighlight||'';
+    const datasets=items.map((it,i)=>{const color=colors[i%colors.length]; return {label:it.name,data:metrics.map(m=>Number(it[m.key]||0)/totals[m.key]*100),rawValues:metrics.map(m=>Number(it[m.key]||0)),backgroundColor:(!hi||hi===it.name)?color:'rgba(71,85,105,.38)',borderColor:'#10141d',borderWidth:1,originalColor:color};});
+    const legend=$('db-stack-legend'); if(legend) legend.innerHTML=items.map((it,i)=>`<span class="db-stack-legend-item" data-name="${esc(it.name)}" style="display:flex;align-items:center;gap:4px;font-size:9px;color:${hi&&hi!==it.name?'#64748b':'#94a3b8'};white-space:nowrap;"><span style="width:10px;height:10px;border-radius:2px;background:${hi&&hi!==it.name?'rgba(71,85,105,.38)':colors[i%colors.length]};display:inline-block;"></span>${esc(it.name.slice(0,16))}</span>`).join('');
+    legend?.querySelectorAll('.db-stack-legend-item').forEach(el=>{el.onclick=()=>{const n=el.dataset.name||''; window.__dbStackHighlight=(window.__dbStackHighlight===n?'':n); window.dbRenderStackChart(true);};});
+    canvas.style.height=Math.max(280, metrics.length*46)+'px';
+    try{window.__dbStackChart?.destroy();}catch(e){}
+    const setHi=(name)=>{window.__dbStackHighlight=(window.__dbStackHighlight===name?'':name); window.dbRenderStackChart(true);};
+    window.__dbStackChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels:metrics.map(m=>m.label),datasets},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:true},onClick:(e,els,chart)=>{if(els&&els.length)setHi(chart.data.datasets[els[0].datasetIndex].label);},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(1)}% (${fmt(metrics[ctx.dataIndex].key,ctx.dataset.rawValues[ctx.dataIndex])})`}},datalabels:{display:(ctx)=>ctx.dataset.data[ctx.dataIndex]>=4,formatter:v=>v.toFixed(0)+'%',color:'#fff',font:{size:10,weight:'900'}}},scales:{x:{stacked:true,min:0,max:100,grid:{color:'rgba(203,213,225,.14)'},ticks:{color:'#dbeafe',font:{weight:'800'},callback:v=>v+'%'}},y:{stacked:true,grid:{display:false},ticks:{color:'#f8fafc',font:{weight:'900'}}}}}});
+  };
+  try{dbRenderStackChart=window.dbRenderStackChart;}catch(e){}
+  function boot(){ensureRowLimitControls(); ensureWaterfallControls(); ensureStackControls(); populateStackCampaigns();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{boot();[200,700,1600,3200].forEach(t=>setTimeout(boot,t));}); else {boot();[200,700,1600,3200].forEach(t=>setTimeout(boot,t));}
+})();
+</script>
+
 </body>
 </html>
