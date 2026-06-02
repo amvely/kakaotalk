@@ -11637,6 +11637,10 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
     });
   }
   function restoreTopLayout(){
+    /* v28: 상단 레이아웃 권한을 단일화하기 위해 v25 의 레이아웃 재배치를 비활성화한다.
+       (v25 와 v26 이 서로 다른 레이아웃으로 MutationObserver 에서 충돌 → 옵션/계획 컬럼이 깨지던 문제) */
+    return;
+    /* 아래는 보존용(미실행) */
     const ctrl=$('db-ctrl-area'); const body=ctrl&&ctrl.nextElementSibling; if(!body)return;
     body.id='gpt-v9-settings-body'; body.classList.add('gpt-v25-settings-body'); body.dataset.v9Ready='1';
     body.style.display='grid'; body.style.gridTemplateColumns='minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)'; body.style.gap='0'; body.style.borderTop='1px solid var(--border2)';
@@ -11802,6 +11806,10 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
     host.appendChild(btn);
   }
   function finalTopLayout(){
+    /* v28: 상단 레이아웃 빌드는 v28 단일 권한으로 위임한다(중복/충돌 방지).
+       ensureCommentOutputPosition / patchStackStability 는 계속 사용한다. */
+    return;
+    /* 아래는 보존용(미실행) */
     const ctrl=$('db-ctrl-area'); const body=ctrl&&ctrl.nextElementSibling; if(!body) return;
     body.id='gpt-v9-settings-body'; body.classList.add('gpt-v25-settings-body');
     removeBadPanels();
@@ -11882,5 +11890,477 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
 })();
 </script>
 
+
+<!-- ════════════════════════════════════════════════════════════════════
+     v27 final fixes (요청 반영)
+     - 캠페인 유형/캠페인/광고그룹/일자 테이블 열 헤더 정렬을, 표를 다시 그려도
+       동작하도록 위임(delegation) 방식으로 재바인딩 (기존 enhanceSortable 의
+       1회성 가드 버그로 필터/재렌더 후 정렬이 죽던 문제 해결)
+     - HTML 다운로드 결과물 동작을 라이브 화면과 동일하게 복구
+         · 워터폴 차트 hover 숫자의 소수점 제거 (예: 8,307.024 → 8,307)
+         · 요일×시간대 히트맵 hover 툴팁 복구
+         · 유형 행 클릭 → 해당 유형의 캠페인/광고그룹만, 캠페인 행 클릭 →
+           해당 캠페인의 광고그룹만 표시 (라이브와 동일한 드릴다운)
+         · 열 헤더 정렬 + 검색 필터 유지
+   ════════════════════════════════════════════════════════════════════ -->
+<style id="gpt-v27-final-fixes-css">
+/* 정렬 가능한 헤더임을 시각적으로 표시 */
+#db-type-tbl thead th,
+#db-camp-tbl thead th,
+#db-group-tbl thead th,
+#db-daily-tbl thead th{cursor:pointer;user-select:none;}
+#db-type-tbl thead th:hover,
+#db-camp-tbl thead th:hover,
+#db-group-tbl thead th:hover,
+#db-daily-tbl thead th:hover{color:#fff;}
+/* 다운로드 HTML: 선택된 행 강조 + 클릭 가능 표시 */
+.db-report-html #db-type-tbl tbody tr,
+.db-report-html #db-camp-tbl tbody tr{cursor:pointer;}
+.db-report-html tr.db-selected td{background:rgba(59,130,246,.16)!important;color:#dbeafe!important;}
+</style>
+<script id="gpt-v27-final-fixes-js">
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  /* ───────────────────────────────────────────────────────────────
+     1) 라이브 화면 정렬(오름/내림차순) — 재렌더 안전 위임 바인딩
+        기존 enhanceSortable 은 thead 를 매 렌더마다 새로 그리면서
+        새 <th> 에 핸들러가 붙지 않아 정렬이 죽는 문제가 있다.
+        표(table) 요소 자체에 위임 리스너를 달아 thead 가 교체돼도
+        항상 동작하게 만든다.
+  ─────────────────────────────────────────────────────────────── */
+  const SORT_TABLE_IDS = ['db-type-tbl', 'db-camp-tbl', 'db-group-tbl', 'db-daily-tbl'];
+
+  /** 셀 텍스트에서 숫자만 추출 (쉼표/단위/기호 제거). 숫자가 아니면 null */
+  function parseCellNumber(text){
+    const n = parseFloat(String(text || '').replace(/,/g, '').replace(/%/g, '').replace(/[+원회건\s]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** TOTAL 행은 항상 맨 아래로 고정한 채 idx 열 기준 정렬 */
+  function sortTableByColumn(tbl, idx, dir){
+    const tb = tbl.tBodies[0];
+    if (!tb) return;
+    const dataRows = [...tb.rows].filter(r => !r.classList.contains('db-v20-total-row'));
+    const totalRow = [...tb.rows].find(r => r.classList.contains('db-v20-total-row'));
+    dataRows.sort((a, b) => {
+      const av = a.cells[idx] ? a.cells[idx].innerText : '';
+      const bv = b.cells[idx] ? b.cells[idx].innerText : '';
+      const an = parseCellNumber(av), bn = parseCellNumber(bv);
+      const cmp = (an !== null && bn !== null) ? (an - bn) : av.localeCompare(bv, 'ko');
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    dataRows.forEach(r => tb.appendChild(r));
+    if (totalRow) tb.appendChild(totalRow);
+  }
+
+  function bindDelegatedSort(tbl){
+    if (!tbl || tbl.dataset.v27Sort) return;
+    tbl.dataset.v27Sort = '1';
+    // 기존 v21 enhanceSortable 의 1회성 per-th 바인딩을 차단(중복 정렬 방지)
+    tbl.dataset.v21Sort = '1';
+    tbl.addEventListener('click', ev => {
+      const th = ev.target.closest('th');
+      if (!th || !tbl.tHead || !tbl.tHead.contains(th)) return;
+      const idx = [...th.parentElement.children].indexOf(th);
+      const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+      tbl.querySelectorAll('th').forEach(x => { delete x.dataset.dir; });
+      th.dataset.dir = dir;
+      sortTableByColumn(tbl, idx, dir);
+    });
+  }
+
+  function ensureSortBindings(){
+    SORT_TABLE_IDS.forEach(id => { const t = $(id); if (t) bindDelegatedSort(t); });
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     2) HTML 다운로드 재정의 — 라이브와 동일하게 동작하는 정적 리포트
+        · 모든 Chart.js 그래프(워터폴/100%비중/일간추이) 재생성
+        · 워터폴 hover 숫자 소수점 제거
+        · 히트맵 hover 툴팁 복구
+        · 유형/캠페인 행 클릭 드릴다운 + 헤더 정렬 + 검색
+  ─────────────────────────────────────────────────────────────── */
+  const esc = v => (typeof dbHtmlEscape === 'function')
+    ? dbHtmlEscape(v)
+    : String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function toast(msg){ try{ if (typeof showToast === 'function') showToast(msg); }catch(e){} }
+  function clonePlain(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return null; } }
+
+  function chartForCanvas(canvas){
+    if (!window.Chart || !canvas) return null;
+    try{ if (typeof Chart.getChart === 'function') return Chart.getChart(canvas); }catch(e){}
+    try{ return Object.values(Chart.instances || {}).find(ch => ch && ch.canvas === canvas) || null; }catch(e){ return null; }
+  }
+
+  /** 캡처 영역 내 살아있는 Chart.js 인스턴스의 설정을 수집(데이터는 깊은 복제) */
+  function collectChartConfigs(area){
+    const out = [];
+    if (!area || !window.Chart) return out;
+    [...area.querySelectorAll('canvas')].forEach((c, i) => {
+      if (!c.id) c.id = 'db-v27-export-canvas-' + i;
+      const ch = chartForCanvas(c);
+      if (!ch || !ch.data) return;
+      const rect = c.getBoundingClientRect();
+      const kind = c.id === 'db-wf-canvas' ? 'waterfall'
+        : (c.id === 'db-stack-canvas' ? 'stack'
+        : (c.id.startsWith('db-tl-cv-') ? 'trend' : 'generic'));
+      const data = clonePlain(ch.data);
+      if (!data) return;
+      const minH = (kind === 'trend') ? 120 : 280;
+      out.push({ id: c.id, type: ch.config.type || 'bar', data, kind,
+        height: Math.max(minH, Math.round(rect.height || c.clientHeight || (kind === 'trend' ? 120 : 300))) });
+    });
+    return out;
+  }
+
+  function reportHeader(){
+    const title = $('db-adv-title')?.innerHTML || $('db-result-title')?.textContent || '네이버 광고 성과 데이터';
+    return '<div class="db-v16-export-header" style="max-width:none;margin:0 0 14px;padding:16px 18px;background:#0f1520;border:1px solid #1e293b;border-radius:12px;">'
+      + '<div style="font-size:21px;font-weight:950;color:#fff;line-height:1.3;margin-bottom:8px;">' + title + '</div>'
+      + '<div class="db-v16-export-author"><span>작성자 <strong>미래아이엔씨 이태웅 과장</strong></span>'
+      + '<span>☎ <em>02-2633-9029</em> / <em>010-2841-1527</em></span><span>카톡 <em>208km</em></span></div></div>';
+  }
+
+  /* 다운로드 HTML 안에서 실행될 런타임 스크립트(차트 재생성 + 인터랙션) */
+  function exportRuntime(configs){
+    const json = JSON.stringify(configs).replace(/<\//g, '<\\/');
+    return '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>'
+      + '<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"><\/script>'
+      + '<script>(function(){'
+      + 'var CFG=' + json + ';'
+      // 정수 포맷(소수점 제거)
+      + 'function nfmt(v){v=Number(v||0);return Math.round(v).toLocaleString("ko-KR");}'
+      + 'function isRed(c){return String(c||"").indexOf("239,68,68")>-1;}'
+      // 차트 옵션 구성
+      + 'function opt(cfg){'
+      + 'var hi=null;function setH(ch,l){hi=hi===l?null:l;(ch.data.datasets||[]).forEach(function(ds){if(ds.__b===undefined)ds.__b=ds.backgroundColor;if(cfg.kind==="stack")ds.backgroundColor=(!hi||ds.label===hi)?ds.__b:"rgba(71,85,105,.35)";});ch.update();}'
+      + 'var o={responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"nearest",intersect:false},'
+      + 'plugins:{legend:{display:cfg.kind==="stack",position:"top",labels:{boxWidth:12,color:"#e2e8f0",font:{size:10,weight:"800"}}},'
+      + 'tooltip:{enabled:true,backgroundColor:"rgba(15,23,42,.96)",titleColor:"#fff",bodyColor:"#e2e8f0",borderColor:"#475569",borderWidth:1},'
+      + 'datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:"#dbeafe"}},y:{grid:{display:false},ticks:{color:"#dbeafe"}}}};'
+      // 워터폴: 보이지 않는 offset(0번) 데이터셋은 툴팁에서 숨기고, 값은 소수점 없이 +/- 표기
+      + 'if(cfg.kind==="waterfall"){o.scales.x.stacked=true;o.scales.y.stacked=true;o.scales.y.beginAtZero=true;o.scales.y.ticks.display=false;'
+      + 'o.plugins.tooltip.filter=function(it){return it.datasetIndex>0;};'
+      + 'o.plugins.tooltip.callbacks={label:function(ctx){var v=Number(ctx.parsed.y||0);var ls=ctx.chart.data.labels||[];var i=ctx.dataIndex,last=ls.length-1;if(i===0||i===last)return nfmt(v);var bg=ctx.dataset.backgroundColor;var neg=Array.isArray(bg)&&isRed(bg[i]);return (neg?"-":"+")+nfmt(v);}};'
+      + 'o.plugins.datalabels={display:function(ctx){return ctx.datasetIndex>0;},anchor:"end",align:"end",offset:3,color:"#e0f2fe",font:{size:9,weight:"700"},formatter:function(v,ctx){if(ctx.datasetIndex===0)return "";var i=ctx.dataIndex,last=(ctx.chart.data.labels||[]).length-1;if(i===0||i===last)return nfmt(v);var bg=ctx.dataset.backgroundColor;var neg=Array.isArray(bg)&&isRed(bg[i]);return (neg?"-":"+")+nfmt(v);}};}'
+      // 100% 비중(stack): 가로 막대 + 클릭 하이라이트 + 소수점 없는 실수치
+      + 'if(cfg.kind==="stack"){o.indexAxis="y";o.interaction={mode:"nearest",intersect:true};'
+      + 'o.onClick=function(e,els,ch){if(els&&els.length)setH(ch,ch.data.datasets[els[0].datasetIndex].label);};'
+      + 'o.plugins.legend.onClick=function(e,item,lg){setH(lg.chart,item.text);};'
+      + 'o.plugins.tooltip.callbacks={label:function(ctx){var raw=(ctx.dataset.rawValues||[])[ctx.dataIndex];return ctx.dataset.label+": "+Number(ctx.parsed.x||0).toFixed(1)+"%"+(raw!==undefined?" ("+nfmt(raw)+")":"");}};'
+      + 'o.plugins.datalabels={display:function(ctx){return Number((ctx.dataset.data||[])[ctx.dataIndex]||0)>=4;},formatter:function(v){return Number(v||0).toFixed(0)+"%";},color:"#fff",font:{size:10,weight:"900"}};'
+      + 'o.scales.x.stacked=true;o.scales.x.min=0;o.scales.x.max=100;o.scales.x.grid={color:"rgba(203,213,225,.14)"};o.scales.x.ticks.callback=function(v){return v+"%";};o.scales.y.stacked=true;o.scales.y.grid={display:false};o.scales.y.ticks={color:"#f8fafc",font:{weight:"900"}};}'
+      // 일간 추이(trend): y축 라벨 숨김 + 소수점 없는 툴팁
+      + 'if(cfg.kind==="trend"){o.scales.y.ticks.display=false;o.plugins.tooltip.callbacks={label:function(ctx){return (ctx.dataset.label||"")+": "+nfmt(ctx.parsed.y);}};}'
+      + 'return o;}'
+      // 차트 부팅
+      + 'function bootCharts(){if(!window.Chart)return;try{if(window.ChartDataLabels)Chart.register(ChartDataLabels);}catch(e){}'
+      + 'CFG.forEach(function(cfg){var c=document.getElementById(cfg.id);if(!c)return;c.style.width="100%";c.style.height=cfg.height+"px";'
+      + 'if(cfg.kind==="stack"){(cfg.data.datasets||[]).forEach(function(ds){if(ds.__b===undefined)ds.__b=ds.backgroundColor;});}'
+      + 'try{new Chart(c.getContext("2d"),{type:cfg.type,data:cfg.data,options:opt(cfg)});}catch(e){console.warn("[v27 export chart]",cfg.id,e);}});}'
+      // ── 요일×시간대 히트맵 hover 툴팁 ──
+      + 'function tipEl(card){var t=card.querySelector(".db-pivot-tip");if(!t){t=document.createElement("div");t.className="db-pivot-tip";card.appendChild(t);}return t;}'
+      + 'function showTip(cell){var card=cell.closest(".db-pivot-card")||cell.closest(".db-tbl-card");if(!card)return;'
+      + 'var label=cell.getAttribute("data-tip-label")||"";var val=cell.getAttribute("data-tip-val")||"";'
+      + 'if(getComputedStyle(card).position==="static")card.style.position="relative";var t=tipEl(card);'
+      + 't.style.cssText="display:block;position:absolute;z-index:9999;pointer-events:none;background:rgba(8,14,30,.96);border:1px solid rgba(96,165,250,.35);border-radius:9px;padding:8px 13px;box-shadow:0 8px 24px rgba(0,0,0,.55);white-space:nowrap;font-family:Pretendard,Noto Sans KR,sans-serif;";'
+      + 't.innerHTML="<div style=\\"font-size:9.5px;color:#93c5fd;margin-bottom:4px;\\">"+label+"</div><div style=\\"font-size:14px;font-weight:800;color:#f8fafc;\\">"+val+"</div>";'
+      + 'var cr=cell.getBoundingClientRect(),pr=card.getBoundingClientRect();var lx=cr.left-pr.left+cr.width/2,ly=cr.top-pr.top-62;if(ly<4)ly=cr.bottom-pr.top+4;if(lx+120>pr.width)lx=pr.width-120;if(lx<4)lx=4;t.style.left=lx+"px";t.style.top=ly+"px";t.style.transform="translateX(-50%)";}'
+      + 'function hideTip(cell){var card=cell.closest(".db-pivot-card")||cell.closest(".db-tbl-card");if(!card)return;var t=card.querySelector(".db-pivot-tip");if(t)t.style.display="none";}'
+      + 'function bootHeatmap(){document.querySelectorAll(".db-heat").forEach(function(cell){cell.addEventListener("mouseenter",function(){showTip(cell);});cell.addEventListener("mouseleave",function(){hideTip(cell);});});}'
+      // ── 헤더 정렬 + 검색 + 행 클릭 드릴다운 ──
+      + 'function num(s){var n=parseFloat(String(s||"").replace(/,/g,"").replace(/%/g,"").replace(/[+원회건\\s]/g,""));return isFinite(n)?n:null;}'
+      + 'function sortT(tbl,i,d){var tb=tbl.tBodies[0];if(!tb)return;var rows=[].slice.call(tb.rows).filter(function(r){return !r.classList.contains("db-v20-total-row");});var total=[].slice.call(tb.rows).find(function(r){return r.classList.contains("db-v20-total-row");});rows.sort(function(a,b){var av=a.cells[i]?a.cells[i].innerText:"",bv=b.cells[i]?b.cells[i].innerText:"";var an=num(av),bn=num(bv);var c=(an!==null&&bn!==null)?an-bn:av.localeCompare(bv,"ko");return d==="asc"?c:-c;});rows.forEach(function(r){tb.appendChild(r);});if(total)tb.appendChild(total);}'
+      + 'var typeFilter="",campFilter="";'
+      + 'function cellTxt(r,n){return (r.children[n]?r.children[n].textContent:"").trim();}'
+      + 'function searchState(card){var b=card.__sbar;return b?{mode:b.querySelector(".db-v27-mode").value,q:b.querySelector(".db-v27-q").value}:{mode:"include",q:""};}'
+      + 'function matchSearch(text,st){var terms=String(st.q||"").split(",").map(function(x){return x.trim().toLowerCase();}).filter(Boolean);if(!terms.length)return true;text=String(text||"").toLowerCase();if(st.mode==="exclude")return terms.every(function(t){return text.indexOf(t)===-1;});if(st.mode==="exact")return terms.some(function(t){return text===t;});return terms.some(function(t){return text.indexOf(t)>-1;});}'
+      // 모든 필터(유형/캠페인 드릴다운 + 카드별 검색)를 합쳐 한 번에 표시 재계산
+      + 'function recompute(){'
+      + 'var typeTbl=document.getElementById("db-type-tbl"),campTbl=document.getElementById("db-camp-tbl"),groupTbl=document.getElementById("db-group-tbl"),dailyTbl=document.getElementById("db-daily-tbl");'
+      + '[ [typeTbl], [dailyTbl] ].forEach(function(pair){var tbl=pair[0];if(!tbl)return;var st=searchState(tbl.closest(".db-tbl-card")||document.body);tbl.querySelectorAll("tbody tr").forEach(function(r){if(r.classList.contains("db-v20-total-row"))return;r.style.display=matchSearch(r.innerText,st)?"":"none";});});'
+      + 'if(campTbl){var cst=searchState(campTbl.closest(".db-tbl-card")||document.body);campTbl.querySelectorAll("tbody tr").forEach(function(r){if(r.classList.contains("db-v20-total-row"))return;var ok=(!typeFilter||cellTxt(r,0)===typeFilter)&&matchSearch(r.innerText,cst);r.style.display=ok?"":"none";});}'
+      + 'if(groupTbl){var gst=searchState(groupTbl.closest(".db-tbl-card")||document.body);groupTbl.querySelectorAll("tbody tr").forEach(function(r){if(r.classList.contains("db-v20-total-row"))return;var ok=(!typeFilter||cellTxt(r,0)===typeFilter)&&(!campFilter||cellTxt(r,1)===campFilter)&&matchSearch(r.innerText,gst);r.style.display=ok?"":"none";});}'
+      + '}'
+      + 'function addSearchBar(tbl){var card=tbl.closest(".db-tbl-card");if(!card||card.querySelector(".db-v27-bar"))return;var bar=document.createElement("div");bar.className="db-v27-bar";bar.style.cssText="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;background:rgba(255,255,255,.012);border-bottom:1px solid #273244;";'
+      + 'bar.innerHTML="<span style=\\"font-size:10px;color:#94a3b8;font-weight:800;\\">검색</span><select class=\\"db-v27-mode\\"><option value=\\"include\\">포함</option><option value=\\"exact\\">일치</option><option value=\\"exclude\\">제외</option></select><input class=\\"db-v27-q\\" placeholder=\\"쉼표로 복수 검색\\"><button type=\\"button\\" class=\\"db-v27-apply\\">적용</button><button type=\\"button\\" class=\\"db-v27-reset\\">초기화</button>";'
+      + 'card.insertBefore(bar,card.firstChild);card.__sbar=bar;'
+      + 'bar.querySelectorAll("select,input,button").forEach(function(el){el.style.cssText+=";background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:7px;padding:5px 8px;font-size:10.5px;font-weight:800;";});'
+      + 'bar.querySelector(".db-v27-apply").onclick=recompute;bar.querySelector(".db-v27-q").onkeydown=function(e){if(e.key==="Enter")recompute();};bar.querySelector(".db-v27-reset").onclick=function(){bar.querySelector(".db-v27-q").value="";recompute();};}'
+      + 'function bootTables(){'
+      + 'document.querySelectorAll("#db-daily-tbl,#db-type-tbl,#db-camp-tbl,#db-group-tbl").forEach(function(tbl){addSearchBar(tbl);tbl.querySelectorAll("thead th").forEach(function(th,i){th.style.cursor="pointer";th.onclick=function(){var d=th.dataset.dir==="asc"?"desc":"asc";tbl.querySelectorAll("th").forEach(function(x){delete x.dataset.dir;});th.dataset.dir=d;sortT(tbl,i,d);};});});'
+      // 유형 행 클릭 → 해당 유형의 캠페인/광고그룹만
+      + 'document.querySelectorAll("#db-type-tbl tbody tr").forEach(function(r){if(r.classList.contains("db-v20-total-row"))return;r.style.cursor="pointer";r.addEventListener("click",function(){var v=cellTxt(r,0);var same=typeFilter===v;typeFilter=same?"":v;campFilter="";document.querySelectorAll("#db-type-tbl tbody tr,#db-camp-tbl tbody tr").forEach(function(x){x.classList.remove("db-selected");});if(!same)r.classList.add("db-selected");recompute();});});'
+      // 캠페인 행 클릭 → 해당 캠페인의 광고그룹만
+      + 'document.querySelectorAll("#db-camp-tbl tbody tr").forEach(function(r){if(r.classList.contains("db-v20-total-row"))return;r.style.cursor="pointer";r.addEventListener("click",function(){var v=cellTxt(r,1);var same=campFilter===v;campFilter=same?"":v;document.querySelectorAll("#db-camp-tbl tbody tr").forEach(function(x){x.classList.remove("db-selected");});if(!same)r.classList.add("db-selected");recompute();});});'
+      + 'var note=document.createElement("div");note.style.cssText="font-family:Pretendard,Noto Sans KR,sans-serif;font-size:11px;color:#94a3b8;margin:6px 0 0;";note.textContent="유형/캠페인 행을 클릭하면 하위 표가 필터링됩니다. 같은 행을 다시 클릭하면 해제됩니다.";var tc=document.querySelector("#db-type-tbl");if(tc){var card=tc.closest(".db-tbl-card");if(card&&!card.querySelector(".db-v27-note")){note.className="db-v27-note";card.appendChild(note);}}'
+      + '}'
+      + 'function start(){bootCharts();bootHeatmap();bootTables();}'
+      + 'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();'
+      + '})();<\/script>';
+  }
+
+  /** 라이브 화면과 동일하게 동작하는 인터랙티브 HTML 리포트 생성 */
+  function downloadReportHtml(){
+    try{ if (typeof dbPrepareCommentOutput === 'function') dbPrepareCommentOutput(); }catch(e){}
+    // 최신 차트 상태 확보
+    try{ if (typeof dbRenderTrendLines === 'function') dbRenderTrendLines(); }catch(e){}
+    try{ if (typeof dbRenderWaterfall === 'function') dbRenderWaterfall(); }catch(e){}
+    try{ if (typeof dbRenderStackChart === 'function') dbRenderStackChart(); }catch(e){}
+
+    const area = $('db-capture-area');
+    if (!area){ toast('다운로드할 리포트가 없습니다'); return; }
+
+    setTimeout(() => {
+      const configs = collectChartConfigs(area);
+      const clone = area.cloneNode(true);
+      clone.querySelectorAll('script, style, .dbc-tip, .db-v27-bar, .db-v27-note, .db-pivot-tip').forEach(el => el.remove());
+
+      // 히트맵 셀의 hover 라벨/값을 data-* 속성으로 보존(이후 인라인 핸들러 제거에도 안전)
+      clone.querySelectorAll('.db-heat').forEach(el => {
+        const oe = el.getAttribute('onmouseenter') || '';
+        const m = oe.match(/dbPivotTip\(this,\s*'([^']*)'\s*,\s*'([^']*)'\)/);
+        if (m){ el.setAttribute('data-tip-label', m[1]); el.setAttribute('data-tip-val', m[2]); }
+      });
+      // 인라인 이벤트 핸들러 제거(원본 함수가 없는 정적 HTML 에서 에러 방지)
+      clone.querySelectorAll('[onclick],[onchange],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el => {
+        ['onclick','onchange','onmouseenter','onmousemove','onmouseleave'].forEach(a => el.removeAttribute(a));
+      });
+      // 캔버스는 고정 픽셀 크기 제거 후 런타임에서 재생성
+      clone.querySelectorAll('canvas').forEach(c => {
+        c.removeAttribute('width'); c.removeAttribute('height'); c.style.width = '100%';
+        if (c.id === 'db-wf-canvas' || c.id === 'db-stack-canvas') c.style.height = '300px';
+      });
+      clone.querySelectorAll('.db-threshold-empty').forEach(el => {
+        if ((el.textContent || '').includes('임계값 초과 항목이 없습니다')) el.remove();
+      });
+
+      const css = [...document.querySelectorAll('style')].map(s => s.textContent || '').join('\n');
+      const adv = (typeof dbActiveAdv === 'function' ? dbActiveAdv() : window.currentAdv) || {};
+      const pm = window.dbPeriodMeta;
+      const pad = n => String(n).padStart(2, '0');
+      const stamp = pm
+        ? `${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`
+        : new Date().toISOString().slice(0, 10);
+
+      const html = '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+        + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
+        + '<title>' + esc(adv.name || '성과') + ' 성과 대시보드</title><style>' + css
+        + '\nbody{padding:0;background:#08090c!important;}'
+        + '#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:18px!important;}'
+        + '#db-capture-area{max-width:none!important;width:100%!important;margin:0!important;display:flex!important;flex-direction:column!important}'
+        + '.db-v16-export-author{font-family:\'Pretendard\',\'Noto Sans KR\',sans-serif!important;font-size:12px;color:#cbd5e1;display:flex;gap:12px;flex-wrap:wrap}'
+        + '.db-v16-export-author *{font-family:inherit!important}.db-v16-export-author strong,.db-v16-export-author em{color:#fff;font-style:normal}'
+        + '.db-selected td{background:rgba(59,130,246,.16)!important;color:#dbeafe!important}'
+        + '</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'
+        + reportHeader() + clone.outerHTML + '</div>' + exportRuntime(configs) + '</body></html>';
+
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${adv.name || '성과'}_성과대시보드_${stamp}.html`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast('✅ 리포트 HTML 저장 완료');
+    }, 240);
+  }
+  // v23 의 패치 타이머가 다시 감싸지 않도록 동일 플래그를 달아둔다
+  downloadReportHtml.__v23Wrapped = true;
+  window.dbDownloadReportHtml = downloadReportHtml;
+  try{ dbDownloadReportHtml = downloadReportHtml; }catch(e){}
+
+  /* ─────────────────────────────────────────────────────────────── */
+  function boot(){
+    ensureSortBindings();
+    // 다운로드 함수가 후속 패치/타이머에 의해 교체됐다면 다시 우리 것으로 고정
+    if (window.dbDownloadReportHtml !== downloadReportHtml){
+      window.dbDownloadReportHtml = downloadReportHtml;
+      try{ dbDownloadReportHtml = downloadReportHtml; }catch(e){}
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  [200, 700, 1500, 3200].forEach(t => setTimeout(boot, t));
+  // 표가 동적으로 다시 그려질 때도 정렬 위임이 유지되도록 감시
+  if (window.MutationObserver){
+    const mo = new MutationObserver(() => { clearTimeout(window.__v27mo); window.__v27mo = setTimeout(ensureSortBindings, 150); });
+    setTimeout(() => { const root = $('tab-dashboard'); if (root) mo.observe(root, { childList: true, subtree: true }); }, 500);
+  }
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     v28 단일 상단 레이아웃 권한 (요청 반영)
+     - v25/v26 의 레이아웃 충돌(서로 다른 배치를 MutationObserver 에서 번갈아
+       덮어쓰던 문제)을 제거하고, 상단 설정 영역을 하나의 함수가 책임진다.
+         · 1열: 날짜 옵션 + 성과 항목 선택
+         · 2열: 📌 캠페인/광고그룹 노출행(개수 셀렉트) + 📈 증감률 표시(ON/OFF)
+         · 3열: ✏️ 마케터 코멘트(위) + 🎯 금일 운영 계획(아래) 세로 배치
+     - v26 의 CSS 클래스/ID 를 그대로 재사용하므로 디자인은 동일하게 유지된다.
+     - idempotent(이미 올바르면 아무 것도 안 함) → 깜빡임/무한 재배치 없음.
+   ════════════════════════════════════════════════════════════════════ -->
+<script id="gpt-v28-single-layout-js">
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  let applying = false; // 재진입(자기 자신이 만든 mutation) 방지 플래그
+
+  /** body 의 직계 자식 중 el 을 포함하는 컬럼을 찾는다 */
+  function columnOf(body, el){
+    let n = el;
+    while (n && n.parentElement !== body) n = n.parentElement;
+    return n || null;
+  }
+
+  /** 2열의 증감률 ON/OFF 버튼 동작(기존 v25 setDiff 가 있으면 그것을 사용) */
+  function wireDiffButton(btn){
+    btn.onclick = function(){
+      const on = !(window.__dbDiffRateOn !== false); // 현재 ON 이면 OFF 로 토글
+      if (typeof window.dbV25SetDiff === 'function'){
+        window.dbV25SetDiff(on);
+      } else {
+        window.__dbDiffRateOn = on;
+        document.querySelectorAll('.db-diff-rate-th,.db-diff-rate-td').forEach(el => { el.style.display = on ? '' : 'none'; });
+      }
+      document.querySelectorAll('#db-diff-rate-toggle,.gpt-v25-diff-btn').forEach(b => {
+        b.classList.toggle('on', on);
+        b.textContent = '증감률 ' + (on ? 'ON' : 'OFF');
+      });
+    };
+  }
+
+  /** 메트릭 컬럼에 남은 코멘트/계획 "제목만 있는" 빈 껍데기 제거 */
+  function stripStaleTitles(metricCol, comment, plan){
+    [...metricCol.querySelectorAll('div')].forEach(d => {
+      const t = (d.textContent || '').trim();
+      if ((t === '🎯 금일 운영 계획' || t === '✏️ 마케터 코멘트')
+          && !d.contains(comment) && !d.contains(plan) && d.children.length <= 1){
+        d.remove();
+      }
+    });
+  }
+
+  function isAlreadyCorrect(body){
+    const oc = $('db-v26-options-col'), cp = $('db-v26-comment-plan-col');
+    const comment = $('db-comment'), plan = $('db-plan');
+    return !!(oc && cp && comment && plan
+      && oc.contains($('db-camp-row-limit')) && oc.contains($('db-group-row-limit'))
+      && cp.contains(comment) && cp.contains(plan)
+      && body.children.length === 3 && body.children[1] === oc && body.children[2] === cp);
+  }
+
+  function buildLayout(){
+    const ctrl = $('db-ctrl-area');
+    const body = ctrl && ctrl.nextElementSibling;
+    if (!body) return;
+
+    const metricGrid = $('db-metric-toggle-grid');
+    const comment = $('db-comment');
+    const plan = $('db-plan');
+    if (!metricGrid || !comment || !plan) return; // 아직 DOM 준비 전
+
+    if (isAlreadyCorrect(body)) return; // 이미 올바른 배치 → 재구성 안 함
+
+    body.id = 'gpt-v9-settings-body';
+    body.classList.add('gpt-v25-settings-body');
+    body.style.display = 'grid';
+    body.style.gridTemplateColumns = 'minmax(300px,.95fr) minmax(220px,.58fr) minmax(420px,1.25fr)';
+    body.style.gap = '0';
+    body.style.alignItems = 'stretch';
+
+    /* 1열: 성과 항목(+ 날짜 옵션) 컬럼 */
+    const metricCol = columnOf(body, metricGrid) || body.children[0];
+    metricCol.classList.add('gpt-v26-metric-col');
+
+    /* 2열: 옵션(노출행 + 증감률) — v26 의 ID/클래스를 재사용해 디자인 유지 */
+    let optCol = $('db-v26-options-col');
+    if (!optCol){ optCol = document.createElement('div'); optCol.id = 'db-v26-options-col'; }
+    optCol.innerHTML =
+      '<div class="db-v26-option-box"><div class="db-v26-option-title">📌 캠페인/광고그룹 노출행</div><div class="db-v26-option-body" id="db-v28-row-host"></div></div>'
+      + '<div class="db-v26-option-box"><div class="db-v26-option-title">📈 증감률 표시</div><div class="db-v26-option-body" id="db-v28-diff-host"></div></div>';
+    // 캠페인/광고그룹 노출행 셀렉트(라벨 통째로) 이동
+    ['db-camp-row-limit', 'db-group-row-limit'].forEach(id => {
+      const sel = $(id);
+      if (sel){ const lab = sel.closest('label') || sel; optCol.querySelector('#db-v28-row-host').appendChild(lab); }
+    });
+    // 증감률 토글 버튼(없으면 생성)
+    let diffBtn = $('db-diff-rate-toggle');
+    if (!diffBtn){
+      diffBtn = document.createElement('button');
+      diffBtn.type = 'button';
+      diffBtn.id = 'db-diff-rate-toggle';
+      diffBtn.className = 'db-diff-toggle-btn gpt-v25-diff-btn ' + (window.__dbDiffRateOn === false ? '' : 'on');
+      diffBtn.textContent = '증감률 ' + (window.__dbDiffRateOn === false ? 'OFF' : 'ON');
+    }
+    wireDiffButton(diffBtn);
+    optCol.querySelector('#db-v28-diff-host').appendChild(diffBtn);
+
+    /* 3열: 마케터 코멘트(위) + 금일 운영 계획(아래) 세로 배치 */
+    let cpCol = $('db-v26-comment-plan-col');
+    if (!cpCol){ cpCol = document.createElement('div'); cpCol.id = 'db-v26-comment-plan-col'; }
+    cpCol.innerHTML = '';
+    // 코멘트 섹션 (AI 버튼 행 포함)
+    const cSec = document.createElement('div');
+    cSec.className = 'db-v26-comment-section';
+    const aiRow = document.querySelector('#db-settings-panel .db-ai-row');
+    if (aiRow){ cSec.appendChild(aiRow); }
+    else { const t = document.createElement('div'); t.className = 'db-v26-section-title'; t.innerHTML = '✏️ 마케터 코멘트'; cSec.appendChild(t); }
+    cSec.appendChild(comment);
+    // 운영 계획 섹션
+    const pSec = document.createElement('div');
+    pSec.className = 'db-v26-plan-section';
+    const pTitle = document.createElement('div');
+    pTitle.className = 'db-v26-section-title';
+    pTitle.innerHTML = '🎯 금일 운영 계획';
+    const hidePlan = $('db-v23-hide-plan');
+    if (hidePlan) pTitle.appendChild(hidePlan);
+    pSec.appendChild(pTitle);
+    pSec.appendChild(plan);
+    cpCol.appendChild(cSec);
+    cpCol.appendChild(pSec);
+
+    // 1열에 남은 코멘트/계획 제목 껍데기 정리(텍스트박스는 이미 3열로 이동됨)
+    stripStaleTitles(metricCol, comment, plan);
+
+    /* 본문을 정확히 3컬럼으로 재조립 */
+    body.innerHTML = '';
+    body.appendChild(metricCol);
+    body.appendChild(optCol);
+    body.appendChild(cpCol);
+  }
+
+  function apply(){
+    if (applying) return;
+    applying = true;
+    try { buildLayout(); }
+    catch(e){ console.warn('[v28 layout]', e); }
+    finally { setTimeout(() => { applying = false; }, 0); }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+  else apply();
+  // 초기 패치들(v8~v11)이 시간차로 DOM 을 재구성하므로 여러 시점에 보정
+  [120, 350, 700, 1300, 2400, 3600, 5000].forEach(t => setTimeout(apply, t));
+
+  // 이후 다른 코드가 상단을 건드려도 자동 복구(재진입 가드로 무한 루프 방지)
+  if (window.MutationObserver){
+    const mo = new MutationObserver(() => {
+      if (applying) return;
+      clearTimeout(window.__v28mo);
+      window.__v28mo = setTimeout(apply, 150);
+    });
+    setTimeout(() => {
+      const ctrl = $('db-ctrl-area');
+      const body = ctrl && ctrl.nextElementSibling;
+      if (body) mo.observe(body, { childList: true, subtree: true });
+    }, 400);
+  }
+})();
+</script>
+
 </body>
 </html>
+
