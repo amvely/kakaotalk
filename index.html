@@ -2375,11 +2375,13 @@ function renderAdvDD(filter=''){
   const isMetaTab  =activeTab.includes('메타');
   const isNaverTab =activeTab.includes('네이버');
   const isGoogleTab=activeTab.includes('구글');
+  const isDashboardTab=activeTab.includes('성과 대시보드');
 
   const filtered=advertisers.map(migrateAdv).filter(a=>{
     if(isMetaTab   && !hasMeta(a))   return false;
     if(isNaverTab  && !hasNaver(a))  return false;
     if(isGoogleTab && !hasGoogle(a)) return false;
+    if(isDashboardTab && !hasNaver(a)) return false;
     return !fl || a.name.toLowerCase().includes(fl) || (a.cat||'').toLowerCase().includes(fl);
   });
 
@@ -2444,48 +2446,55 @@ async function selectAdv(id){
   const ys=addDays(new Date(),-1);
   // toISOString()은 UTC 기준이므로 KST 00:00~08:59 사이에 하루 밀리는 버그 수정 → 로컬 시간 기반으로 변경
   const toISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const ymd=toISO(ys);
 
-  // 현재 활성 탭 기준으로 동작
-  const activeTab=[...document.querySelectorAll('.tab-btn')].find(b=>b.classList.contains('active'))?.textContent||'';
-  const goMeta  =activeTab.includes('메타')   && hasMeta(currentAdv);
-  const goGoogle=activeTab.includes('구글')   && hasGoogle(currentAdv);
+  // 선택한 광고주는 현재 열려 있는 탭에서만 작동한다. 탭을 강제로 이동하지 않는다.
+  const activePanel=[...document.querySelectorAll('.tab-panel')].find(p=>p.classList.contains('active'));
+  const activeName=(activePanel?.id||'tab-kakao').replace(/^tab-/,'');
 
-  if(goGoogle){
-    googlePeriod='D1'; googleCustomRange=null;
-    const gs=document.getElementById('google-start');
-    const ge=document.getElementById('google-end');
-    if(gs&&ge){gs.value=toISO(ys);ge.value=toISO(ys);}
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.getElementById('tab-google')?.classList.add('active');
-    [...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.includes('구글'))?.classList.add('active');
-    syncGooglePeriodButtons();
-    await googleFetchAndPreview();
-  } else if(goMeta){
-    metaPeriod='D1'; metaCustomRange=null;
-    const ms=document.getElementById('meta-start');
-    const me=document.getElementById('meta-end');
-    if(ms&&me){ms.value=toISO(ys);me.value=toISO(ys);}
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.getElementById('tab-meta')?.classList.add('active');
-    [...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.includes('메타'))?.classList.add('active');
-    
-    syncMetaPeriodButtons();
-    await metaFetchAndPreview();
-  } else {
+  try{
+    if(activeName==='dashboard'){
+      if(!hasNaver(currentAdv)){ showToast('성과 대시보드는 네이버 광고주만 사용할 수 있습니다'); return; }
+      dbSyncPeriodButtons?.();
+      await dbLoad?.();
+      return;
+    }
+
+    if(activeName==='google'){
+      if(!hasGoogle(currentAdv)){ showToast('구글 보고서 정보가 없는 광고주입니다'); return; }
+      googlePeriod='D1'; googleCustomRange=null;
+      const gs=document.getElementById('google-start');
+      const ge=document.getElementById('google-end');
+      if(gs&&ge){gs.value=ymd;ge.value=ymd;}
+      syncGooglePeriodButtons?.();
+      await googleFetchAndPreview?.();
+      return;
+    }
+
+    if(activeName==='meta'){
+      if(!hasMeta(currentAdv)){ showToast('메타 보고서 정보가 없는 광고주입니다'); return; }
+      metaPeriod='D1'; metaCustomRange=null;
+      const ms=document.getElementById('meta-start');
+      const me=document.getElementById('meta-end');
+      if(ms&&me){ms.value=ymd;me.value=ymd;}
+      syncMetaPeriodButtons?.();
+      await metaFetchAndPreview?.();
+      return;
+    }
+
+    // 기본: 네이버 보고서 탭
+    if(!hasNaver(currentAdv)){ showToast('네이버 보고서 정보가 없는 광고주입니다'); return; }
     kakaoPeriod='D1'; kakaoCustomRange=null;
     const ks=document.getElementById('kakao-start');
     const ke=document.getElementById('kakao-end');
-    if(ks&&ke){ks.value=toISO(ys);ke.value=toISO(ys);}
+    if(ks&&ke){ks.value=ymd;ke.value=ymd;}
     const lbl2=document.getElementById('kakao-period-label');
-    if(lbl2) lbl2.textContent=`[${toISO(ys).replace(/-/g,'.')}]`;
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.getElementById('tab-kakao')?.classList.add('active');
-    [...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.includes('네이버'))?.classList.add('active');
-    syncKakaoPeriodButtons();
-    await loadKakaoData();
+    if(lbl2) lbl2.textContent=`[${ymd.replace(/-/g,'.')}]`;
+    syncKakaoPeriodButtons?.();
+    await loadKakaoData?.();
+  }catch(err){
+    console.error('[selectAdv current-tab]', err);
+    showToast(err?.message || '광고주 데이터를 불러오지 못했습니다');
   }
 }
 // goBack removed (dropdown 방식)
