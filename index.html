@@ -6640,7 +6640,7 @@ function dbDownloadReportHtml(){
   document.addEventListener('input',e=>{ if(e.target&&/^(db-comment|db-plan)$/.test(e.target.id||'')){prepareOutput();} },true);
   const oldDownload=window.dbDownloadReportHtml; if(typeof oldDownload==='function'&&!oldDownload.__v31Wrapped){ const wrapped=function(){ ensureButtons(); prepareOutput(); try{window.dbRenderStackChart&&window.dbRenderStackChart();}catch(e){} return oldDownload.apply(this,arguments); }; wrapped.__v31Wrapped=true; window.dbDownloadReportHtml=wrapped; try{dbDownloadReportHtml=wrapped;}catch(e){} }
 })();
-</script>
+<\/script>
 
 </body></html>';
   const blob=new Blob([htmlOut],{type:'text/html;charset=utf-8'});
@@ -12796,9 +12796,6 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
   document.addEventListener('input',e=>{if(e.target&&/^(db-comment|db-plan)$/.test(e.target.id||''))prepareOutput();},true);
 })();
 </script>
-</body>
-</html>
-
 
 <!-- GPT v32 final comment/report layout patch -->
 <style id="gpt-v32-comment-layout-style">
@@ -12886,3 +12883,6 @@ table.dbt2 th.db-no-sort, table.dbt th.db-no-sort{cursor:default;}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{boot();setTimeout(boot,500);setTimeout(boot,1200);}); else {boot();setTimeout(boot,500);setTimeout(boot,1200);}
 })();
 </script>
+
+</body>
+</html>
