@@ -948,7 +948,17 @@ body.db-capturing .db-metric-chart-collapsed,
 #db-stack-card .db-chartjs-wrap{height:410px;}
 #db-stack-legend{display:none!important;}
 @media(max-width:1100px){#db-top-row{grid-template-columns:1fr!important;}#db-top-row #db-tlines-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;}}
-</style></head>
+</style><style id="v51-stack-visible-fix-css">
+
+/* v51: 항목별 성과 비중 분석(100%) 섹션 표시 복원 - raw code 출력 방지용 단일 안전 패치 */
+#tab-dashboard #db-stack-card{display:block!important;margin-top:12px!important;}
+#tab-dashboard #db-stack-card .db-tbl-hd{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;flex-wrap:wrap!important;}
+#tab-dashboard #db-stack-card .db-tbl-hd-title{font-weight:950!important;color:#f8fafc!important;}
+#tab-dashboard #db-stack-card #db-stack-legend{display:flex!important;flex-wrap:wrap!important;gap:6px!important;}
+#tab-dashboard #db-stack-card #db-stack-canvas{width:100%!important;display:block!important;min-height:240px!important;}
+#tab-dashboard #db-stack-empty-v51{display:none;align-items:center;justify-content:center;min-height:180px;margin:8px 14px 14px;border:1px dashed rgba(148,163,184,.25);border-radius:10px;color:#94a3b8;font-size:12px;font-weight:800;background:rgba(15,23,42,.35);}
+</style>
+</head>
 <body data-theme="dark">
 <!-- ═══ SCREEN 2: 리포트 ═══ -->
 <div id="screen-report">
@@ -12780,5 +12790,67 @@ function dbDownloadReportHtml(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot); else boot();
   window.dbV42FinalBoot=boot;
 })();
-</script></body>
+</script>
+<script id="v51-stack-visible-fix-script">
+(function(){
+  'use strict';
+  function $(id){return document.getElementById(id);}
+  function ensureStackSection(){
+    var card=$('db-stack-card');
+    if(!card) return;
+    card.style.display='block';
+    card.hidden=false;
+    if(!card.querySelector('#db-stack-empty-v51')){
+      var empty=document.createElement('div');
+      empty.id='db-stack-empty-v51';
+      empty.textContent='데이터가 들어오면 항목별 성과 비중 분석 차트가 표시됩니다.';
+      var canvas=$('db-stack-canvas');
+      if(canvas && canvas.parentNode){ canvas.parentNode.insertBefore(empty, canvas); }
+      else card.appendChild(empty);
+    }
+    var canvas=$('db-stack-canvas');
+    if(canvas){
+      canvas.style.display='block';
+      if(!canvas.style.height) canvas.style.height='240px';
+    }
+  }
+  function showEmptyIfNeeded(){
+    var card=$('db-stack-card'), canvas=$('db-stack-canvas'), empty=$('db-stack-empty-v51');
+    if(!card||!empty) return;
+    card.style.display='block';
+    var hasData=false;
+    try{
+      hasData=!!(window.__dbStackChart && window.__dbStackChart.data && window.__dbStackChart.data.datasets && window.__dbStackChart.data.datasets.length);
+    }catch(e){}
+    if(canvas) canvas.style.display=hasData?'block':'none';
+    empty.style.display=hasData?'none':'flex';
+  }
+  function wrapRenderer(){
+    if(window.__v51StackRendererWrapped) return;
+    var original=window.dbRenderStackChart;
+    if(typeof original==='function'){
+      window.dbRenderStackChart=function(){
+        ensureStackSection();
+        var result;
+        try{ result=original.apply(this,arguments); }
+        finally{ ensureStackSection(); setTimeout(showEmptyIfNeeded,0); }
+        return result;
+      };
+      try{ dbRenderStackChart=window.dbRenderStackChart; }catch(e){}
+      window.__v51StackRendererWrapped=true;
+    }
+  }
+  function boot(){
+    ensureStackSection();
+    wrapRenderer();
+    try{ if(typeof window.dbRenderStackChart==='function') window.dbRenderStackChart(); }catch(e){}
+    setTimeout(function(){ensureStackSection();wrapRenderer();try{if(typeof window.dbRenderStackChart==='function') window.dbRenderStackChart();}catch(e){} showEmptyIfNeeded();},300);
+    setTimeout(function(){ensureStackSection();wrapRenderer();try{if(typeof window.dbRenderStackChart==='function') window.dbRenderStackChart();}catch(e){} showEmptyIfNeeded();},1200);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+})();
+</script>
+
+</body>
 </html>
