@@ -1534,7 +1534,12 @@ tr.db-total-row td:first-child{color:#03C75A!important;}
 #db-comment-output-top .db-comment-report-card{border-radius:12px!important;}
 #db-threshold-output{display:none!important;}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script></head>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style id="db-daily-average-row-style">
+#db-daily-tbl tr.db-average-row td{background:rgba(30,198,255,.08)!important;color:#dbeafe!important;font-weight:900!important;border-top:1.5px solid rgba(30,198,255,.28)!important;}
+#db-daily-tbl tr.db-total-row td{border-top:1.5px solid rgba(3,199,90,.28)!important;}
+</style>
+</head>
 <body data-theme="dark">
 <!-- ═══ SCREEN 2: 리포트 ═══ -->
 <div id="screen-report">
@@ -9894,16 +9899,31 @@ function dbRenderScorecards(cur, prev) {
   function enhMetric(id,raw){
     var tbl=document.getElementById(id); if(!tbl||!tbl.tBodies[0]||tbl.style.display==='none')return;
     var tb=tbl.tBodies[0],ex=tb.querySelector('tr.db-total-row'); if(ex)ex.remove(); if(!tb.rows.length)return;
-    var cols=window.dbVisibleTblCols?dbVisibleTblCols():[]; var th=tbl.querySelectorAll('thead th').length; var lead=Math.max(1,th-cols.length);
-    var agg=dbAggCamp(sumRaw(raw)); var html=''; for(var i=0;i<lead;i++)html+='<td>'+(i===0?'합계 (TOTAL)':'')+'</td>';
-    html+=cols.map(function(c){return '<td>'+c.fmt(agg[c.key]!=null?agg[c.key]:0)+'</td>';}).join('');
+    var cols=(window.dbVisibleTblCols?dbVisibleTblCols():[]).filter(function(c){return c&&c.key;});
+    var th=tbl.querySelectorAll('thead th').length;
+    var rateOn=(window.__dbDiffRateOn!==false);
+    var metricCellSpan=rateOn?2:1;
+    var lead=Math.max(1,th-(cols.length*metricCellSpan));
+    var agg=dbAggCamp(sumRaw(raw));
+    var html='';
+    for(var i=0;i<lead;i++) html+='<td>'+(i===0?'합계 (TOTAL)':'')+'</td>';
+    html+=cols.map(function(c){
+      var v=(agg[c.key]!=null?agg[c.key]:0);
+      var out='<td>'+c.fmt(v)+'</td>';
+      if(rateOn) out+='<td class="db-diff-rate-td">-</td>';
+      return out;
+    }).join('');
     var tr=document.createElement('tr');tr.className='db-total-row';tr.innerHTML=html;tb.appendChild(tr); attachSort(id);applySort(id);
   }
   function enhDaily(){
     var tbl=document.getElementById('db-daily-tbl'); if(!tbl||!tbl.tBodies[0]||tbl.style.display==='none')return;
     var tb=tbl.tBodies[0],ex=tb.querySelector('tr.db-total-row'); if(ex)ex.remove(); if(!tb.rows.length)return;
-    var agg=dbAggCamp(sumRaw(window.dbLast7ChartDays?dbLast7ChartDays():[])); var pm=dbPurchaseBasedMode;
-    var cells=['합계 (TOTAL)',dbFmt('cost',agg.cost),dbFmt(pm?'purchaseConvAmt':'revenue',pm?agg.purchaseConvAmt:agg.revenue),dbFmt('roas',agg.roas),dbFmt('imp',agg.imp),dbFmt('click',agg.click),dbFmt('ctr',agg.ctr),dbFmt('cvr',agg.cvr),dbFmt('conv',agg.conv),dbFmt('purchaseCcnt',agg.purchaseCcnt),dbFmt('cart',agg.cart),dbFmt('cpc',agg.cpc),dbFmt('cpa',agg.cpa),dbFmt('aov',agg.aov)];
+    var cols=(window.dbVisibleTblCols?dbVisibleTblCols():[]).filter(function(c){return c&&c.key;});
+    var agg=dbAggCamp(sumRaw(window.dbLast7ChartDays?dbLast7ChartDays():[]));
+    var cells=['합계 (TOTAL)','-'].concat(cols.map(function(c){
+      var v=(agg[c.key]!=null?agg[c.key]:0);
+      return c.fmt?c.fmt(v):dbFmt(c.key,v);
+    }));
     var tr=document.createElement('tr');tr.className='db-total-row';tr.innerHTML=cells.map(function(c){return '<td>'+c+'</td>';}).join('');tb.appendChild(tr); attachSort('db-daily-tbl');applySort('db-daily-tbl');
   }
   function wrap(name,after){var o=window[name]; if(typeof o!=='function'||o.__enh)return; var w=function(){var r=o.apply(this,arguments);try{after();}catch(e){}return r;};w.__enh=true;window[name]=w;}
@@ -9938,7 +9958,7 @@ function dbRenderScorecards(cur, prev) {
       });
     }catch(e){}
   }
-  wrap('dbRenderTypeTbl',function(){enhMetric('db-type-tbl',(_dbRawData&&_dbRawData.allCamps)||[]);});
+  wrap('dbRenderTypeTbl',function(){enhMetric('db-type-tbl',window.dbRowsForType?dbRowsForType(_dbRawData||{}):((_dbRawData&&_dbRawData.allCamps)||[]));});
   wrap('dbRenderCampTbl',function(){enhMetric('db-camp-tbl',window.dbFilteredCamps?dbFilteredCamps(_dbRawData||{}):((_dbRawData&&_dbRawData.allCamps)||[]));});
   wrap('dbRenderGroupTbl',function(){enhMetric('db-group-tbl',window.dbFilteredGroups?dbFilteredGroups(_dbRawData||{}):((_dbRawData&&_dbRawData.allGroups)||[])); try{fixGroupTypes();}catch(e){}});
   wrap('dbRenderDailyTbl',function(){enhDaily();});
@@ -10129,7 +10149,122 @@ function dbRenderScorecards(cur, prev) {
   if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
   var n=0,t=setInterval(function(){killThr(); if(++n>=5)clearInterval(t);},800);
 })();
+
+
+/* ════════════════════════════════════════════════════════
+   Final total/average fix — 최근 7일 성과 평균(일)+TOTAL 정렬
+   - 평균(일) 행을 TOTAL 바로 위에 표시
+   - 증감률 ON/OFF 모두 지표 컬럼 하단에 정렬
+   - 현재 렌더링 대상 days 기준으로 평균/TOTAL 재계산
+   ════════════════════════════════════════════════════════ */
+(function(){
+  function byId(id){ return document.getElementById(id); }
+  function safeEsc(v){
+    if(typeof esc==='function') return esc(v);
+    return String(v == null ? '' : v).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});
+  }
+  function dateShort(v){
+    var s=String(v||'');
+    if(/^\d{8}$/.test(s)) return s.slice(4,6)+'/'+s.slice(6,8);
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(5,7)+'/'+s.slice(8,10);
+    return s||'-';
+  }
+  function visibleCols(){
+    var arr=[];
+    try{ arr=(typeof dbVisibleTblCols==='function'?dbVisibleTblCols():[]); }catch(e){ arr=[]; }
+    return (arr||[]).filter(function(c){return c&&c.key;});
+  }
+  function metricLabel(k){
+    try{ if(typeof dbTblLabel==='function') return dbTblLabel(k); }catch(e){}
+    var def=(window.METRIC_DEFS||[]).find(function(m){return m.key===k;});
+    return (def&&def.label)||k;
+  }
+  function rateOn(){ return window.__dbDiffRateOn !== false; }
+  function diffClass(k,d){
+    try{ if(typeof dbDiffClass==='function') return dbDiffClass(k,d); }catch(e){}
+    return d>0?'up':(d<0?'dn':'neu');
+  }
+  function sumRows(rows){
+    var t={cost:0,imp:0,click:0,conv:0,purchaseCcnt:0,revenue:0,purchaseConvAmt:0};
+    (rows||[]).forEach(function(r){ Object.keys(t).forEach(function(k){ t[k]+=Number((r&&r[k])||0); }); });
+    return t;
+  }
+  function avgRaw(rows){
+    var n=Math.max(1,(rows||[]).length), t=sumRows(rows);
+    Object.keys(t).forEach(function(k){ t[k]=t[k]/n; });
+    return t;
+  }
+  function agg(row){
+    try{ if(typeof dbAggCamp==='function') return dbAggCamp(row||{}); }catch(e){}
+    return row||{};
+  }
+  function val(row,k){
+    var a=agg(row);
+    return Number((a&&a[k])||0);
+  }
+  function fmtMetric(k,v){
+    try{ if(typeof dbFmt==='function') return dbFmt(k,Number(v||0)); }catch(e){}
+    try{ if(typeof fmt==='function') return fmt(k,Number(v||0)); }catch(e){}
+    return Math.round(Number(v||0)).toLocaleString('ko-KR');
+  }
+  function metricCells(row,prevRow,cols,isSummary){
+    return cols.map(function(c){
+      var cv=val(row,c.key);
+      var html='<td>'+fmtMetric(c.key,cv)+'</td>';
+      if(rateOn()){
+        if(isSummary || !prevRow){
+          html+='<td class="db-diff-rate-td">-</td>';
+        }else{
+          var pv=val(prevRow,c.key);
+          var pct=pv?((cv-pv)/Math.abs(pv)*100):0;
+          var txt=pv?((pct>0?'+':'')+Math.round(pct).toLocaleString('ko-KR')+'%'):'-';
+          html+='<td class="db-diff-rate-td '+diffClass(c.key,cv-pv)+'">'+txt+'</td>';
+        }
+      }
+      return html;
+    }).join('');
+  }
+  function renderDailyWithAverage(days){
+    var tbl=byId('db-daily-tbl'), empty=byId('db-daily-empty');
+    var thead=tbl&&tbl.querySelector('thead tr'), tbody=byId('db-daily-body');
+    if(!tbl||!empty||!thead||!tbody) return;
+
+    var rows=(days||[]).slice(-7).sort(function(a,b){return String(a.dt||a.date||'').localeCompare(String(b.dt||b.date||''));});
+    if(!rows.length){ empty.style.display='flex'; tbl.style.display='none'; return; }
+
+    var cols=visibleCols();
+    thead.innerHTML='<th class="db-date-head">날짜</th>'+cols.map(function(c){
+      return '<th>'+safeEsc(metricLabel(c.key))+'</th>'+(rateOn()?'<th class="db-diff-rate-th">증감률</th>':'');
+    }).join('');
+
+    var html=rows.map(function(r,i){
+      var prev=i>0?rows[i-1]:null;
+      return '<tr><td class="db-date-cell">'+safeEsc(dateShort(r.dt||r.date))+'</td>'+metricCells(r,prev,cols,false)+'</tr>';
+    }).join('');
+
+    var avg=avgRaw(rows);
+    var total=sumRows(rows);
+    html+='<tr class="db-average-row"><td>평균 (일)</td>'+metricCells(avg,null,cols,true)+'</tr>';
+    html+='<tr class="db-total-row"><td>합계 (TOTAL)</td>'+metricCells(total,null,cols,true)+'</tr>';
+    tbody.innerHTML=html;
+
+    empty.style.display='none';
+    tbl.style.display='table';
+    try{ if(typeof attachSort==='function') attachSort('db-daily-tbl'); }catch(e){}
+  }
+
+  window.dbRenderDailyTbl=renderDailyWithAverage;
+  function rerender(){
+    try{
+      var raw=window._dbRawData || (typeof _dbRawData!=='undefined'?_dbRawData:null);
+      if(raw) renderDailyWithAverage(raw.recentDays||raw.days||[]);
+    }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',rerender); else setTimeout(rerender,0);
+})();
 </script>
+
+
 
 </body>
 </html>
