@@ -1035,7 +1035,7 @@ body.db-capturing .db-metric-chart-collapsed,
 
 /* 캡처용 코멘트/계획/배너 */
 #db-comment-output{display:none!important;}
-#db-comment-output-top{display:none;border:1px solid #273244;border-radius:12px;overflow:hidden;background:#10141d;}
+#db-comment-output-top{display:none!important;}
 .db-comment-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
 .db-comment-report-card{border:none!important;border-radius:0!important;box-shadow:none!important;min-height:88px;}
 .db-comment-report-card + .db-comment-report-card{border-left:1px solid #273244!important;}
@@ -1529,7 +1529,7 @@ body.db-capturing .db-metric-chart-collapsed,
 tr.db-total-row td{font-weight:800!important;color:#e2e8f4!important;background:rgba(3,199,90,.07)!important;border-top:1.5px solid #2b374b!important;}
 tr.db-total-row td:first-child{color:#03C75A!important;}
 .db-sort-mk{font-size:8px;opacity:.85;margin-left:2px;}
-#db-comment-output-top{margin:0;}
+/* db-comment-output-top margin removed */
 #db-comment-output-top .db-comment-top-grid{gap:12px!important;align-items:stretch;}
 #db-comment-output-top .db-comment-report-card{border-radius:12px!important;}
 #db-threshold-output{display:none!important;}
@@ -2002,12 +2002,16 @@ tr.db-total-row td:first-child{color:#03C75A!important;}
 <!-- ─── 워터폴: 항목별 기여도 분석 ─── -->
 <div class="db-tbl-card compact" id="db-waterfall-card" style="display:none;">
 <div class="db-tbl-hd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-<div class="db-tbl-hd-title">🌊 항목별 기여도 분석 (워터폴)</div>
+<div class="db-tbl-hd-title">🌊 항목별 기여도 분석 (워터폴)<span id="db-wf-metric-badge" style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:20px;background:rgba(59,130,246,.18);border:1px solid rgba(59,130,246,.35);color:#93c5fd;font-size:10px;font-weight:800;vertical-align:middle;letter-spacing:.02em;">광고비</span></div>
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
 <select id="db-wf-metric" onchange="dbRenderWaterfall()" style="background:#1a2535;border:1px solid #2b374b;color:#e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;">
-<option value="cost">광고비</option><option value="imp">노출수</option>
-<option value="click">클릭수</option><option value="conv">전환수</option>
+<option value="cost">광고비</option>
+<option value="imp">노출수</option>
+<option value="click">클릭수</option>
+<option value="conv">전환수</option>
+<option value="purchaseCcnt">전환수(구매)</option>
 <option value="revenue">매출액</option>
+<option value="purchaseConvAmt">매출액(구매)</option>
 </select>
 <select id="db-wf-dim" onchange="dbRenderWaterfall()" style="background:#1a2535;border:1px solid #2b374b;color:#e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;">
 <option value="campaign">캠페인별</option>
@@ -9973,7 +9977,7 @@ function dbRenderScorecards(cur, prev) {
     var capBtn=document.getElementById('db-capture-btn-top');
     var prevSettings=settings?settings.style.display:null; if(settings) settings.style.display='none';
     var prevBtn=capBtn?capBtn.style.display:null; if(capBtn) capBtn.style.display='none';
-    var keep={'db-top-row':1,'db-comment-output-top':1};
+    var keep={'db-top-row':1};
     var hidden=[];
     [].forEach.call(area.children,function(c){ if(!keep[c.id] && c.style.display!=='none'){ hidden.push([c,c.style.display||'']); c.style.display='none'; } });
     try{
@@ -10082,26 +10086,55 @@ function dbRenderScorecards(cur, prev) {
   var EXPORT_BOOT_SRC = '<scr'+'ipt id="db-export-boot">(function(){'
     + 'function rev(p){if(!p)return p;["curS","curE","prevS","prevE"].forEach(function(k){if(p[k])p[k]=new Date(p[k]);});return p;}'
     + 'function hdr(B){if(document.getElementById("db-export-header"))return;var h=document.createElement("div");h.id="db-export-header";'
-    + 'var ds="";try{var d=(B.period&&B.period.curE)?new Date(B.period.curE):new Date();ds=d.getFullYear()+"\\uB144 "+(d.getMonth()+1)+"\\uC6D4 "+d.getDate()+"\\uC77C ";}catch(e){}'
-    + 'var nm=(B.advName?B.advName+", ":"");'
-    + 'h.style.cssText="width:100%;box-sizing:border-box;margin:0 0 12px;padding:22px 30px;border-radius:14px;background:linear-gradient(110deg,#03C75A 0%,#0bb6d6 52%,#845AFF 100%);color:#fff;box-shadow:0 10px 34px rgba(0,0,0,.4);font-family:\\u0027Noto Sans KR\\u0027,sans-serif;";'
-    + 'h.innerHTML="<div style=\\u0027font-size:11px;font-weight:800;letter-spacing:.2em;opacity:.85;\\u0027>PERFORMANCE REPORT</div><div style=\\u0027font-size:24px;font-weight:900;letter-spacing:-.02em;margin-top:6px;\\u0027>"+nm+ds+"\\uB124\\uC774\\uBC84 \\uAD11\\uACE0 \\uC131\\uACFC \\uB370\\uC774\\uD130</div>";'
-    + 'var _ca=document.getElementById(\"db-capture-area\"); if(_ca){_ca.insertBefore(h,_ca.firstChild);} else {document.body.insertBefore(h,document.body.firstChild);}}'
+    + 'var nm=B.advName||""; var em=B.advEmoji||"\U0001F4CA"; var cL=(B.period&&B.period.curLabel)||"";'
+    + 'h.style.cssText="width:100%;box-sizing:border-box;margin:0 0 14px;padding:18px 28px;border-radius:14px;background:linear-gradient(110deg,#03C75A 0%,#0bb6d6 52%,#845AFF 100%);color:#fff;box-shadow:0 10px 34px rgba(0,0,0,.4);font-family:\'Noto Sans KR\',sans-serif;display:flex;align-items:center;justify-content:space-between;gap:16px;";'
+    + 'h.innerHTML='
+    + '  "<div style=\'flex:1;min-width:0;\'>"
+    + '  +"<div style=\'font-size:11px;font-weight:800;letter-spacing:.22em;opacity:.8;text-transform:uppercase;\'>PERFORMANCE REPORT</div>"
+    + '  +"<div style=\'font-size:20px;font-weight:900;letter-spacing:-.025em;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;\'>"+em+" "+nm+" \uAD11\uACE0 \uC131\uACFC \uB370\uC774\uD130</div>"
+    + '  +"<div style=\'font-size:12px;font-weight:700;margin-top:3px;opacity:.9;font-family:JetBrains Mono,monospace;\'>"+cL+"</div>"
+    + '  +"</div>"
+    + '  +"<div style=\'flex-shrink:0;text-align:right;display:flex;flex-direction:column;gap:5px;align-items:flex-end;\'>"
+    + '  +"<div style=\'font-size:14px;font-weight:900;\'>\uC791\uC131\uC790 \uBBF8\uB798\uC544\uC774\uC5D4\uC528 <strong style=\'font-size:15px;font-weight:950;\'>\uC774\uD0DC\uC6C9 \uACFC\uC7A5</strong></div>"
+    + '  +"<div style=\'font-size:13px;font-weight:700;opacity:.95;\'>\u260E 02-2633-9029 / 010-2841-1527</div>"
+    + '  +"<div style=\'font-size:13px;font-weight:700;opacity:.95;\'>\uCE74\uD1A1 208km</div>"
+    + '  +"</div>";'
+    + 'var ca=document.getElementById("db-capture-area");if(ca)ca.insertBefore(h,ca.firstChild);else document.body.insertBefore(h,document.body.firstChild);}'
     + 'function isolate(){var area=document.getElementById("db-capture-area");if(!area)return;var hdrEl=document.getElementById("db-export-header");var el=area;'
     + 'while(el&&el!==document.body){var par=el.parentElement;if(!par)break;[].forEach.call(par.children,function(s){if(s!==el&&s!==hdrEl&&s.id!=="db-export-boot"&&s.id!=="db-export-iso"){s.style.display="none";}});el.style.display="";el=par;}'
-    + 'var td=document.getElementById("tab-dashboard");if(td){td.style.display="block";td.classList.add("active");}document.body.style.background="#08090c";}'
+    + 'var sp=document.getElementById("db-settings-panel");if(sp)sp.style.display="none";'
+    + 'var ct=document.getElementById("db-comment-output-top");if(ct)ct.style.display="none";'
+    + 'var td=document.getElementById("tab-dashboard");if(td){td.style.display="block";td.classList.add("active");}'
+    + 'document.body.style.background="#08090c";}'
+    + 'function setTitles(B){'
+    + 'var nm=B.advName||"";var em=B.advEmoji||"\U0001F4CA";var cL=(B.period&&B.period.curLabel)||"";var pL=(B.period&&B.period.prevLabel)||"";'
+    + 'var rt=document.getElementById("db-result-title");'
+    + 'if(rt)rt.innerHTML=em+" <em style=\'color:var(--g);font-style:normal;\'>"+nm+"</em> \uAD11\uACE0 \uC131\uACFC \uB370\uC774\uD130";'
+    + 'var at=document.getElementById("db-adv-title");'
+    + 'if(at)at.innerHTML=em+" <strong>"+nm+"</strong> \uAD11\uACE0 \uC131\uACFC \uB370\uC774\uD130";'
+    + 'var rp=document.getElementById("db-result-period");if(rp)rp.textContent=cL;'
+    + 'var rv=document.getElementById("db-result-prev");if(rv)rv.textContent=pL?"\uC804\uAE30\uAC04: "+pL:"";'
+    + 'var thP=document.getElementById("db-th-prev");if(thP)thP.textContent=pL;'
+    + 'var thC=document.getElementById("db-th-cur");if(thC)thC.textContent=cL;}'
     + 'function render(B){var raw=B.raw,cur=B.cur,prev=B.prev,label=(B.period&&B.period.curLabel)||"";'
-    + 'var calls=[["dbRenderScorecards",[cur,prev]],["dbRenderCompareTable",[cur,prev]],["dbRenderTypeTbl",[raw,label]],["dbRenderCampTbl",[raw,label]],["dbRenderGroupTbl",[raw,label]],["dbRenderDailyTbl",[(raw&&(raw.recentDays||raw.days))||[]]],["dbRenderPivotHeatmap",[]],["dbRenderDailyTrend",[]],["dbRenderWaterfall",[]],["dbRenderRadar",[]],["dbRenderStackChart",[]],["dbRenderTrendLines",[]],["dbRenderMetricTrendCharts",[]],["dbPrepareCommentOutput",[]]];'
-    + 'calls.forEach(function(c){try{if(typeof window[c[0]]==="function")window[c[0]].apply(null,c[1]);}catch(e){}});'
+    + 'var fns=["dbRenderScorecards","dbRenderCompareTable","dbRenderTypeTbl","dbRenderCampTbl","dbRenderGroupTbl","dbRenderDailyTbl","dbRenderPivotHeatmap","dbRenderDailyTrend","dbRenderWaterfall","dbRenderRadar","dbRenderStackChart","dbRenderTrendLines","dbRenderMetricTrendCharts"];'
+    + 'var args={dbRenderScorecards:[cur,prev],dbRenderCompareTable:[cur,prev],dbRenderTypeTbl:[raw,label],dbRenderCampTbl:[raw,label],dbRenderGroupTbl:[raw,label],dbRenderDailyTbl:[(raw&&(raw.recentDays||raw.days))||[]]};'
+    + 'fns.forEach(function(fn){try{if(typeof window[fn]==="function")window[fn].apply(null,args[fn]||[]);}catch(e){}});'
+    + 'setTitles(B);'
     + 'try{var s=document.getElementById("db-stack-camp-sel");if(s&&B.stackCamp){s.value=B.stackCamp;if(typeof dbRenderStackChart==="function")dbRenderStackChart();}}catch(e){}}'
     + 'function boot(){var B=window.__DB_EXPORT__;if(!B)return;rev(B.period);'
     + 'try{window.eval("_dbRawData=window.__DB_EXPORT__.raw;_dbCur=window.__DB_EXPORT__.cur;_dbPrev=window.__DB_EXPORT__.prev;dbPurchaseBasedMode=!!window.__DB_EXPORT__.purchase;dbCurrentSaleType=window.__DB_EXPORT__.sale||\\u0027sale\\u0027;");}catch(e){try{window._dbRawData=B.raw;}catch(e2){}}'
     + 'try{if(B.period)window.eval("dbPeriodMeta=window.__DB_EXPORT__.period;");}catch(e){}'
-    + 'var c=document.getElementById("db-comment");if(c)c.value=B.comment||"";var p=document.getElementById("db-plan");if(p)p.value=B.plan||"";'
+    + 'var c=document.getElementById("db-comment");if(c)c.value=B.comment||"";'
+    + 'var p=document.getElementById("db-plan");if(p)p.value=B.plan||"";'
     + 'try{if(typeof switchTab==="function")switchTab("dashboard");}catch(e){}'
-    + 'hdr(B);render(B);setTimeout(function(){render(B);isolate();},250);setTimeout(function(){render(B);isolate();},700);setTimeout(isolate,1400);}'
-    + 'if(document.readyState==="complete")setTimeout(boot,150);else window.addEventListener("load",function(){setTimeout(boot,150);});'
-    + '})();<\/scr'+'ipt>';
+    + 'isolate();hdr(B);render(B);'
+    + 'setTimeout(function(){render(B);isolate();setTitles(B);},300);'
+    + 'setTimeout(function(){render(B);isolate();setTitles(B);},900);'
+    + 'setTimeout(function(){isolate();setTitles(B);},1800);}'
+    + 'if(document.readyState==="complete")setTimeout(boot,150);'
+    + 'else window.addEventListener("load",function(){setTimeout(boot,150);});'
+  + '})();<\/scr'+'ipt>';
 
   window.dbDownloadReportHtml = function(){
     try{
@@ -10114,15 +10147,24 @@ function dbRenderScorecards(cur, prev) {
         prev:(typeof _dbPrev!=="undefined")?_dbPrev:null,
         purchase:(typeof dbPurchaseBasedMode!=="undefined")?!!dbPurchaseBasedMode:false,
         sale:(typeof dbCurrentSaleType!=="undefined")?dbCurrentSaleType:"sale",
-        period:pm?{curS:pm.curS,curE:pm.curE,prevS:pm.prevS,prevE:pm.prevE,label:pm.label,curLabel:pm.curLabel}:null,
+        period:pm?{curS:pm.curS,curE:pm.curE,prevS:pm.prevS,prevE:pm.prevE,label:pm.label,curLabel:pm.curLabel,prevLabel:pm.prevLabel||''}:null,
         comment:(document.getElementById("db-comment")||{}).value||"",
         plan:(document.getElementById("db-plan")||{}).value||"",
         advName:adv.name||"",
+        advEmoji:adv.emoji||"📊",
         stackCamp:(document.getElementById("db-stack-camp-sel")||{}).value||""
       };
       if(!boot.raw){ if(typeof showToast==="function") showToast("\u26A0 \uBA3C\uC800 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC640\uC8FC\uC138\uC694"); return; }
       var bootJson=JSON.stringify(boot).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");
-      var inject='<style id="db-export-iso">.dbc-tip{display:none!important;}#db-capture-area>#db-export-header{display:block!important;width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;align-self:stretch!important;}body>#db-export-header{max-width:none!important;}</style>'
+      var inject=''
+        +'<style id="db-export-iso">'
+        +'.tab-panel{display:none!important;}'
+        +'#tab-dashboard{display:block!important;}'
+        +'#db-settings-panel{display:none!important;}'
+        +'.topbar,.tab-mobile-select,.period-bar{display:none!important;}'
+        +'body{background:#08090c!important;}'
+        +'#db-comment-output-top{display:none!important;}'
+        +'.dbc-tip{display:none!important;}#db-capture-area>#db-export-header{display:block!important;width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;align-self:stretch!important;}body>#db-export-header{max-width:none!important;}</style>'
         +'<scr'+'ipt>window.__DB_EXPORT__='+bootJson+';<\/scr'+'ipt>'+EXPORT_BOOT_SRC;
       var pad=function(n){return String(n).padStart(2,"0");};
       var stamp=pm?(pad(pm.curE.getMonth()+1)+pad(pm.curE.getDate())):new Date().toISOString().slice(0,10);
@@ -10266,5 +10308,163 @@ function dbRenderScorecards(cur, prev) {
 
 
 
+<style id="db-extra-polish">
+/* 워터폴 지표 배지 */
+#db-wf-metric-badge{transition:background .2s,color .2s;}
+/* author bar 가독성 */
+.db-v10-author-chip{font-size:12px!important;}
+.db-v10-author-chip strong{font-size:13px!important;}
+.db-v10-author-chip em{font-size:12px!important;}
+</style>
+<script id="db-extra-js">
+(function(){
+'use strict';
+
+/* ── A. 워터폴 지표 배지 업데이트 ── */
+var WF_LABELS={cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',
+  purchaseCcnt:'전환수(구매)',revenue:'매출액',purchaseConvAmt:'매출액(구매)'};
+function updateWfBadge(){
+  var sel=document.getElementById('db-wf-metric');
+  var badge=document.getElementById('db-wf-metric-badge');
+  if(!sel||!badge) return;
+  badge.textContent=WF_LABELS[sel.value]||sel.value;
+}
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.id==='db-wf-metric') updateWfBadge();
+});
+var _origWF=window.dbRenderWaterfall;
+if(typeof _origWF==='function'){
+  window.dbRenderWaterfall=function(){
+    var r=_origWF.apply(this,arguments);
+    setTimeout(updateWfBadge,50);
+    return r;
+  };
+}
+setTimeout(updateWfBadge,600);
+setTimeout(updateWfBadge,1800);
+
+/* ── B. 코멘트/계획 블록 완전 숨김 ── */
+window.dbPrepareCommentOutput=function(){
+  var top=document.getElementById('db-comment-output-top');
+  if(top) top.style.display='none';
+  var old=document.getElementById('db-comment-output');
+  if(old) old.style.display='none';
+};
+function hideCommentBlock(){
+  var top=document.getElementById('db-comment-output-top');
+  if(top) top.style.display='none';
+}
+document.addEventListener('DOMContentLoaded',hideCommentBlock);
+setTimeout(hideCommentBlock,500);
+setTimeout(hideCommentBlock,1500);
+
+/* ── C. 광고주별 옵션 localStorage 저장/복원 ── */
+var DB_ADV_KEY='db_adv_settings_v2';
+function getAdvSettings(id){
+  try{ return JSON.parse(localStorage.getItem(DB_ADV_KEY)||'{}')[id]||null; }catch(e){return null;}
+}
+function saveAdvSettings(){
+  try{
+    var adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{};
+    if(!adv||!adv.id) return;
+    var settings={
+      period:typeof dbPeriod!=='undefined'?dbPeriod:'D1',
+      customRange:(typeof dbCustomRange!=='undefined'&&dbCustomRange)
+        ?{start:dbCustomRange.start.toISOString(),end:dbCustomRange.end.toISOString()}:null,
+      saleType:typeof dbCurrentSaleType!=='undefined'?dbCurrentSaleType:'sale',
+      purchaseMode:typeof dbPurchaseBasedMode!=='undefined'?!!dbPurchaseBasedMode:false,
+      selectedMetrics:(typeof dbSelectedMetrics!=='undefined'&&dbSelectedMetrics instanceof Set)
+        ?[...dbSelectedMetrics]:null,
+      wfMetric:(document.getElementById('db-wf-metric')||{}).value||'cost',
+      wfDim:(document.getElementById('db-wf-dim')||{}).value||'campaign',
+      campRowLimit:(document.getElementById('db-camp-row-limit')||{}).value||'10',
+      groupRowLimit:(document.getElementById('db-group-row-limit')||{}).value||'10',
+      comment:(document.getElementById('db-comment')||{}).value||'',
+      plan:(document.getElementById('db-plan')||{}).value||'',
+      savedAt:Date.now()
+    };
+    var all=JSON.parse(localStorage.getItem(DB_ADV_KEY)||'{}');
+    all[adv.id]=settings;
+    localStorage.setItem(DB_ADV_KEY,JSON.stringify(all));
+  }catch(e){}
+}
+function applyAdvSettings(s){
+  if(!s) return;
+  try{
+    if(s.period&&typeof dbPeriod!=='undefined'){
+      if(s.period==='CUSTOM'&&s.customRange){
+        window.dbCustomRange={start:new Date(s.customRange.start),end:new Date(s.customRange.end)};
+        window.dbPeriod='CUSTOM';
+        var p2=function(d){return String(d.getMonth()+1).padStart(2,'0');};
+        var p3=function(d){return String(d.getDate()).padStart(2,'0');};
+        var si=document.getElementById('db-start'),ei=document.getElementById('db-end');
+        if(si)si.value=s.customRange.start.slice(0,10);
+        if(ei)ei.value=s.customRange.end.slice(0,10);
+      }else{window.dbPeriod=s.period;window.dbCustomRange=null;}
+      if(typeof dbSyncPeriodButtons==='function') dbSyncPeriodButtons();
+    }
+    if(s.saleType&&typeof dbCurrentSaleType!=='undefined'){
+      window.dbCurrentSaleType=s.saleType;
+      var sy=document.getElementById('db-btn-sale-y'),sn=document.getElementById('db-btn-sale-n');
+      if(sy)sy.classList.toggle('active',s.saleType==='sale');
+      if(sn)sn.classList.toggle('active',s.saleType!=='sale');
+    }
+    if(typeof s.purchaseMode!=='undefined'&&typeof dbPurchaseBasedMode!=='undefined'){
+      window.dbPurchaseBasedMode=!!s.purchaseMode;
+      if(typeof dbSyncPurchaseSwitch==='function') dbSyncPurchaseSwitch();
+    }
+    if(Array.isArray(s.selectedMetrics)&&typeof dbSelectedMetrics!=='undefined'){
+      window.dbSelectedMetrics=new Set(s.selectedMetrics);
+      if(typeof dbRenderMetricToggles==='function') dbRenderMetricToggles();
+    }
+    var wm=document.getElementById('db-wf-metric');if(wm&&s.wfMetric)wm.value=s.wfMetric;
+    var wd=document.getElementById('db-wf-dim');if(wd&&s.wfDim)wd.value=s.wfDim;
+    var cl=document.getElementById('db-camp-row-limit');if(cl&&s.campRowLimit)cl.value=s.campRowLimit;
+    var gl=document.getElementById('db-group-row-limit');if(gl&&s.groupRowLimit)gl.value=s.groupRowLimit;
+    var ce=document.getElementById('db-comment');if(ce&&s.comment!=null)ce.value=s.comment;
+    var pe=document.getElementById('db-plan');if(pe&&s.plan!=null)pe.value=s.plan;
+    updateWfBadge();
+  }catch(e){console.warn('[adv settings]',e);}
+}
+
+/* dbLoad 후킹 — 광고주 설정 복원 */
+var _origLoad=window.dbLoad;
+if(typeof _origLoad==='function'){
+  window.dbLoad=async function(){
+    var adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{};
+    if(adv&&adv.id){var sv=getAdvSettings(adv.id);if(sv)applyAdvSettings(sv);}
+    var r=await _origLoad.apply(this,arguments);
+    attachSaveHooks();
+    updateWfBadge();
+    return r;
+  };
+}
+
+/* 저장 후크 */
+var _saveTimer=null;
+function debouncedSave(){clearTimeout(_saveTimer);_saveTimer=setTimeout(saveAdvSettings,600);}
+function attachSaveHooks(){
+  ['db-comment','db-plan'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&!el._advSH){el._advSH=true;el.addEventListener('input',debouncedSave);}
+  });
+  ['db-wf-metric','db-wf-dim','db-wf-base','db-wf-comp','db-camp-row-limit','db-group-row-limit'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&!el._advSH){el._advSH=true;el.addEventListener('change',debouncedSave);}
+  });
+}
+var _origSP=window.dbSetPeriod;
+if(typeof _origSP==='function')window.dbSetPeriod=function(p){_origSP(p);debouncedSave();};
+var _origST=window.dbSetSaleType;
+if(typeof _origST==='function')window.dbSetSaleType=function(t){_origST(t);debouncedSave();};
+var _origTP=window.dbTogglePurchaseMode;
+if(typeof _origTP==='function')window.dbTogglePurchaseMode=function(e){_origTP(e);debouncedSave();};
+var _origTM=window.dbToggleMetric;
+if(typeof _origTM==='function')window.dbToggleMetric=function(k,el){_origTM(k,el);debouncedSave();};
+document.addEventListener('DOMContentLoaded',attachSaveHooks);
+setTimeout(attachSaveHooks,1200);
+
+})();
+</script>
 </body>
 </html>
