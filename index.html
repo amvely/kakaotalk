@@ -2579,7 +2579,19 @@ const CAMP_TP_LABEL = {
   '5': '플레이스',
 };
 function campTpLabel(tp) {
-  return CAMP_TP_LABEL[String(tp||'')] || (tp ? String(tp) : '기타');
+  var s = String(tp==null?'':tp).trim();
+  var key = s.toUpperCase().replace(/[\s\-]+/g,'_');
+  var MAP = {
+    'WEB_SITE':'파워링크','WEBSITE':'파워링크','POWER_LINK':'파워링크','POWERLINK':'파워링크',
+    'SHOPPING':'쇼핑검색','SHOPPING_SEARCH':'쇼핑검색',
+    'POWER_CONTENTS':'파워컨텐츠','POWERCONTENTS':'파워컨텐츠','POWER_CONTENT':'파워컨텐츠',
+    'BRAND_SEARCH':'브랜드검색','BRAND':'브랜드검색',
+    'PLACE':'플레이스','PLACE_SEARCH':'플레이스',
+    'SHOPPING_BRAND':'쇼핑브랜드','CATALOG':'카탈로그'
+  };
+  if(MAP[key]) return MAP[key];
+  if(typeof CAMP_TP_LABEL!=='undefined' && CAMP_TP_LABEL[s]) return CAMP_TP_LABEL[s];  /* 숫자 코드 등 기존 매핑 */
+  return s || '기타';
 }
 
 function renderKakaoKwChips(convKws){
@@ -5038,7 +5050,7 @@ function dbSetAllMetrics(val) {
 
 
 // ── 대시보드 데이터/필터/다운로드/AI 확장 ──
-const DB_SAMPLE_ADV = { id:'sample-dashboard', name:'스타일리시', emoji:'🏪', cat:'패션 커머스', naver:{cid:'sample'} };
+const DB_SAMPLE_ADV = { id:'sample-dashboard', name:'', emoji:'📊', cat:'', naver:{cid:'sample'} };
 function dbActiveAdv(){ return currentAdv || DB_SAMPLE_ADV; }
 function dbNumSeed(str){ return String(str||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0); }
 function dbSampleMetricFor(base, dayIdx, weight, boost=1){
@@ -5842,136 +5854,14 @@ function dbRenderRadar() {
 ═══════════════════════════════════════════ */
 const DB_STACK_COLORS=['#3b82f6','#a855f7','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#eab308','#8b5cf6','#10b981','#f43f5e'];
 
-function dbRenderStackChart() {
-  const card=document.getElementById('db-stack-card');
-  const allCamps=_dbRawData?.allCamps||[];
-  if(!card||!allCamps.length){ if(card) card.style.display='none'; return; }
-  card.style.display='block';
-
-  const dim=document.getElementById('db-stack-dim')?.value||'campaign';
-  const limitSel=document.getElementById('db-stack-limit');
-  const limit=limitSel?Number(limitSel.value):0;
-
-  /* 항목 구성 */
-  let items=[];
-  if(dim==='type'){
-    const tm={}; allCamps.forEach(c=>{ const t=dbTypeOfCamp(c); if(!tm[t])tm[t]={name:t,cost:0,imp:0,click:0,conv:0,revenue:0}; ['cost','imp','click','conv','revenue'].forEach(k=>tm[t][k]+=dbAggCamp(c)[k]||0); });
-    items=Object.values(tm);
-  } else if(dim==='adgroup'){
-    items=(_dbRawData?.allGroups||[]).map(g=>({name:(g.groupNm||g.name||'').slice(0,18),...dbAggCamp(g)}));
-  } else {
-    items=allCamps.map(c=>({name:(c.campNm||c.name||'').slice(0,18),...dbAggCamp(c)}));
-  }
-  /* 정렬 및 제한 */
-  items.sort((a,b)=>(b.cost||0)-(a.cost||0));
-  if(limit>0) items=items.slice(0,limit);
-  if(!items.length) return;
-  const ni=items.length;
-
-  /* 범례 */
-  const legendEl=document.getElementById('db-stack-legend');
-  if(legendEl) legendEl.innerHTML=items.map((it,i)=>`
-    <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#94a3b8;white-space:nowrap;">
-      <span style="width:10px;height:10px;border-radius:2px;background:${DB_STACK_COLORS[i%DB_STACK_COLORS.length]};display:inline-block;"></span>
-      ${it.name.slice(0,12)}
-    </span>`).join('');
-
-  /* 지표 행 */
-  const METRICS=[
-    {key:'cost',   label:'광고비'},
-    {key:'imp',    label:'노출수'},
-    {key:'click',  label:'클릭수'},
-    {key:'conv',   label:'전환수'},
-    {key:'revenue',label:'매출액'},
-  ];
-
-  /* Canvas */
-  const canvas=document.getElementById('db-stack-canvas'); if(!canvas)return;
-  const dpr=window.devicePixelRatio||1;
-  const W0=Math.max(canvas.parentElement.getBoundingClientRect().width-28,400);
-  const rowH=36, gap=8, labelW=58;
-  const H0=(rowH+gap)*METRICS.length+16;
-  canvas.height=H0;
-  canvas.width=W0*dpr; canvas.height=H0*dpr;
-  canvas.style.width=W0+'px'; canvas.style.height=H0+'px';
-  const ctx=canvas.getContext('2d');
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,W0,H0);
-
-  const barAreaW=W0-labelW-8;
-
-  METRICS.forEach((m,mi)=>{
-    const y=mi*(rowH+gap)+4;
-    const rowTotal=items.reduce((s,it)=>s+(it[m.key]||0),0)||1;
-
-    /* 지표명 */
-    ctx.font='bold 11px Pretendard,sans-serif';
-    ctx.fillStyle='#c8d6e0'; ctx.textAlign='right'; ctx.textBaseline='middle';
-    ctx.fillText(m.label, labelW-6, y+rowH/2);
-
-    /* 세그먼트 */
-    let runX=labelW;
-    items.forEach((it,ii)=>{
-      const v=it[m.key]||0;
-      const w=Math.max(0,(v/rowTotal)*barAreaW);
-      const pct=Math.round(v/rowTotal*1000)/10;
-      const color=DB_STACK_COLORS[ii%DB_STACK_COLORS.length];
-      ctx.fillStyle=color;
-      const r2=ii===0?[4,0,0,4]:ii===ni-1?[0,4,4,0]:[0,0,0,0];
-      if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(runX,y,w,rowH,r2); ctx.fill(); }
-      else { ctx.fillRect(runX,y,w,rowH); }
-      /* 퍼센트 레이블 (너비가 30px 이상이고 5% 이상) */
-      if(w>32&&pct>=5){
-        ctx.font='bold 8.5px "JetBrains Mono",monospace';
-        ctx.fillStyle='rgba(255,255,255,.88)'; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(pct.toFixed(1)+'%', runX+w/2, y+rowH/2);
-      }
-      runX+=w;
-    });
-
-    /* 행 테두리 */
-    ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=1;
-    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(labelW,y,barAreaW,rowH,4); ctx.stroke(); }
-  });
-}
+/* [정리] dbRenderStackChart 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
 /* ═══════════════════════════════════════════
    12개 지표 추이 라인차트 (이미지2 형태)
    - 4열 그리드, 각 지표 라인+면적
    - 캡션: 현재 / 이전 / 평균
 ═══════════════════════════════════════════ */
-function dbRenderTrendLines() {
-  const card=document.getElementById('db-trend-lines-card');
-  const days=(_dbRawData?.recentDays||_dbRawData?.days||[]).slice();
-  if(!card||!days.length){ if(card) card.style.display='none'; return; }
-  card.style.display='block';
-
-  const sorted=days.slice().sort((a,b)=>String(a.dt||a.date).localeCompare(String(b.dt||b.date)));
-  const sub=document.getElementById('db-tlines-subtitle');
-  if(sub&&sorted.length>=2) sub.textContent=`(${dbDateShort(sorted[0].dt||sorted[0].date)} ~ ${dbDateShort(sorted[sorted.length-1].dt||sorted[sorted.length-1].date)}, ${sorted.length}일)`;
-
-  const grid=document.getElementById('db-tlines-grid'); if(!grid) return;
-  grid.innerHTML=DB_DT12_METRICS.map((m,i)=>{
-    const rows=sorted.map(d=>({date:dbDateShort(d.dt||d.date),val:dbDt12Value(d,m.key)}));
-    const cur=rows.length?rows[rows.length-1].val:0;
-    const prev=rows.length>1?rows[rows.length-2].val:0;
-    const avg=rows.length?rows.reduce((s,r)=>s+r.val,0)/rows.length:0;
-    const fmt=v=>dbFmt(m.key==='cor'?'roas':m.key,v);
-    return `<div class="db-tline-cell">
-      <div class="db-tline-cap">${m.label}</div>
-      <div class="db-tline-meta">현재: ${fmt(cur)} / 이전: ${fmt(prev)} / 평균: ${fmt(avg)}</div>
-      <canvas id="db-tl-cv-${m.key}" height="110"></canvas>
-    </div>`;
-  }).join('');
-
-  requestAnimationFrame(()=>{
-    DB_DT12_METRICS.forEach(m=>{
-      const canvas=document.getElementById('db-tl-cv-'+m.key); if(!canvas)return;
-      const rows=sorted.map(d=>({date:dbDateShort(d.dt||d.date),val:dbDt12Value(d,m.key)}));
-      dbDrawTrendLine(canvas, rows, m, false); /* 라인 스타일 */
-    });
-  });
-}
+/* [정리] dbRenderTrendLines 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
 /* 라인 차트 (이미지2 스타일: 라인+면적+데이터라벨) */
 function dbDrawTrendLine(canvas, rows, metric, compact) {
@@ -6417,60 +6307,7 @@ function dbRenderDailyTbl(days) {
 }
 
 // ── 캡처 (설정 패널 숨기고 결과물만 1장) ──
-async function dbCapture() {
-  if (typeof html2canvas === 'undefined') {
-    showToast('캡처 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요'); return;
-  }
-
-  // 코멘트/계획이 있으면 차트 상단 리포트 영역에 출력
-  dbPrepareCommentOutput();
-
-  // 설정/필터 패널 숨김
-  document.body.classList.add('db-capturing');
-  const _collapsedCharts=[...document.querySelectorAll('.db-metric-chart-collapsed')];
-  _collapsedCharts.forEach(el=>{el.dataset.wasCollapsed='1';el.style.display='none';});
-  const settingsPanel = document.getElementById('db-settings-panel');
-  if (settingsPanel) settingsPanel.style.display = 'none';
-
-  const captureBtn = document.getElementById('db-capture-btn-top');
-  if (captureBtn) captureBtn.style.display = 'none';
-
-  try {
-    const el = document.getElementById('db-capture-area');
-    if (!el) return;
-
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      backgroundColor: getComputedStyle(document.documentElement)
-        .getPropertyValue('--bg').trim() || '#0f1117',
-      useCORS: true,
-      logging: false,
-      scrollY: -window.scrollY,
-    });
-
-    const link = document.createElement('a');
-    const advName = currentAdv?.name || '성과';
-    const pm = dbPeriodMeta;
-    const dateStr = pm
-      ? pad(pm.curS.getMonth()+1) + pad(pm.curS.getDate()) + '-' +
-        pad(pm.curE.getMonth()+1) + pad(pm.curE.getDate())
-      : new Date().toISOString().slice(0,10);
-    link.download = `${advName}_성과대시보드_${dateStr}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    showToast('✅ 이미지 저장 완료');
-  } catch (e) {
-    console.error(e); showToast('❌ 캡처 오류: ' + e.message);
-  } finally {
-    document.body.classList.remove('db-capturing');
-    _collapsedCharts.forEach(el=>{if(el.dataset.wasCollapsed)el.style.display='';delete el.dataset.wasCollapsed;});
-    if (settingsPanel) settingsPanel.style.display = '';
-    if (captureBtn) captureBtn.style.display = '';
-    if (commentOut) commentOut.style.display = 'none';
-    if (commentDisplay) commentDisplay.innerHTML = '';
-    if (planDisplay) planDisplay.innerHTML = '';
-  }
-}
+/* [정리] dbCapture 구버전(commentOut 버그) 제거 — 최종 클린 정의 1개만 유지 */
 
 
 
@@ -6512,42 +6349,8 @@ function dbRenderGroupTbl(data, periodLabel){
   dbSetChip('db-group-filter-chip', txt, !!txt, dbSelectedCampName ? 'dbClearCampFilter' : 'dbClearTypeFilter');
   empty.style.display='none'; tbl.style.display='table';
 }
-function dbPrepareCommentOutput(){
-  const comment=document.getElementById('db-comment')?.value?.trim()||'';
-  const plan=document.getElementById('db-plan')?.value?.trim()||'';
-  const commentOut=document.getElementById('db-comment-output'), commentDisplay=document.getElementById('db-comment-display'), planDisplay=document.getElementById('db-plan-display');
-  if(commentDisplay) commentDisplay.innerHTML = comment ? `<div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">✏️ 마케터 코멘트</div>${dbHtmlEscape(comment)}` : '';
-  if(planDisplay) planDisplay.innerHTML = plan ? `<div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;margin-top:8px;">🎯 금일 운영 계획</div>${dbHtmlEscape(plan)}` : '';
-  if(commentOut) commentOut.style.display = (comment||plan) ? 'block' : 'none';
-}
-function dbDownloadReportHtml(){
-  dbPrepareCommentOutput(); dbRenderMetricTrendCharts();
-  const area=document.getElementById('db-capture-area');
-  if(!area){showToast('다운로드할 리포트가 없습니다');return;}
-  const clone=area.cloneNode(true);
-  /* UI 전용 요소 제거 (숨기기 버튼, 필터 등) */
-  clone.querySelectorAll('.db-ui-only').forEach(el=>el.remove());
-  /* 숨겨진(collapsed) 차트 카드 제거 */
-  clone.querySelectorAll('.db-metric-chart-collapsed').forEach(el=>el.remove());
-  /* 툴팁 제거 */
-  clone.querySelectorAll('.dbc-tip').forEach(el=>el.remove());
-  /* 남은 canvas → img 변환 */
-  const srcCan=[...area.querySelectorAll('canvas')],dstCan=[...clone.querySelectorAll('canvas')];
-  dstCan.forEach((c,i)=>{const img=document.createElement('img');img.src=srcCan[i]?.toDataURL('image/png')||'';img.style.cssText='width:100%;height:auto;display:block;';c.replaceWith(img);});
-  clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el=>{
-    el.removeAttribute('onclick');el.removeAttribute('onmouseenter');
-    el.removeAttribute('onmousemove');el.removeAttribute('onmouseleave');
-  });
-  const styles=[...document.querySelectorAll('style')].map(x=>x.innerHTML).join('\n');
-  const adv=dbActiveAdv(),pm=dbPeriodMeta;
-  const stamp=pm?`${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`:new Date().toISOString().slice(0,10);
-  const htmlOut='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+dbHtmlEscape(adv.name)+' 성과 대시보드</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}#db-top-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important;gap:12px!important}.db-dtrend12-section{display:flex!important;flex-direction:column!important}.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}.db-clickable{cursor:default!important}.db-ichrt{pointer-events:none!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div></body></html>';
-  const blob=new Blob([htmlOut],{type:'text/html;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`;
-  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  showToast('✅ 리포트 HTML 저장 완료');
-}
+/* [정리] dbPrepareCommentOutput 구버전 정의 제거(중복) — 최종 1개만 유지 */
+/* [정리] dbDownloadReportHtml 구버전 정의 제거(중복) — 최종 정의 1개만 유지 */
 function dbBuildAiDataString(){
   if(!_dbCur || !_dbPrev || !_dbRawData) return '';
   const c=dbEffectiveAgg(_dbCur), p=dbEffectiveAgg(_dbPrev), pm=dbPeriodMeta||getPeriodDates(dbPeriod, dbCustomRange), W=n=>Math.round(Number(n||0)).toLocaleString('ko-KR'), pct=(cv,pv)=>pv?((cv-pv)/pv*100).toFixed(1)+'%':'이전 데이터 없음';
@@ -6701,15 +6504,7 @@ function dbRenderGroupTbl(data, periodLabel){
   empty.style.display='none'; tbl.style.display='table';
 }
 
-function dbPrepareCommentOutput(){
-  const comment=document.getElementById('db-comment')?.value?.trim()||'';
-  const plan=document.getElementById('db-plan')?.value?.trim()||'';
-  const top=document.getElementById('db-comment-output-top'), cd=document.getElementById('db-comment-display-top'), pd=document.getElementById('db-plan-display-top');
-  const old=document.getElementById('db-comment-output'); if(old) old.style.display='none';
-  if(cd) cd.innerHTML = comment ? `<div class="db-comment-report-label">✏️ 마케터 코멘트</div>${dbHtmlEscape(comment)}` : '';
-  if(pd) pd.innerHTML = plan ? `<div class="db-comment-report-label">🎯 금일 운영 계획</div>${dbHtmlEscape(plan)}` : '';
-  if(top) top.style.display = (comment||plan) ? 'block' : 'none';
-}
+/* [정리] dbPrepareCommentOutput 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
 
 /* ══ FINAL DASHBOARD OVERRIDES: metric charts, scorecards, heatmap, download style parity ══ */
@@ -6856,43 +6651,8 @@ function dbRenderScorecards(cur, prev) {
   }).join('');
 }
 
-function dbPrepareCommentOutput(){
-  const comment=document.getElementById('db-comment')?.value?.trim()||'';
-  const plan=document.getElementById('db-plan')?.value?.trim()||'';
-  const top=document.getElementById('db-comment-output-top'), cd=document.getElementById('db-comment-display-top'), pd=document.getElementById('db-plan-display-top');
-  const old=document.getElementById('db-comment-output'); if(old) old.style.display='none';
-  if(cd) cd.innerHTML = comment ? `<div class="db-comment-report-label">✏️ 마케터 코멘트</div>${dbHtmlEscape(comment)}` : '';
-  if(pd) pd.innerHTML = plan ? `<div class="db-comment-report-label">🎯 금일 운영 계획</div>${dbHtmlEscape(plan)}` : '';
-  if(top) top.style.display = (comment||plan) ? 'block' : 'none';
-}
-function dbDownloadReportHtml(){
-  dbPrepareCommentOutput(); dbRenderMetricTrendCharts();
-  const area=document.getElementById('db-capture-area');
-  if(!area){showToast('다운로드할 리포트가 없습니다');return;}
-  const clone=area.cloneNode(true);
-  /* UI 전용 요소 제거 (숨기기 버튼, 필터 등) */
-  clone.querySelectorAll('.db-ui-only').forEach(el=>el.remove());
-  /* 숨겨진(collapsed) 차트 카드 제거 */
-  clone.querySelectorAll('.db-metric-chart-collapsed').forEach(el=>el.remove());
-  /* 툴팁 제거 */
-  clone.querySelectorAll('.dbc-tip').forEach(el=>el.remove());
-  /* 남은 canvas → img 변환 */
-  const srcCan=[...area.querySelectorAll('canvas')],dstCan=[...clone.querySelectorAll('canvas')];
-  dstCan.forEach((c,i)=>{const img=document.createElement('img');img.src=srcCan[i]?.toDataURL('image/png')||'';img.style.cssText='width:100%;height:auto;display:block;';c.replaceWith(img);});
-  clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el=>{
-    el.removeAttribute('onclick');el.removeAttribute('onmouseenter');
-    el.removeAttribute('onmousemove');el.removeAttribute('onmouseleave');
-  });
-  const styles=[...document.querySelectorAll('style')].map(x=>x.innerHTML).join('\n');
-  const adv=dbActiveAdv(),pm=dbPeriodMeta;
-  const stamp=pm?`${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`:new Date().toISOString().slice(0,10);
-  const htmlOut='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>'+dbHtmlEscape(adv.name)+' 성과 대시보드</title><style>'+styles+'\nbody{padding:20px;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important}#db-top-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important;gap:12px!important}.db-dtrend12-section{display:flex!important;flex-direction:column!important}.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}.db-clickable{cursor:default!important}.db-ichrt{pointer-events:none!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">'+clone.outerHTML+'</div></body></html>';
-  const blob=new Blob([htmlOut],{type:'text/html;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`;
-  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  showToast('✅ 리포트 HTML 저장 완료');
-}
+/* [정리] dbPrepareCommentOutput 구버전 정의 제거(중복) — 최종 1개만 유지 */
+/* [정리] dbDownloadReportHtml 구버전 정의 제거(중복) — 최종 정의 1개만 유지 */
 
 // ── 초기화 ──
 (function dbInit() {
@@ -6900,7 +6660,8 @@ function dbDownloadReportHtml(){
     dbRenderMetricToggles(); dbInitPivotMetricOptions(); dbSyncPurchaseSwitch(); dbSyncPeriodButtons();
     const ys=addDays(new Date(),-1); const iso=`${ys.getFullYear()}-${pad(ys.getMonth()+1)}-${pad(ys.getDate())}`;
     const si=document.getElementById('db-start'), ei=document.getElementById('db-end'); if(si) si.value=iso; if(ei) ei.value=iso;
-    setTimeout(()=>dbLoad(), 0);
+    /* 샘플 자동표시 제거 — 광고주가 선택된 경우에만 자동 로드 */
+    if (typeof currentAdv!=='undefined' && currentAdv) setTimeout(()=>dbLoad(), 0);
   } catch(e) { console.error(e); }
 })();
 
@@ -6971,79 +6732,10 @@ function dbDownloadReportHtml(){
   }
 
   window.__dbTrendCharts = window.__dbTrendCharts || {};
-  window.dbRenderTrendLines = function(){
-    registerDL();
-    const card=document.getElementById('db-trend-lines-card');
-    const days=(_dbRawData?.recentDays||_dbRawData?.days||[]).slice();
-    if(!card||!days.length){ if(card) card.style.display='none'; return; }
-    if(!window.Chart){ if(typeof oldTrend==='function') return oldTrend(); return; }
-    card.style.display='flex';
-    const sorted=days.slice().sort((a,b)=>String(a.dt||a.date).localeCompare(String(b.dt||b.date)));
-    const sub=document.getElementById('db-tlines-subtitle');
-    if(sub&&sorted.length>=2) sub.textContent=`(${dbDateShort(sorted[0].dt||sorted[0].date)} ~ ${dbDateShort(sorted[sorted.length-1].dt||sorted[sorted.length-1].date)}, ${sorted.length}일)`;
-    const grid=document.getElementById('db-tlines-grid'); if(!grid) return;
-    const metrics=DB_DT12_METRICS;
-    grid.innerHTML=metrics.map(m=>{
-      const vals=sorted.map(d=>metricRaw(d,m.key));
-      const cur=vals.at(-1)||0, prev=vals.length>1?vals.at(-2)||0:0, avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
-      return `<div class="db-tline-cell">
-        <div class="db-tline-cap">${m.label}</div>
-        <div class="db-tline-meta">현재: ${fmtMetric(m.key,cur)} / 이전: ${fmtMetric(m.key,prev)} / 평균: ${fmtMetric(m.key,avg)} ${deltaPctHTML(cur,prev)}</div>
-        <div class="chart-wrapper-db"><canvas id="db-tl-cv-${m.key}"></canvas></div>
-      </div>`;
-    }).join('');
-    requestAnimationFrame(()=>{
-      metrics.forEach((m,idx)=>{
-        const canvas=document.getElementById('db-tl-cv-'+m.key); if(!canvas) return;
-        const old=window.__dbTrendCharts[m.key]; if(old) old.destroy();
-        const labels=sorted.map(d=>dbDateShort(d.dt||d.date));
-        const data=sorted.map(d=>metricRaw(d,m.key));
-        const color=m.color || chartColors()[idx%chartColors().length];
-        window.__dbTrendCharts[m.key]=new Chart(canvas.getContext('2d'),{
-          type:'line',
-          data:{labels,datasets:[{label:m.label,data,borderColor:color,backgroundColor:color+'24',tension:.25,fill:true,pointRadius:3,pointHoverRadius:4,borderWidth:2}]},
-          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:(ctx)=>`${m.label}: ${fmtMetric(m.key,ctx.parsed.y)}`}},datalabels:{display:true,align:'top',anchor:'end',offset:2,color:'#cbd5e1',font:{size:8,weight:'700'},formatter:(v)=>fmtMetric(m.key,v)}},scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:4}},y:{beginAtZero:false,grace:'22%',grid:{color:'rgba(148,163,184,.08)'},ticks:{display:false}}}}
-        });
-      });
-    });
-  };
+  /* [정리] dbRenderTrendLines 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
   window.__dbStackChart = null;
-  window.dbRenderStackChart = function(){
-    registerDL();
-    const card=document.getElementById('db-stack-card');
-    const allCamps=_dbRawData?.allCamps||[];
-    if(!card||!allCamps.length){ if(card) card.style.display='none'; return; }
-    if(!window.Chart) return;
-    card.style.display='block';
-    const dim=document.getElementById('db-stack-dim')?.value||'campaign';
-    const limit=Number(document.getElementById('db-stack-limit')?.value||0);
-    let items=[];
-    if(dim==='type'){
-      const tm={}; allCamps.forEach(c=>{const t=dbTypeOfCamp(c); if(!tm[t])tm[t]={name:t,cost:0,imp:0,click:0,conv:0,revenue:0}; const a=dbAggCamp(c); ['cost','imp','click','conv','revenue'].forEach(k=>tm[t][k]+=a[k]||0);}); items=Object.values(tm);
-    }else if(dim==='adgroup'){
-      items=(_dbRawData?.allGroups||[]).map(g=>({name:(g.groupNm||g.name||'미분류').slice(0,22),...dbAggCamp(g)}));
-    }else{
-      items=allCamps.map(c=>({name:(c.campNm||c.name||'미분류').slice(0,22),...dbAggCamp(c)}));
-    }
-    items.sort((a,b)=>(b.cost||0)-(a.cost||0));
-    if(limit>0 && items.length>limit){
-      const top=items.slice(0,limit), rest=items.slice(limit);
-      const etc={name:'기타',cost:0,imp:0,click:0,conv:0,revenue:0}; rest.forEach(it=>['cost','imp','click','conv','revenue'].forEach(k=>etc[k]+=it[k]||0)); items=[...top,etc];
-    }
-    const metrics=[{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'conv',label:'전환수'},{key:'revenue',label:'매출액'}];
-    const totals={}; metrics.forEach(m=>totals[m.key]=items.reduce((s,it)=>s+(it[m.key]||0),0)||1);
-    const colors=chartColors();
-    const datasets=items.map((it,i)=>({label:it.name,data:metrics.map(m=>(it[m.key]||0)/totals[m.key]*100),rawValues:metrics.map(m=>it[m.key]||0),backgroundColor:colors[i%colors.length],borderColor:'#10141d',borderWidth:1,originalColor:colors[i%colors.length]}));
-    const canvas=ensureCanvasWrap('db-stack-card','db-stack-canvas'); if(!canvas) return;
-    if(window.__dbStackChart) window.__dbStackChart.destroy();
-    let highlighted=null;
-    const setHighlight=(chart,label)=>{ highlighted = highlighted===label ? null : label; chart.data.datasets.forEach(ds=>{ds.backgroundColor=(!highlighted||ds.label===highlighted)?ds.originalColor:'rgba(71,85,105,.35)';}); chart.update(); };
-    window.__dbStackChart=new Chart(canvas.getContext('2d'),{
-      type:'bar', data:{labels:metrics.map(m=>m.label),datasets},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(e,els,chart)=>{if(els.length)setHighlight(chart,chart.data.datasets[els[0].datasetIndex].label);},plugins:{legend:{position:'top',labels:{boxWidth:11,color:'#94a3b8',font:{size:10}},onClick:(e,item,legend)=>setHighlight(legend.chart,item.text)},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(1)}% (${Math.round(ctx.dataset.rawValues[ctx.dataIndex]).toLocaleString('ko-KR')})`}},datalabels:{display:(ctx)=>ctx.dataset.data[ctx.dataIndex]>=4,formatter:v=>v.toFixed(1)+'%',color:'#f8fafc',font:{size:10,weight:'700'}}},scales:{x:{stacked:true,min:0,max:100,grid:{color:'rgba(148,163,184,.08)'},ticks:{color:'#94a3b8',callback:v=>v+'%'}},y:{stacked:true,grid:{display:false},ticks:{color:'#cbd5e1',font:{weight:'700'}}}}}
-    });
-  };
+  /* [정리] dbRenderStackChart 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
   window.__dbWaterfallChart=null;
   window.dbRenderWaterfall = function(){
@@ -7314,41 +7006,9 @@ function dbDownloadReportHtml(){
     });
   };
 
-  window.dbRenderStackChart = function(){
-    if(!hasChart()) return;
-    if(typeof ChartDataLabels!=='undefined' && !Chart.registry.plugins.get('datalabels')) { try{ Chart.register(ChartDataLabels); }catch(e){} }
-    const card=$('db-stack-card'), allCamps=_dbRawData?.allCamps||[]; if(!card||!allCamps.length){ if(card)card.style.display='none'; return; }
-    card.style.display='block';
-    const dim=$('db-stack-dim')?.value==='adgroup'?'adgroup':'campaign';
-    const limit=Number($('db-stack-limit')?.value||0);
-    let items = dim==='adgroup' ? (_dbRawData?.allGroups||[]).map(g=>({name:(g.groupNm||g.name||'미분류').slice(0,24), ...dbAggCamp(g)})) : allCamps.map(c=>({name:(c.campNm||c.name||'미분류').slice(0,24), ...dbAggCamp(c)}));
-    items.sort((a,b)=>(b.cost||0)-(a.cost||0));
-    if(limit>0 && items.length>limit){ const top=items.slice(0,limit), rest=items.slice(limit), etc={name:'기타',cost:0,imp:0,click:0,conv:0,revenue:0}; rest.forEach(it=>['cost','imp','click','conv','revenue'].forEach(k=>etc[k]+=Number(it[k]||0))); items=[...top,etc]; }
-    const metrics=[{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'conv',label:'전환수'},{key:'revenue',label:'매출액'}];
-    const totals={}; metrics.forEach(m=>totals[m.key]=items.reduce((s,it)=>s+Number(it[m.key]||0),0)||1);
-    const colors=(typeof chartColors==='function'?chartColors():['#22c55e','#3b82f6','#f59e0b','#a855f7','#ef4444','#14b8a6','#eab308']);
-    const datasets=items.map((it,i)=>({label:it.name,data:metrics.map(m=>Number(it[m.key]||0)/totals[m.key]*100),rawValues:metrics.map(m=>Number(it[m.key]||0)),backgroundColor:colors[i%colors.length],borderColor:'#10141d',borderWidth:1,originalColor:colors[i%colors.length]}));
-    const canvas=$('db-stack-canvas'); if(!canvas) return; canvas.style.height='280px'; canvas.height=280;
-    if(window.__dbStackChart) { try{window.__dbStackChart.destroy();}catch(e){} }
-    let highlighted=null;
-    const setHighlight=(chart,label)=>{ highlighted=highlighted===label?null:label; chart.data.datasets.forEach(ds=>ds.backgroundColor=(!highlighted||ds.label===highlighted)?ds.originalColor:'rgba(71,85,105,.38)'); chart.update(); };
-    window.__dbStackChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels:metrics.map(m=>m.label),datasets},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,interaction:{mode:'nearest',intersect:true},onClick:(e,els,chart)=>{if(els.length)setHighlight(chart,chart.data.datasets[els[0].datasetIndex].label);},plugins:{legend:{position:'top',labels:{boxWidth:12,color:'#e2e8f0',font:{size:10,weight:'800'}},onClick:(e,item,legend)=>setHighlight(legend.chart,item.text)},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(1)}% (${fmt(metrics[ctx.dataIndex].key,ctx.dataset.rawValues[ctx.dataIndex])})`}},datalabels:{display:(ctx)=>ctx.dataset.data[ctx.dataIndex]>=4,formatter:v=>v.toFixed(0)+'%',color:'#ffffff',font:{size:10,weight:'900'}}},scales:{x:{stacked:true,min:0,max:100,grid:{color:'rgba(203,213,225,.14)'},ticks:{color:'#dbeafe',font:{weight:'800'},callback:v=>v+'%'}},y:{stacked:true,grid:{display:false},ticks:{color:'#f8fafc',font:{weight:'900'}}}}}});
-  };
+  /* [정리] dbRenderStackChart 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
-  window.dbRenderTrendLines = function(){
-    if(!hasChart()) return;
-    if(typeof ChartDataLabels!=='undefined' && !Chart.registry.plugins.get('datalabels')) { try{ Chart.register(ChartDataLabels); }catch(e){} }
-    const card=$('db-trend-lines-card'), grid=$('db-tlines-grid'); if(!card||!grid) return;
-    const days=(_dbRawData?.recentDays||_dbRawData?.days||[]).slice().sort((a,b)=>String(a.dt||a.date).localeCompare(String(b.dt||b.date))).slice(-7);
-    if(!days.length){card.style.display='none'; return;} card.style.display='flex';
-    const sub=$('db-tlines-subtitle'); if(sub) sub.textContent=`(${normalizeDateStr(days[0].dt||days[0].date)} ~ ${normalizeDateStr(days[days.length-1].dt||days[days.length-1].date)}, 7일)`;
-    const metricKeys=['cost','imp','click','conv','revenue','ctr','cvr','cpc','cpa','roas','aov','cart'];
-    const defs=metricKeys.map(k=>({key:k,label:label(k)}));
-    const colors=(typeof chartColors==='function'?chartColors():['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8','#eab308']);
-    grid.innerHTML=defs.map((m,i)=>{ const vals=days.map(d=>dbMetricValueForRow(d,m.key)); const cur=vals[vals.length-1]||0, prev=vals[vals.length-2]||0, avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1); const pct=prev?((cur-prev)/prev*100):0; const dir=typeof dbDiffClass==='function'?dbDiffClass(m.key,cur-prev):(pct>=0?'up':'dn'); return `<div class="db-tline-card"><div class="db-tline-title">${esc(m.label)}</div><div class="db-tline-meta">현재 ${fmt(m.key,cur)} · 이전 ${fmt(m.key,prev)} · 평균 ${fmt(m.key,avg)} <span class="${dir}" style="font-weight:900;">${pct>=0?'▲':'▼'} ${Math.abs(pct).toFixed(0)}%</span></div><div style="flex:1;min-height:112px;"><canvas id="db-tl-cv-${m.key}"></canvas></div></div>`; }).join('');
-    window.__dbTrendCharts=window.__dbTrendCharts||{};
-    requestAnimationFrame(()=>{defs.forEach((m,i)=>{const canvas=$(`db-tl-cv-${m.key}`); if(!canvas)return; if(window.__dbTrendCharts[m.key]){try{window.__dbTrendCharts[m.key].destroy();}catch(e){}} const labels=days.map(d=>normalizeDateStr(d.dt||d.date)); const data=days.map(d=>dbMetricValueForRow(d,m.key)); const color=colors[i%colors.length]; window.__dbTrendCharts[m.key]=new Chart(canvas.getContext('2d'),{type:'line',data:{labels,datasets:[{label:m.label,data,borderColor:color,backgroundColor:color+'33',tension:.28,fill:true,pointRadius:3.5,pointHoverRadius:6,borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:(ctx)=>`${m.label}: ${fmt(m.key,ctx.parsed.y)}`}},datalabels:{display:true,align:'top',anchor:'end',offset:2,clip:false,color:'#f8fafc',font:{size:8,weight:'900'},formatter:v=>fmt(m.key,v)}},scales:{x:{grid:{display:false},ticks:{color:'#e2e8f0',font:{size:9,weight:'800'},maxRotation:0,autoSkip:true,maxTicksLimit:5}},y:{beginAtZero:false,grace:'26%',grid:{color:'rgba(203,213,225,.14)'},ticks:{display:false,color:'#dbeafe'}}}}});});});
-  };
+  /* [정리] dbRenderTrendLines 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
   document.addEventListener('DOMContentLoaded', enhanceTopControls);
   enhanceTopControls();
@@ -7431,7 +7091,7 @@ function dbDownloadReportHtml(){
   function wfItems(dim,key){ if(dim==='media') return mediaRows(window._dbRawData||{}).map(r=>({name:r.name,cur:val(r,key)})); if(dim==='adgroup') return (window._dbRawData?.allGroups||[]).map(g=>({name:(g.groupNm||g.name||'미분류').slice(0,24),cur:val(g,key)})); return (window._dbRawData?.allCamps||[]).map(c=>({name:(c.campNm||c.name||'미분류').slice(0,24),cur:val(c,key)})); }
   function renderWhenChart(fn){ if(window.Chart) return fn(); setTimeout(()=>renderWhenChart(fn),120); }
   window.dbRenderWaterfall=function(){ renderWhenChart(function(){ ensureTopControls(); try{ if(typeof ChartDataLabels!=='undefined' && window.Chart && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels); }catch(e){} const card=$('db-waterfall-card'); if(!card) return; if(!window._dbRawData&&!window._dbCur){ card.style.display='none'; return; } card.style.display='block'; const metricKey=$('db-wf-metric')?.value||'cost', dim=$('db-wf-dim')?.value||'campaign'; const baseTotal=totalPeriod('current',metricKey), compTotal=totalPeriod('previous',metricKey); const count=Number($('db-wf-count-val')?.textContent||12); const source=wfItems(dim,metricKey).filter(x=>x.cur>0); const totalCur=source.reduce((s,x)=>s+x.cur,0)||1; const items=source.map(it=>({name:it.name,base:it.cur/totalCur*baseTotal,comp:it.cur/totalCur*compTotal})).map(it=>({...it,diff:it.base-it.comp})).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,count); const compLabel=labelRange('previous'), baseLabel=labelRange('current'), diffTotal=baseTotal-compTotal, diffPct=compTotal?diffTotal/compTotal*100:0; const sum=$('db-wf-summary'); if(sum) sum.innerHTML=`<div style="background:#1a2535;border:1px solid #2b374b;border-radius:8px;padding:8px 14px;font-size:11px;"><div style="color:#cbd5e1;font-size:9px;margin-bottom:2px;">비교 · ${esc(compLabel)}</div><div style="font-weight:800;color:#e2e8f0;">${fmt(metricKey,compTotal)}</div></div><div style="color:#93a4bb;font-size:18px;align-self:center;">→</div><div style="background:#1a2535;border:1px solid #2b374b;border-radius:8px;padding:8px 14px;font-size:11px;"><div style="color:#cbd5e1;font-size:9px;margin-bottom:2px;">기준 · ${esc(baseLabel)}</div><div style="font-weight:800;color:#fff;">${fmt(metricKey,baseTotal)}</div></div><div style="background:#1a2535;border:1px solid ${diffTotal>=0?'rgba(34,197,94,.45)':'rgba(248,113,113,.45)'};border-radius:8px;padding:8px 14px;font-size:11px;"><div style="color:#cbd5e1;font-size:9px;margin-bottom:2px;">증감</div><div style="font-weight:800;color:${diffTotal>=0?'#34d399':'#fb7185'};">${diffTotal>=0?'▲':'▼'}${Math.abs(diffPct).toFixed(0)}% (${diffTotal>=0?'+':''}${fmt(metricKey,diffTotal)})</div></div>`; const labels=[compLabel,...items.map(i=>i.name),baseLabel]; const floatData=[0], barData=[compTotal], colors=['rgba(16,185,129,.92)']; let running=compTotal; items.forEach(it=>{ const d=it.diff; if(d>=0){floatData.push(running);barData.push(d);colors.push('rgba(59,130,246,.94)');}else{floatData.push(running+d);barData.push(-d);colors.push('rgba(239,68,68,.94)');} running+=d; }); floatData.push(0); barData.push(baseTotal); colors.push('rgba(99,102,241,.94)'); const canvas=$('db-wf-canvas'); if(!canvas) return; canvas.style.height='300px'; if(window.__dbWaterfallChart){try{window.__dbWaterfallChart.destroy();}catch(e){}} window.__dbWaterfallChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'offset',data:floatData,backgroundColor:'rgba(0,0,0,0)',borderWidth:0,stack:'wf',datalabels:{display:false}},{label:label(metricKey),data:barData,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:5,stack:'wf'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1},datalabels:{display:true,anchor:'end',align:'end',offset:3,color:'#dbeafe',font:{size:9,weight:'500'},formatter:(v,ctx)=>{if(ctx.datasetIndex===0)return ''; const i=ctx.dataIndex; if(i===0||i===labels.length-1)return fmt(metricKey,v); const neg=String(colors[i]).includes('239,68,68'); const vv=neg?-v:v; return (vv>=0?'+':'')+fmt(metricKey,vv);}}},scales:{x:{stacked:true,grid:{display:false,drawBorder:false},ticks:{color:'#e2e8f0',font:{size:10,weight:'600'},callback:function(v){return String(this.getLabelForValue(v)).split('\n');}}},y:{stacked:true,beginAtZero:true,grace:'26%',grid:{display:false,drawBorder:false},ticks:{color:'#dbeafe',font:{size:10,weight:'500'},callback:v=>fmt(metricKey,v)}}}}}); }); };
-  window.dbRenderTrendLines=function(){ renderWhenChart(function(){ try{ if(typeof ChartDataLabels!=='undefined' && window.Chart && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels); }catch(e){} const card=$('db-trend-lines-card'), grid=$('db-tlines-grid'); if(!card||!grid) return; const days=(window._dbRawData?.recentDays||window._dbRawData?.days||[]).slice().sort((a,b)=>String(a.dt||a.date).localeCompare(String(b.dt||b.date))).slice(-7); if(!days.length){card.style.display='none';return;} card.style.display='flex'; const sub=$('db-tlines-subtitle'); if(sub) sub.textContent=`(${dateShort(days[0].dt||days[0].date)} ~ ${dateShort(days[days.length-1].dt||days[days.length-1].date)}, 7일)`; const allOrder=['cost','imp','click','conv','revenue','cart','ctr','cvr','cpc','cpa','roas','aov']; const keys=(window.dbCurrentSaleType==='nonsale' && window.dbSelectedMetrics) ? allOrder.filter(k=>dbSelectedMetrics.has(k)) : allOrder; const colors=['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#eab308','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8']; grid.innerHTML=keys.map((k,i)=>{ const vals=days.map(d=>val(d,k)); const cur=vals.at(-1)||0, prev=vals.length>1?vals.at(-2)||0:0, avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1); const cls=diffClass(k,cur-prev); return `<div class="db-tline-card"><div class="db-tline-title">${esc(label(k))}</div><div class="db-tline-meta">현재 ${fmt(k,cur)} · 이전 ${fmt(k,prev)} · 평균 ${fmt(k,avg)} <span class="${cls}" style="font-weight:900;">${pctInline(k,cur,prev)}</span></div><div style="flex:1;min-height:84px;"><canvas id="db-tl-cv-${k}"></canvas></div></div>`; }).join(''); window.__dbTrendCharts=window.__dbTrendCharts||{}; requestAnimationFrame(()=>keys.forEach((k,i)=>{ const canvas=$(`db-tl-cv-${k}`); if(!canvas)return; if(window.__dbTrendCharts[k]){try{window.__dbTrendCharts[k].destroy();}catch(e){}} const labels=days.map(d=>dateShort(d.dt||d.date)); const data=days.map(d=>val(d,k)); const color=colors[i%colors.length]; window.__dbTrendCharts[k]=new Chart(canvas.getContext('2d'),{type:'line',data:{labels,datasets:[{label:label(k),data,borderColor:color,backgroundColor:color+'30',tension:.28,fill:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:(ctx)=>`${label(k)}: ${fmt(k,ctx.parsed.y)}`}},datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#e2e8f0',font:{size:8,weight:'800'},maxRotation:0,minRotation:0,autoSkip:false}},y:{beginAtZero:false,grace:'24%',grid:{display:false},ticks:{display:false,color:'#dbeafe'}}}}}); })); }); };
+  /* [정리] dbRenderTrendLines 구버전 정의 제거(중복) — 최종 1개만 유지 */
   const oldRefresh=window.dbRefreshAllViews;
   window.dbRefreshAllViews=function(){ ensureTopControls(); if(oldRefresh) oldRefresh(); try{ dbRenderMediaTbl&&dbRenderMediaTbl(window._dbRawData,dbPeriodMeta?.curLabel||''); }catch(e){} };
   function rerenderCharts(){ try{ ensureTopControls(); if(window._dbRawData||window._dbCur){ dbRenderTrendLines(); dbRenderWaterfall(); dbRenderStackChart&&dbRenderStackChart(); dbRenderMediaTbl&&dbRenderMediaTbl(window._dbRawData,dbPeriodMeta?.curLabel||''); }}catch(e){ console.warn('[v6 charts]',e); } }
@@ -7598,13 +7258,7 @@ function dbDownloadReportHtml(){
     render(list,false); render(out,true);
   };
 
-  window.dbPrepareCommentOutput = function(){
-    ensureCaptureCommentOutput(); dbRenderThresholdAlerts();
-    const comment=$('db-comment')?.value?.trim()||''; const plan=$('db-plan')?.value?.trim()||'';
-    const top=$('db-comment-output-top'), cd=$('db-comment-display-top'), pd=$('db-plan-display-top');
-    if(cd) cd.textContent = comment || '-'; if(pd) pd.textContent = plan || '-';
-    if(top) top.style.display = (comment||plan||buildThresholdAlerts().length) ? 'block' : 'none';
-  };
+  /* [정리] dbPrepareCommentOutput 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
   window.dbRenderCompareTable = function(cur,prev){
     const tbl=$('db-compare-tbl'), tbody=$('db-tbl-body'); if(!tbl||!tbody) return;
@@ -7628,21 +7282,7 @@ function dbDownloadReportHtml(){
     empty.style.display='none'; tbl.style.display='table'; if(typeof dbRenderTypeCharts==='function') dbRenderTypeCharts(rows);
   };
 
-  window.dbDownloadReportHtml = function(){
-    dbPrepareCommentOutput(); if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); if(typeof dbRenderWaterfall==='function') dbRenderWaterfall(); if(typeof dbRenderStackChart==='function') dbRenderStackChart();
-    const area=$('db-capture-area'); if(!area){ showToast&&showToast('다운로드할 리포트가 없습니다'); return; }
-    setTimeout(()=>{
-      const clone=area.cloneNode(true);
-      clone.querySelectorAll('.db-ui-only,.dbc-tip,script,style').forEach(el=>el.remove());
-      clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el=>['onclick','onmouseenter','onmousemove','onmouseleave'].forEach(a=>el.removeAttribute(a)));
-      const src=[...area.querySelectorAll('canvas')], dst=[...clone.querySelectorAll('canvas')];
-      dst.forEach((c,i)=>{ const img=document.createElement('img'); try{ img.src=src[i]?.toDataURL('image/png')||''; }catch(e){ img.src=''; } img.style.cssText='width:100%;height:auto;display:block;'; c.replaceWith(img); });
-      const css=[...document.querySelectorAll('style')].map(s=>s.textContent||'').join('\n');
-      const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{}; const pm=window.dbPeriodMeta; const stamp=pm?`${String(pm.curS.getMonth()+1).padStart(2,'0')}${String(pm.curS.getDate()).padStart(2,'0')}-${String(pm.curE.getMonth()+1).padStart(2,'0')}${String(pm.curE.getDate()).padStart(2,'0')}`:new Date().toISOString().slice(0,10);
-      const parts=['<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>',esc(adv.name||'성과'),' 성과 대시보드</title><style>',css,'\nbody{padding:0;background:#08090c!important;}#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}#db-capture-area{max-width:none!important;width:100%!important;margin:0!important;display:flex!important;flex-direction:column!important}.db-clickable{cursor:default!important}</style></head><body data-theme="dark" class="db-report-html"><div id="tab-dashboard" class="active">',clone.outerHTML,'</div></body></html>'];
-      const blob=new Blob([parts.join('')],{type:'text/html;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); showToast&&showToast('✅ 리포트 HTML 저장 완료');
-    },180);
-  };
+  /* [정리] dbDownloadReportHtml 구버전 정의 제거(중복) — 최종 정의 1개만 유지 */
 
   const oldCamp=window.dbRenderCampTbl, oldGroup=window.dbRenderGroupTbl;
   window.dbRenderCampTbl=function(data,periodLabel){ if(oldCamp) oldCamp(data,periodLabel); dbRenderThresholdAlerts(); };
@@ -7651,7 +7291,7 @@ function dbDownloadReportHtml(){
   function renderWhenChart(fn){ if(window.Chart) return fn(); setTimeout(()=>renderWhenChart(fn),120); }
   window.dbRenderWaterfall=function(){ renderWhenChart(function(){ ensureTopControls(); try{ if(typeof ChartDataLabels!=='undefined' && window.Chart && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels); }catch(e){} const card=$('db-waterfall-card'); if(!card) return; if(!window._dbRawData&&!window._dbCur){ card.style.display='none'; return; } card.style.display='block'; const metricKey=$('db-wf-metric')?.value||'cost', dim=$('db-wf-dim')?.value||'campaign'; const baseTotal=val(window._dbCur||{},metricKey), compTotal=val(window._dbPrev||{},metricKey); const count=Number($('db-wf-count-val')?.textContent||12); const source=(dim==='media'?mediaRows(window._dbRawData||{}):(dim==='adgroup'?(window._dbRawData?.allGroups||[]):(window._dbRawData?.allCamps||[]))).map(x=>({name:(x.name||x.groupNm||x.campNm||x.campaignName||'미분류').slice(0,24),cur:val(x,metricKey)})).filter(x=>x.cur>0); const totalCur=source.reduce((s,x)=>s+x.cur,0)||1; const items=source.map(it=>({name:it.name,base:it.cur/totalCur*baseTotal,comp:it.cur/totalCur*compTotal})).map(it=>({...it,diff:it.base-it.comp})).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,count); const compLabel=(window.dbPeriodMeta&&dbPeriodMeta.prevLabel)||'이전기간', baseLabel=(window.dbPeriodMeta&&dbPeriodMeta.curLabel)||'조회기간'; const diffTotal=baseTotal-compTotal, diffPct=compTotal?diffTotal/compTotal*100:0; const sum=$('db-wf-summary'); if(sum) sum.innerHTML=`<div style="background:#1a2535;border:1px solid #2b374b;border-radius:8px;padding:8px 14px;font-size:11px;"><div style="color:#cbd5e1;font-size:9px;margin-bottom:2px;">비교 · ${esc(compLabel)}</div><div style="font-weight:700;color:#e2e8f0;">${fmt(metricKey,compTotal)}</div></div><div style="color:#93a4bb;font-size:18px;align-self:center;">→</div><div style="background:#1a2535;border:1px solid #2b374b;border-radius:8px;padding:8px 14px;font-size:11px;"><div style="color:#cbd5e1;font-size:9px;margin-bottom:2px;">기준 · ${esc(baseLabel)}</div><div style="font-weight:700;color:#fff;">${fmt(metricKey,baseTotal)}</div></div><div style="background:#1a2535;border:1px solid ${diffTotal>=0?'rgba(34,197,94,.45)':'rgba(248,113,113,.45)'};border-radius:8px;padding:8px 14px;font-size:11px;"><div style="color:#cbd5e1;font-size:9px;margin-bottom:2px;">증감</div><div style="font-weight:700;color:${diffTotal>=0?'#34d399':'#fb7185'};">${diffTotal>=0?'▲':'▼'}${Math.abs(diffPct).toFixed(0)}% (${diffTotal>=0?'+':''}${fmt(metricKey,diffTotal)})</div></div>`; const labels=[compLabel,...items.map(i=>i.name),baseLabel]; const floatData=[0], barData=[compTotal], colors=['rgba(16,185,129,.92)']; let running=compTotal; items.forEach(it=>{ const d=it.diff; if(d>=0){floatData.push(running);barData.push(d);colors.push('rgba(59,130,246,.94)');}else{floatData.push(running+d);barData.push(-d);colors.push('rgba(239,68,68,.94)');} running+=d; }); floatData.push(0); barData.push(baseTotal); colors.push('rgba(99,102,241,.94)'); const canvas=$('db-wf-canvas'); if(!canvas) return; canvas.style.height='300px'; if(window.__dbWaterfallChart){try{window.__dbWaterfallChart.destroy();}catch(e){}} window.__dbWaterfallChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'offset',data:floatData,backgroundColor:'rgba(0,0,0,0)',borderWidth:0,stack:'wf',datalabels:{display:false}},{label:label(metricKey),data:barData,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:5,stack:'wf'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:80,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1},datalabels:{display:true,anchor:'end',align:'end',offset:3,color:'#e0f2fe',font:{size:9,weight:'400'},formatter:(v,ctx)=>{if(ctx.datasetIndex===0)return ''; const i=ctx.dataIndex; if(i===0||i===labels.length-1)return fmt(metricKey,v); const neg=String(colors[i]).includes('239,68,68'); const vv=neg?-v:v; return (vv>=0?'+':'')+fmt(metricKey,vv);}}},scales:{x:{stacked:true,grid:{display:false,drawBorder:false},ticks:{color:'#e2e8f0',font:{size:10,weight:'500'},callback:function(v){return String(this.getLabelForValue(v)).split('\n');}}},y:{stacked:true,beginAtZero:true,grace:'26%',grid:{display:false,drawBorder:false},ticks:{display:false,color:'#dbeafe',font:{size:10,weight:'400'},callback:v=>fmt(metricKey,v)}}}}}); setTimeout(()=>{try{window.__dbWaterfallChart.resize();}catch(e){}},120); }); };
 
-  window.dbRenderTrendLines=function(){ renderWhenChart(function(){ try{ if(typeof ChartDataLabels!=='undefined' && window.Chart && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels); }catch(e){} const card=$('db-trend-lines-card'), grid=$('db-tlines-grid'); if(!card||!grid) return; const raw=(window._dbRawData?.recentDays||window._dbRawData?.days||[]).slice().sort((a,b)=>String(a.dt||a.date).localeCompare(String(b.dt||b.date))).slice(-7); if(!raw.length){card.style.display='none';return;} const days=raw; card.style.display='flex'; const sub=$('db-tlines-subtitle'); if(sub) sub.textContent=`(${dateShort(days[0].dt||days[0].date)} ~ ${dateShort(days[days.length-1].dt||days[days.length-1].date)}, 7일)`; const allOrder=['cost','imp','click','conv','revenue','cart','ctr','cvr','cpc','cpa','roas','aov']; const keys=(window.dbCurrentSaleType==='nonsale' && window.dbSelectedMetrics) ? allOrder.filter(k=>dbSelectedMetrics.has(k)) : allOrder; const colors=['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#eab308','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8']; grid.innerHTML=keys.map((k,i)=>{ const vals=days.map(d=>val(d,k)); const cur=vals.at(-1)||0, prev=vals.length>1?vals.at(-2)||0:0, avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1); const cls=diffClass(k,cur-prev); return `<div class="db-tline-card"><div class="db-tline-title">${esc(label(k))}</div><div class="db-tline-meta">현재 ${fmt(k,cur)} · 이전 ${fmt(k,prev)} · 평균 ${fmt(k,avg)} <span class="${cls}" style="font-weight:900;">${pctInline(k,cur,prev)}</span></div><div style="flex:1;min-height:84px;"><canvas id="db-tl-cv-${k}"></canvas></div></div>`; }).join(''); window.__dbTrendCharts=window.__dbTrendCharts||{}; requestAnimationFrame(()=>keys.forEach((k,i)=>{ const canvas=$(`db-tl-cv-${k}`); if(!canvas)return; if(window.__dbTrendCharts[k]){try{window.__dbTrendCharts[k].destroy();}catch(e){}} const labels=days.map(d=>dateShort(d.dt||d.date)); const data=days.map(d=>val(d,k)); const color=colors[i%colors.length]; window.__dbTrendCharts[k]=new Chart(canvas.getContext('2d'),{type:'line',data:{labels,datasets:[{label:label(k),data,borderColor:color,backgroundColor:color+'30',tension:.28,fill:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:80,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:(ctx)=>`${label(k)}: ${fmt(k,ctx.parsed.y)}`}},datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#e2e8f0',font:{size:8,weight:'800'},maxRotation:0,minRotation:0,autoSkip:false}},y:{beginAtZero:false,grace:'24%',grid:{display:false},ticks:{display:false,color:'#dbeafe'}}}}}); })); }); };
+  /* [정리] dbRenderTrendLines 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
   function refreshTables(){ try{ if(window._dbCur&&window._dbPrev) dbRenderCompareTable(_dbCur,_dbPrev); if(window._dbRawData){ if(window.dbRenderTypeTbl)dbRenderTypeTbl(_dbRawData,dbPeriodMeta?.curLabel||''); if(window.dbRenderMediaTbl)dbRenderMediaTbl(_dbRawData,dbPeriodMeta?.curLabel||''); }}catch(e){ console.warn('[v7 refresh]',e); } }
   function rerender(){ ensureTopControls(); ensureSettingsLayout(); ensureCaptureCommentOutput(); try{ dbRenderThresholdAlerts(); if(window._dbRawData||window._dbCur){ dbRenderTrendLines(); dbRenderWaterfall(); if(window.dbRenderStackChart) dbRenderStackChart(); if(window.dbRenderMediaTbl) dbRenderMediaTbl(window._dbRawData,window.dbPeriodMeta?.curLabel||''); }}catch(e){ console.warn('[v7 render]',e); } }
@@ -7750,7 +7390,10 @@ function dbDownloadReportHtml(){
   }
 
   function updateBigTitle(){
-    const el=$('db-adv-title'); if(!el) return; const adv=activeAdv(); const nm=adv.name||'네이버'; const dt=rangeLong();
+    const el=$('db-adv-title'); if(!el) return;
+    /* 광고주 미선택 시 샘플 대신 안내 문구 표시 */
+    if(typeof currentAdv==='undefined' || !currentAdv){ el.textContent='광고주를 선택해주세요'; return; }
+    const adv=activeAdv(); const nm=adv.name||'네이버'; const dt=rangeLong();
     el.innerHTML=`${esc(nm)}, <span class="db-big-date">${esc(dt)}</span> 네이버 광고 성과 데이터`;
   }
   function ensureFooter(){
@@ -7793,7 +7436,7 @@ function dbDownloadReportHtml(){
 
   // 차트 안정화/3x4/선택 지표/숫자 제거
   function renderWhenChart(fn){ if(window.Chart) return fn(); setTimeout(()=>renderWhenChart(fn),100); }
-  window.dbRenderTrendLines=function(){ renderWhenChart(()=>{ const card=$('db-trend-lines-card'),grid=$('db-tlines-grid'); if(!card||!grid)return; const raw=((window._dbRawData||_dbRawData||{}).recentDays||((window._dbRawData||_dbRawData||{}).days)||[]).slice().sort((a,b)=>String(a.dt||a.date).localeCompare(String(b.dt||b.date))).slice(-7); if(!raw.length){card.style.display='none';return;} card.style.display='flex'; const sub=$('db-tlines-subtitle'); if(sub)sub.textContent=`(${dateShort(raw[0].dt||raw[0].date)} ~ ${dateShort(raw[raw.length-1].dt||raw[raw.length-1].date)}, 7일)`; const order=['cost','imp','click','conv','revenue','cart','ctr','cvr','cpc','cpa','roas','aov']; const selected=(window.dbSelectedMetrics||dbSelectedMetrics||new Set()); const keys=(window.dbCurrentSaleType||dbCurrentSaleType)==='nonsale'?order.filter(k=>selected.has(k)):order; const colors=['#f59e0b','#38bdf8','#60a5fa','#34d399','#22c55e','#eab308','#a78bfa','#c084fc','#f472b6','#fb7185','#2dd4bf','#818cf8']; grid.innerHTML=keys.map((k,i)=>{const vals=raw.map(d=>val(d,k)),cur=vals.at(-1)||0,prev=vals.at(-2)||0,avg=vals.reduce((a,b)=>a+b,0)/(vals.length||1); const p=prev?((cur-prev)/Math.abs(prev)*100):0; return `<div class="db-tline-card"><div class="db-tline-title">${esc(label(k))}</div><div class="db-tline-meta">현재 ${fmt(k,cur)} · 이전 ${fmt(k,prev)} · 평균 ${fmt(k,avg)} <span class="${cls(k,cur-prev)}" style="font-weight:900;">${prev?(p>0?'+':'')+Math.round(p)+'%':'-'}</span></div><div style="flex:1;min-height:84px;"><canvas id="db-tl-cv-${k}"></canvas></div></div>`;}).join(''); window.__dbTrendCharts=window.__dbTrendCharts||{}; requestAnimationFrame(()=>keys.forEach((k,i)=>{const canvas=$(`db-tl-cv-${k}`); if(!canvas)return; if(window.__dbTrendCharts[k]){try{window.__dbTrendCharts[k].destroy();}catch(e){}} const color=colors[i%colors.length]; window.__dbTrendCharts[k]=new Chart(canvas.getContext('2d'),{type:'line',data:{labels:raw.map(d=>dateShort(d.dt||d.date)),datasets:[{label:label(k),data:raw.map(d=>val(d,k)),borderColor:color,backgroundColor:color+'30',tension:.28,fill:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:120,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.97)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:ctx=>`${label(k)}: ${fmt(k,ctx.parsed.y)}`}},datalabels:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#e2e8f0',font:{size:8,weight:'850'},maxRotation:0,minRotation:0,autoSkip:false}},y:{beginAtZero:false,grace:'24%',grid:{display:false},ticks:{display:false}}}}});})); }); };
+  /* [정리] dbRenderTrendLines 구버전 정의 제거(중복) — 최종 1개만 유지 */
 
   // 지표 토글 후 상세 테이블/차트까지 전체 리렌더
   const oldToggle=window.dbToggleMetric||dbToggleMetric; window.dbToggleMetric=function(key,el){ oldToggle&&oldToggle(key,el); fullRefresh(); };
@@ -9504,21 +9147,7 @@ function dbDownloadReportHtml(){
         canvas height 스타일을 명시적으로 픽셀 고정
      ══════════════════════════════════════════════ */
   const _origDownload = window.dbDownloadReportHtml;
-  window.dbDownloadReportHtml = function(){
-    /* 스택 캔버스 높이 스타일 강제 고정 (clone 직전) */
-    const sc = document.getElementById('db-stack-canvas');
-    if(sc){
-      const h = sc.height / (window.devicePixelRatio||1);
-      sc.style.height = h + 'px';
-    }
-    /* 워터폴도 동일 처리 */
-    const wc = document.getElementById('db-wf-canvas');
-    if(wc){
-      const h = wc.height / (window.devicePixelRatio||1);
-      wc.style.height = h + 'px';
-    }
-    if(typeof _origDownload==='function') _origDownload.apply(this, arguments);
-  };
+  /* [정리] dbDownloadReportHtml 구버전 정의 제거(중복) — 최종 정의 1개만 유지 */
 
   /* ══════════════════════════════════════════════
      2. 패널 높이 동기화 (즉시 스크롤 표시)
@@ -9903,66 +9532,7 @@ function dbDownloadReportHtml(){
   }
 
   const _origDownload = window.dbDownloadReportHtml;
-  window.dbDownloadReportHtml = function(){
-    /* 차트 강제 재렌더 후 캔버스 버퍼 안정화 */
-    try{ if(typeof dbRenderStackChart==='function') dbRenderStackChart(); }catch(e){}
-    try{ if(typeof dbRenderWaterfall==='function') dbRenderWaterfall(); }catch(e){}
-    try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-
-    /* 충분히 기다린 후(차트 애니메이션·리사이즈 완료) 캡처 */
-    setTimeout(()=>{
-      const area=$('db-capture-area');
-      if(!area){ if(typeof showToast==='function') showToast('다운로드할 리포트가 없습니다'); return; }
-
-      const clone=area.cloneNode(true);
-      clone.querySelectorAll('.db-ui-only,.dbc-tip,script,style').forEach(el=>el.remove());
-      clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave]').forEach(el=>
-        ['onclick','onmouseenter','onmousemove','onmouseleave'].forEach(a=>el.removeAttribute(a)));
-
-      /* canvas → img: 실제 버퍼 크기(width/height 속성) 기준으로 캡처 */
-      const src=[...area.querySelectorAll('canvas')], dst=[...clone.querySelectorAll('canvas')];
-      dst.forEach((c,i)=>{
-        const s=src[i];
-        const img=document.createElement('img');
-        try{ img.src = s ? s.toDataURL('image/png') : ''; }catch(e){ img.src=''; }
-        /* 원본 표시 높이를 유지해 절반 잘림 방지 */
-        const dispH = s ? (s.style.height || (s.getBoundingClientRect().height+'px')) : 'auto';
-        img.style.cssText = `width:100%;height:${dispH};object-fit:contain;display:block;`;
-        c.replaceWith(img);
-      });
-
-      const css=[...document.querySelectorAll('style')].map(s=>s.textContent||'').join('\n');
-      const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{};
-      const pm=bPM();
-      const pad=n=>String(n).padStart(2,'0');
-      const stamp=pm?`${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`:new Date().toISOString().slice(0,10);
-
-      const headerHtml = buildReportHeaderHTML();
-
-      const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
-        +'<meta name="viewport" content="width=device-width,initial-scale=1.0">'
-        +'<title>'+esc(adv.name||'성과')+' 성과 대시보드</title><style>'+css
-        +'\nbody{padding:20px;background:#08090c!important;}'
-        +'#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}'
-        +'#db-capture-area{max-width:1500px!important;margin:0 auto!important;display:flex!important;flex-direction:column!important;gap:12px!important}'
-        +'#db-top-row{display:grid!important;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr)!important;align-items:stretch!important;gap:12px!important}'
-        +'.db-tlines-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}'
-        +'.db-clickable{cursor:default!important}'
-        +'</style></head><body data-theme="dark" class="db-report-html">'
-        +'<div id="tab-dashboard" class="active">'
-        + headerHtml
-        + '<div id="db-capture-area">' + clone.innerHTML + '</div>'
-        +'</div></body></html>';
-
-      const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`;
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-      if(typeof showToast==='function') showToast('✅ 리포트 HTML 저장 완료');
-    }, 600);   /* 차트 렌더 안정화 대기 */
-  };
+  /* [정리] dbDownloadReportHtml 구버전 정의 제거(중복) — 최종 정의 1개만 유지 */
 
   /* ══════════════════════════════════════════════
      통합 실행
@@ -10313,62 +9883,7 @@ function dbDownloadReportHtml(){
     </div>`;
   }
 
-  window.dbDownloadReportHtml = function(){
-    try{ if(typeof dbRenderStackChart==='function') dbRenderStackChart(); }catch(e){}
-    try{ if(typeof dbRenderWaterfall==='function') dbRenderWaterfall(); }catch(e){}
-    try{ if(typeof dbRenderTrendLines==='function') dbRenderTrendLines(); }catch(e){}
-
-    setTimeout(()=>{
-      const area=$('db-capture-area');
-      if(!area){ if(typeof showToast==='function') showToast('다운로드할 리포트가 없습니다'); return; }
-
-      const clone=area.cloneNode(true);
-      clone.querySelectorAll('.db-ui-only,.dbc-tip,script,style').forEach(el=>el.remove());
-      /* 인터랙션 속성 제거 (정적 리포트) */
-      clone.querySelectorAll('[onclick],[onmouseenter],[onmousemove],[onmouseleave],[onmouseover],[onmouseout]').forEach(el=>
-        ['onclick','onmouseenter','onmousemove','onmouseleave','onmouseover','onmouseout'].forEach(a=>el.removeAttribute(a)));
-
-      /* canvas → img: 실제 표시 크기 유지 */
-      const src=[...area.querySelectorAll('canvas')], dst=[...clone.querySelectorAll('canvas')];
-      dst.forEach((c,i)=>{
-        const s=src[i];
-        const img=document.createElement('img');
-        try{ img.src = s ? s.toDataURL('image/png') : ''; }catch(e){ img.src=''; }
-        const rect = s ? s.getBoundingClientRect() : null;
-        const dispH = s ? (s.style.height || (rect && rect.height ? rect.height+'px' : 'auto')) : 'auto';
-        img.style.cssText = `width:100%;height:${dispH};object-fit:contain;display:block;`;
-        c.replaceWith(img);
-      });
-
-      const css=[...document.querySelectorAll('style')].map(s=>s.textContent||'').join('\n');
-      const adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{};
-      const pm=bPM();
-      const pad=n=>String(n).padStart(2,'0');
-      const stamp=pm?`${pad(pm.curS.getMonth()+1)}${pad(pm.curS.getDate())}-${pad(pm.curE.getMonth()+1)}${pad(pm.curE.getDate())}`:new Date().toISOString().slice(0,10);
-      const headerHtml = buildReportHeaderHTML();
-
-      /* clone.outerHTML 로 capture-area 자체 인라인 style(grid 레이아웃) 보존 */
-      const html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
-        +'<meta name="viewport" content="width=device-width,initial-scale=1.0">'
-        +'<title>'+esc(adv.name||'성과')+' 성과 대시보드</title><style>'+css
-        +'\nbody{padding:20px;background:#08090c!important;}'
-        +'#tab-dashboard{display:block!important;max-width:none!important;margin:0!important;padding:0!important;}'
-        +'.db-clickable{cursor:default!important}'
-        +'</style></head><body data-theme="dark" class="db-report-html">'
-        +'<div id="tab-dashboard" class="active">'
-        + headerHtml
-        + clone.outerHTML       /* ← innerHTML 래핑 대신 outerHTML 로 폭/스타일 보존 */
-        +'</div></body></html>';
-
-      const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=`${adv.name||'성과'}_성과대시보드_${stamp}.html`;
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-      if(typeof showToast==='function') showToast('✅ 리포트 HTML 저장 완료');
-    }, 600);
-  };
+  /* [정리] dbDownloadReportHtml 구버전 정의 제거(중복) — 최종 정의 1개만 유지 */
 
   /* ══════════════════════════════════════════════
      통합 실행
@@ -10404,11 +9919,29 @@ function dbDownloadReportHtml(){
 tr.db-total-row td{font-weight:800!important;color:#e2e8f4!important;background:rgba(3,199,90,.07)!important;border-top:1.5px solid #2b374b!important;}
 tr.db-total-row td:first-child{color:#03C75A!important;}
 .db-sort-mk{font-size:8px;opacity:.85;margin-left:2px;}
+#db-comment-output-top{margin:0;}
+#db-comment-output-top .db-comment-top-grid{gap:12px!important;align-items:stretch;}
+#db-comment-output-top .db-comment-report-card{border-radius:12px!important;}
+#db-threshold-output{display:none!important;}
 </style>
 <script id="db-refactor-script">
 (function(){
   'use strict';
   var SORT={};
+  /* campTpLabel 은 상단에 함수 선언으로 정의됨(호이스팅) — 여기서 재정의하지 않음 */
+  /* ─ 광고그룹별 표: 유형 컬럼을 캠페인 유형으로 보정 (그룹 campTp 누락 시 '기타' 방지) ─ */
+  function fixGroupTypes(){
+    var tbl=document.getElementById('db-group-tbl'); if(!tbl||!tbl.tBodies[0]) return;
+    var camps=(_dbRawData&&_dbRawData.allCamps)||[]; if(!camps.length) return;
+    var byName={}; camps.forEach(function(c){ var nm=(c.campNm||c.name||'').trim(); if(nm) byName[nm]=campTpLabel(c.campTp); });
+    [].forEach.call(tbl.tBodies[0].rows,function(tr){
+      if(tr.classList.contains('db-total-row')) return;
+      var cells=tr.cells; if(cells.length<2) return;
+      var campName=(cells[1].textContent||'').trim();
+      var t=byName[campName];
+      if(t) cells[0].textContent=t;
+    });
+  }
   /* 긴급점검/임계값 무력화 */
   function killThr(){
     ['db-threshold-panel','db-threshold-settings-btn','db-threshold-list'].forEach(function(id){var e=document.getElementById(id);if(e)e.remove();});
@@ -10448,10 +9981,71 @@ tr.db-total-row td:first-child{color:#03C75A!important;}
     var tr=document.createElement('tr');tr.className='db-total-row';tr.innerHTML=cells.map(function(c){return '<td>'+c+'</td>';}).join('');tb.appendChild(tr); attachSort('db-daily-tbl');applySort('db-daily-tbl');
   }
   function wrap(name,after){var o=window[name]; if(typeof o!=='function'||o.__enh)return; var w=function(){var r=o.apply(this,arguments);try{after();}catch(e){}return r;};w.__enh=true;window[name]=w;}
+  /* ─ 일간 지표 추이: 구매기준 ON이면 전환수/매출액 → 전환수(구매)/매출액(구매) ─ */
+  function enhTrendPurchase(){
+    try{
+      var grid=document.getElementById('db-tlines-grid'); if(!grid) return;
+      var on=(typeof dbPurchaseBasedMode!=='undefined') && !!dbPurchaseBasedMode;
+      var rd=(_dbRawData&&(_dbRawData.recentDays||_dbRawData.days))||[];
+      var raw=rd.slice().sort(function(a,b){return String(a.dt||a.date).localeCompare(String(b.dt||b.date));}).slice(-7);
+      var fmt=function(k,v){ return (typeof dbFmt==='function')?dbFmt(k,Number(v||0)):Math.round(Number(v||0)).toLocaleString('ko-KR'); };
+      var MAP={ conv:{src:'purchaseCcnt',on:'\uC804\uD658\uC218(\uAD6C\uB9E4)',off:'\uC804\uD658\uC218'}, revenue:{src:'purchaseConvAmt',on:'\uB9E4\uCD9C\uC561(\uAD6C\uB9E4)',off:'\uB9E4\uCD9C\uC561'} };
+      Object.keys(MAP).forEach(function(k){
+        var cv=document.getElementById('db-tl-cv-'+k); if(!cv) return;
+        var card=cv.closest?cv.closest('.db-tline-card'):null; if(!card) return;
+        var title=card.querySelector('.db-tline-title'), meta=card.querySelector('.db-tline-meta');
+        var lab=on?MAP[k].on:MAP[k].off;
+        if(title) title.textContent=lab;
+        var data=raw.map(function(d){ return on?Number(d[MAP[k].src]||0):Number(d[k]||0); });
+        var ch=window.__dbTrendCharts&&window.__dbTrendCharts[k];
+        if(ch&&ch.data&&ch.data.datasets&&ch.data.datasets[0]){
+          ch.data.datasets[0].data=data; ch.data.datasets[0].label=lab;
+          try{ ch.options.plugins.tooltip.callbacks.label=function(ctx){return lab+': '+fmt(k,ctx.parsed.y);}; }catch(e){}
+          try{ ch.update('none'); }catch(e){ try{ch.update();}catch(e2){} }
+        }
+        if(meta){
+          var cur=data[data.length-1]||0, prev=data.length>1?(data[data.length-2]||0):0, avg=data.reduce(function(a,b){return a+b;},0)/(data.length||1);
+          var pct=prev?Math.round((cur-prev)/Math.abs(prev)*100):0;
+          var diff=cur-prev, cls=(diff>0?'up':(diff<0?'dn':'neu'));
+          meta.innerHTML='\uD604\uC7AC '+fmt(k,cur)+' \u00B7 \uC774\uC804 '+fmt(k,prev)+' \u00B7 \uD3C9\uADE0 '+fmt(k,avg)+' <span class="'+cls+'" style="font-weight:900;">'+(prev?(pct>0?'+':'')+pct+'%':'-')+'</span>';
+        }
+      });
+    }catch(e){}
+  }
   wrap('dbRenderTypeTbl',function(){enhMetric('db-type-tbl',(_dbRawData&&_dbRawData.allCamps)||[]);});
   wrap('dbRenderCampTbl',function(){enhMetric('db-camp-tbl',window.dbFilteredCamps?dbFilteredCamps(_dbRawData||{}):((_dbRawData&&_dbRawData.allCamps)||[]));});
-  wrap('dbRenderGroupTbl',function(){enhMetric('db-group-tbl',window.dbFilteredGroups?dbFilteredGroups(_dbRawData||{}):((_dbRawData&&_dbRawData.allGroups)||[]));});
+  wrap('dbRenderGroupTbl',function(){enhMetric('db-group-tbl',window.dbFilteredGroups?dbFilteredGroups(_dbRawData||{}):((_dbRawData&&_dbRawData.allGroups)||[])); try{fixGroupTypes();}catch(e){}});
   wrap('dbRenderDailyTbl',function(){enhDaily();});
+  wrap('dbRenderTrendLines',function(){ setTimeout(enhTrendPurchase,50); setTimeout(enhTrendPurchase,300); requestAnimationFrame(function(){requestAnimationFrame(enhTrendPurchase);}); });
+  /* ─ 캡처: 광고성과데이터+일간지표추이(db-top-row) + 코멘트/계획(db-comment-output-top)만 캡처 (클린 재작성) ─ */
+  window.dbCapture = async function(){
+    if(typeof html2canvas==='undefined'){ if(typeof showToast==='function') showToast('\uCEA1\uCC98 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uB85C\uB529 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694'); return; }
+    try{ if(typeof dbPrepareCommentOutput==='function') dbPrepareCommentOutput(); }catch(e){}
+    var area=document.getElementById('db-capture-area'); if(!area) return;
+    var body=document.body; body.classList.add('db-capturing');
+    var settings=document.getElementById('db-settings-panel');
+    var capBtn=document.getElementById('db-capture-btn-top');
+    var prevSettings=settings?settings.style.display:null; if(settings) settings.style.display='none';
+    var prevBtn=capBtn?capBtn.style.display:null; if(capBtn) capBtn.style.display='none';
+    var keep={'db-top-row':1,'db-comment-output-top':1};
+    var hidden=[];
+    [].forEach.call(area.children,function(c){ if(!keep[c.id] && c.style.display!=='none'){ hidden.push([c,c.style.display||'']); c.style.display='none'; } });
+    try{
+      var canvas=await html2canvas(area,{ scale:2, backgroundColor:(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0f1117'), useCORS:true, logging:false, scrollY:-window.scrollY });
+      var adv=(typeof dbActiveAdv==='function'?dbActiveAdv():window.currentAdv)||{};
+      var pm=(typeof dbPeriodMeta!=='undefined')?dbPeriodMeta:null;
+      var pad=function(n){return String(n).padStart(2,'0');};
+      var dateStr=(pm&&pm.curS&&pm.curE)?(pad(pm.curS.getMonth()+1)+pad(pm.curS.getDate())+'-'+pad(pm.curE.getMonth()+1)+pad(pm.curE.getDate())):new Date().toISOString().slice(0,10);
+      var link=document.createElement('a'); link.download=(adv.name||'\uC131\uACFC')+'_\uC131\uACFC\uB300\uC2DC\uBCF4\uB4DC_'+dateStr+'.png'; link.href=canvas.toDataURL('image/png'); link.click();
+      if(typeof showToast==='function') showToast('\u2705 \uC774\uBBF8\uC9C0 \uC800\uC7A5 \uC644\uB8CC');
+    }catch(e){ console.error(e); if(typeof showToast==='function') showToast('\u274C \uCEA1\uCC98 \uC624\uB958: '+e.message); }
+    finally{
+      hidden.forEach(function(p){ p[0].style.display=p[1]; });
+      body.classList.remove('db-capturing');
+      if(settings) settings.style.display=prevSettings||'';
+      if(capBtn) capBtn.style.display=prevBtn||'';
+    }
+  };
 
   /* ─ 항목별 성과 비중(100%) : 최종 단일 구현 (Chart.js, 기존 디자인 계승) ─ */
   function esc(s){ return window.dbHtmlEscape?dbHtmlEscape(s):String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -10508,7 +10102,102 @@ tr.db-total-row td:first-child{color:#03C75A!important;}
           y:{stacked:true,grid:{display:false},ticks:{color:'#f8fafc',font:{weight:'700'}}}}}});
   };
 
+  /* ─ 마케터코멘트/금일운영계획: 워터폴 위 반반 레이아웃 (문구 있을 때만, 빈 칸 숨김) ─ */
+  function ensureCommentBlock(){
+    var ex=document.getElementById('db-comment-output-top'); if(ex) return ex;
+    var topRow=document.getElementById('db-top-row'); if(!topRow) return null;
+    var out=document.createElement('div'); out.id='db-comment-output-top';
+    out.innerHTML='<div class="db-comment-top-grid">'
+      +'<div class="db-comment-report-card"><div class="db-comment-report-label">\u270F\uFE0F \uB9C8\uCF00\uD130 \uCF54\uBA58\uD2B8</div><div id="db-comment-display-top" class="db-comment-report-text"></div></div>'
+      +'<div class="db-comment-report-card"><div class="db-comment-report-label">\uD83C\uDFAF \uAE08\uC77C \uC6B4\uC601 \uACC4\uD68D</div><div id="db-plan-display-top" class="db-comment-report-text"></div></div>'
+      +'</div>';
+    topRow.insertAdjacentElement('afterend', out);
+    return out;
+  }
+  window.dbPrepareCommentOutput=function(){
+    var top=ensureCommentBlock();
+    var cEl=document.getElementById('db-comment'), pEl=document.getElementById('db-plan');
+    var comment=((cEl&&cEl.value)||'').trim(), plan=((pEl&&pEl.value)||'').trim();
+    var oldOut=document.getElementById('db-comment-output'); if(oldOut) oldOut.style.display='none';
+    var thr=document.getElementById('db-threshold-output'); if(thr) thr.style.display='none';
+    if(!top) return;
+    var cd=document.getElementById('db-comment-display-top'), pd=document.getElementById('db-plan-display-top');
+    if(cd) cd.textContent=comment;
+    if(pd) pd.textContent=plan;
+    var cCard=cd?cd.closest('.db-comment-report-card'):null, pCard=pd?pd.closest('.db-comment-report-card'):null;
+    if(cCard) cCard.style.display=comment?'':'none';
+    if(pCard) pCard.style.display=plan?'':'none';
+    var grid=top.querySelector('.db-comment-top-grid');
+    if(grid) grid.style.gridTemplateColumns=(comment&&plan)?'1fr 1fr':'1fr';
+    top.style.display=(comment||plan)?'block':'none';
+  };
+
+  /* ─ 상호작용 유지형 HTML 내보내기 (설정 패널 제외, 차트/필터/드롭박스 그대로) ─ */
+  var EXPORT_BOOT_SRC = '<scr'+'ipt id="db-export-boot">(function(){'
+    + 'function rev(p){if(!p)return p;["curS","curE","prevS","prevE"].forEach(function(k){if(p[k])p[k]=new Date(p[k]);});return p;}'
+    + 'function hdr(B){if(document.getElementById("db-export-header"))return;var h=document.createElement("div");h.id="db-export-header";'
+    + 'var ds="";try{var d=(B.period&&B.period.curE)?new Date(B.period.curE):new Date();ds=d.getFullYear()+"\\uB144 "+(d.getMonth()+1)+"\\uC6D4 "+d.getDate()+"\\uC77C ";}catch(e){}'
+    + 'var nm=(B.advName?B.advName+", ":"");'
+    + 'h.style.cssText="width:100%;box-sizing:border-box;margin:0 auto 16px;max-width:1500px;padding:22px 30px;border-radius:14px;background:linear-gradient(110deg,#03C75A 0%,#0bb6d6 52%,#845AFF 100%);color:#fff;box-shadow:0 10px 34px rgba(0,0,0,.4);font-family:\\u0027Noto Sans KR\\u0027,sans-serif;";'
+    + 'h.innerHTML="<div style=\\u0027font-size:11px;font-weight:800;letter-spacing:.2em;opacity:.85;\\u0027>PERFORMANCE REPORT</div><div style=\\u0027font-size:24px;font-weight:900;letter-spacing:-.02em;margin-top:6px;\\u0027>"+nm+ds+"\\uB124\\uC774\\uBC84 \\uAD11\\uACE0 \\uC131\\uACFC \\uB370\\uC774\\uD130</div>";'
+    + 'document.body.insertBefore(h,document.body.firstChild);}'
+    + 'function isolate(){var area=document.getElementById("db-capture-area");if(!area)return;var hdrEl=document.getElementById("db-export-header");var el=area;'
+    + 'while(el&&el!==document.body){var par=el.parentElement;if(!par)break;[].forEach.call(par.children,function(s){if(s!==el&&s!==hdrEl&&s.id!=="db-export-boot"&&s.id!=="db-export-iso"){s.style.display="none";}});el.style.display="";el=par;}'
+    + 'var td=document.getElementById("tab-dashboard");if(td){td.style.display="block";td.classList.add("active");}document.body.style.background="#08090c";}'
+    + 'function render(B){var raw=B.raw,cur=B.cur,prev=B.prev,label=(B.period&&B.period.curLabel)||"";'
+    + 'var calls=[["dbRenderScorecards",[cur,prev]],["dbRenderCompareTable",[cur,prev]],["dbRenderTypeTbl",[raw,label]],["dbRenderCampTbl",[raw,label]],["dbRenderGroupTbl",[raw,label]],["dbRenderDailyTbl",[(raw&&(raw.recentDays||raw.days))||[]]],["dbRenderPivotHeatmap",[]],["dbRenderDailyTrend",[]],["dbRenderWaterfall",[]],["dbRenderRadar",[]],["dbRenderStackChart",[]],["dbRenderTrendLines",[]],["dbRenderMetricTrendCharts",[]],["dbPrepareCommentOutput",[]]];'
+    + 'calls.forEach(function(c){try{if(typeof window[c[0]]==="function")window[c[0]].apply(null,c[1]);}catch(e){}});'
+    + 'try{var s=document.getElementById("db-stack-camp-sel");if(s&&B.stackCamp){s.value=B.stackCamp;if(typeof dbRenderStackChart==="function")dbRenderStackChart();}}catch(e){}}'
+    + 'function boot(){var B=window.__DB_EXPORT__;if(!B)return;rev(B.period);'
+    + 'try{window.eval("_dbRawData=window.__DB_EXPORT__.raw;_dbCur=window.__DB_EXPORT__.cur;_dbPrev=window.__DB_EXPORT__.prev;dbPurchaseBasedMode=!!window.__DB_EXPORT__.purchase;dbCurrentSaleType=window.__DB_EXPORT__.sale||\\u0027sale\\u0027;");}catch(e){try{window._dbRawData=B.raw;}catch(e2){}}'
+    + 'try{if(B.period)window.eval("dbPeriodMeta=window.__DB_EXPORT__.period;");}catch(e){}'
+    + 'var c=document.getElementById("db-comment");if(c)c.value=B.comment||"";var p=document.getElementById("db-plan");if(p)p.value=B.plan||"";'
+    + 'try{if(typeof switchTab==="function")switchTab("dashboard");}catch(e){}'
+    + 'hdr(B);render(B);setTimeout(function(){render(B);isolate();},250);setTimeout(function(){render(B);isolate();},700);setTimeout(isolate,1400);}'
+    + 'if(document.readyState==="complete")setTimeout(boot,150);else window.addEventListener("load",function(){setTimeout(boot,150);});'
+    + '})();<\/scr'+'ipt>';
+
+  window.dbDownloadReportHtml = function(){
+    try{
+      try{ if(typeof dbRenderStackChart==="function") dbRenderStackChart(); }catch(e){}
+      var adv=(typeof dbActiveAdv==="function"?dbActiveAdv():null)||{};
+      var pm=(typeof dbPeriodMeta!=="undefined"&&dbPeriodMeta)?dbPeriodMeta:null;
+      var boot={
+        raw:(typeof _dbRawData!=="undefined")?_dbRawData:null,
+        cur:(typeof _dbCur!=="undefined")?_dbCur:null,
+        prev:(typeof _dbPrev!=="undefined")?_dbPrev:null,
+        purchase:(typeof dbPurchaseBasedMode!=="undefined")?!!dbPurchaseBasedMode:false,
+        sale:(typeof dbCurrentSaleType!=="undefined")?dbCurrentSaleType:"sale",
+        period:pm?{curS:pm.curS,curE:pm.curE,prevS:pm.prevS,prevE:pm.prevE,label:pm.label,curLabel:pm.curLabel}:null,
+        comment:(document.getElementById("db-comment")||{}).value||"",
+        plan:(document.getElementById("db-plan")||{}).value||"",
+        advName:adv.name||"",
+        stackCamp:(document.getElementById("db-stack-camp-sel")||{}).value||""
+      };
+      if(!boot.raw){ if(typeof showToast==="function") showToast("\u26A0 \uBA3C\uC800 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC640\uC8FC\uC138\uC694"); return; }
+      var bootJson=JSON.stringify(boot).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");
+      var inject='<style id="db-export-iso">.dbc-tip{display:none!important;}#db-export-header{display:block!important;}</style>'
+        +'<scr'+'ipt>window.__DB_EXPORT__='+bootJson+';<\/scr'+'ipt>'+EXPORT_BOOT_SRC;
+      var pad=function(n){return String(n).padStart(2,"0");};
+      var stamp=pm?(pad(pm.curE.getMonth()+1)+pad(pm.curE.getDate())):new Date().toISOString().slice(0,10);
+      var fname=(adv.name||"\uC131\uACFC")+"_\uC131\uACFC\uB300\uC2DC\uBCF4\uB4DC_"+stamp+".html";
+      var dl=function(outHtml){
+        var blob=new Blob([outHtml],{type:"text/html;charset=utf-8"});
+        var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){URL.revokeObjectURL(a.href);},1500);
+        if(typeof showToast==="function") showToast("\u2705 \uC778\uD130\uB799\uD2F0\uBE0C HTML \uC800\uC7A5 \uC644\uB8CC");
+      };
+      var build=function(srcHtml){ var idx=srcHtml.lastIndexOf("</body>"); if(idx<0){ var low=srcHtml.toLowerCase().lastIndexOf("</body>"); idx=low; } var out=(idx>=0)?(srcHtml.slice(0,idx)+inject+srcHtml.slice(idx)):(srcHtml+inject); dl(out); };
+      fetch(location.href).then(function(r){return r.text();}).then(function(t){
+        if(t && /<\/body>/i.test(t)) build(t); else build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML);
+      }).catch(function(){ build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML); });
+    }catch(e){ console.error("export error",e); if(typeof showToast==="function") showToast("\uB0B4\uBCF4\uB0B4\uAE30 \uC624\uB958: "+e.message); }
+  };
+
   function init(){ killThr();
+    try{ window.dbPrepareCommentOutput(); }catch(e){}
+    ['db-comment','db-plan'].forEach(function(id){ var el=document.getElementById(id); if(el&&!el.__cmEnh){ el.__cmEnh=true; el.addEventListener('input',function(){ try{ window.dbPrepareCommentOutput(); }catch(e){} }); } });
     if(_dbRawData){ try{dbRenderTypeTbl(_dbRawData,'');}catch(e){} try{dbRenderCampTbl(_dbRawData,'');}catch(e){} try{dbRenderGroupTbl(_dbRawData,'');}catch(e){} try{dbRenderDailyTbl(_dbRawData.recentDays||_dbRawData.days||[]);}catch(e){} try{dbRenderStackChart();}catch(e){} }
   }
   if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
