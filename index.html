@@ -903,7 +903,7 @@ body.db-capturing .db-metric-chart-collapsed,
 
 /* ══ 레이아웃 다운로드/캡처 오버라이드 ══ */
 .db-report-html #db-capture-area { display:flex!important; flex-direction:column!important; }
-.db-report-html #db-top-row { display:grid!important; grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important; align-items:stretch!important; gap:12px!important; }
+.db-report-html #db-top-row { display:grid!important; grid-template-columns:minmax(420px,.72fr) minmax(0,1.28fr)!important; align-items:stretch!important; gap:12px!important; }
 .db-report-html .db-dtrend12-section { display:flex!important; flex-direction:column!important; }
 
 /* ══ 12개 지표 미니차트 — 우측 패널 (3열×4행) ══ */
@@ -5572,6 +5572,7 @@ function dbRefreshAllViews() {
     dbRenderStackChart();
     dbRenderTrendLines();
   }
+  if(typeof dbSyncResultHeader==='function') dbSyncResultHeader();
 }
 
 // ── 기간 버튼 ──
@@ -5643,8 +5644,30 @@ function dbSetAllMetrics(val) {
 
 
 // ── 대시보드 데이터/필터/다운로드/AI 확장 ──
-const DB_SAMPLE_ADV = { id:'sample-dashboard', name:'', emoji:'📊', cat:'', naver:{cid:'sample'} };
+const DB_SAMPLE_ADV = { id:'sample-dashboard', name:'업체명', emoji:'📊', cat:'', naver:{cid:'sample'} };
 function dbActiveAdv(){ return currentAdv || DB_SAMPLE_ADV; }
+function dbDashboardAdvName(){
+  try{
+    const adv = (typeof dbActiveAdv==='function' ? dbActiveAdv() : null) || currentAdv || {};
+    let name = (currentAdv && currentAdv.name) || adv.name || adv.advName || '';
+    if(!name){
+      const dd = document.getElementById('adv-dd-label');
+      if(dd) name = String(dd.textContent||'').replace(/[🟢🔴🟡]/g,'').replace(/^\s*[\p{Extended_Pictographic}\uFE0F]+\s*/u,'').trim();
+    }
+    name = String(name||'').replace(/광고주를 선택해주세요|광고주 선택…|예시 광고주/g,'').trim();
+    return name || '업체명';
+  }catch(e){ return '업체명'; }
+}
+function dbDashboardTitleHtml(){
+  const adv = (typeof dbActiveAdv==='function' ? dbActiveAdv() : null) || currentAdv || {};
+  const emoji = adv.emoji || (currentAdv && currentAdv.emoji) || '📊';
+  const name = dbDashboardAdvName();
+  return `${emoji} <em style="color:var(--g);font-style:normal">${dbHtmlEscape ? dbHtmlEscape(name) : name}</em> 광고 성과 데이터`;
+}
+function dbSyncResultHeader(){
+  const rt = document.getElementById('db-result-title');
+  if(rt) rt.innerHTML = dbDashboardTitleHtml();
+}
 function dbNumSeed(str){ return String(str||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0); }
 function dbSampleMetricFor(base, dayIdx, weight, boost=1){
   const wave = 1 + Math.sin((dayIdx+1)*0.83 + weight)*0.12 + (dayIdx%3)*0.025;
@@ -5809,14 +5832,14 @@ async function dbLoad() {
     if (ei) ei.value = toISO(curE);
 
     const titleEl = document.getElementById('db-adv-title');
-    if (titleEl) titleEl.innerHTML = `${adv.emoji || '📊'} <strong>${adv.name || '예시 광고주'}</strong> 광고 성과 데이터`;
+    if (titleEl) titleEl.innerHTML = `${adv.emoji || '📊'} <strong>${dbDashboardAdvName()}</strong> 광고 성과 데이터`;
     const dd = document.getElementById('adv-dd-label');
     if (dd && !currentAdv) { dd.textContent = `${adv.emoji} ${adv.name} 🟢`; dd.classList.remove('dd-placeholder'); }
 
     const rt = document.getElementById('db-result-title');
     const rp = document.getElementById('db-result-period');
     const rv = document.getElementById('db-result-prev');
-    if (rt) rt.innerHTML = `${adv.emoji || '📊'} <em style="color:var(--g);font-style:normal">${adv.name || '예시 광고주'}</em> 광고 성과 데이터`;
+    if (rt) rt.innerHTML = dbDashboardTitleHtml();
     if (rp) rp.textContent = curLabel;
     if (rv) rv.textContent = `전기간: ${prevLabel}`;
 
@@ -7848,10 +7871,11 @@ function dbRenderScorecards(cur, prev) {
 
   function updateBigTitle(){
     const el=$('db-adv-title'); if(!el) return;
-    /* 광고주 미선택 시 샘플 대신 안내 문구 표시 */
-    if(typeof currentAdv==='undefined' || !currentAdv){ el.textContent='광고주를 선택해주세요'; return; }
-    const adv=activeAdv(); const nm=adv.name||'네이버'; const dt=rangeLong();
+    const nm=(typeof dbDashboardAdvName==='function'?dbDashboardAdvName():(activeAdv().name||'업체명'));
+    const dt=rangeLong();
     el.innerHTML=`${esc(nm)}, <span class="db-big-date">${esc(dt)}</span> 네이버 광고 성과 데이터`;
+    const rt=$('db-result-title');
+    if(rt) rt.innerHTML=`<em style="color:var(--g);font-style:normal">${esc(nm)}</em>, ${esc(dt)} 네이버 광고 성과 데이터`;
   }
   function ensureFooter(){
     if($('db-report-footer-v8')) return; const area=$('db-capture-area'); if(!area) return;
@@ -10071,14 +10095,16 @@ function dbRenderScorecards(cur, prev) {
     + 'function rev(p){if(!p)return p;["curS","curE","prevS","prevE"].forEach(function(k){if(p[k])p[k]=new Date(p[k]);});return p;}'
     + 'function hdr(B){if(document.getElementById("db-export-header"))return;var h=document.createElement("div");h.id="db-export-header";'
     + 'var ds="";try{var d=(B.period&&B.period.curE)?new Date(B.period.curE):new Date();ds=d.getFullYear()+"\\uB144 "+(d.getMonth()+1)+"\\uC6D4 "+d.getDate()+"\\uC77C ";}catch(e){}'
-    + 'var nm=(B.advName?B.advName+", ":"");'
+    + 'var nm=((B.advName&&String(B.advName).trim())?B.advName:"업체명")+", ";'
     + 'h.style.cssText="width:100%;box-sizing:border-box;margin:0 0 14px;padding:24px 30px;border-radius:16px;background:linear-gradient(110deg,#03C75A 0%,#0bb6d6 52%,#845AFF 100%);color:#fff;box-shadow:0 10px 34px rgba(0,0,0,.4);font-family:\\u0027Noto Sans KR\\u0027,sans-serif;display:flex;justify-content:space-between;align-items:flex-start;gap:28px;";'
     + 'h.innerHTML="<div style=\\u0027min-width:0;\\u0027><div style=\\u0027font-size:12px;font-weight:900;letter-spacing:.22em;opacity:.88;\\u0027>PERFORMANCE REPORT</div><div style=\\u0027font-size:26px;font-weight:950;letter-spacing:-.03em;margin-top:6px;line-height:1.25;\\u0027>"+nm+ds+"\\uB124\\uC774\\uBC84 \\uAD11\\uACE0 \\uC131\\uACFC \\uB370\\uC774\\uD130</div></div><div style=\\u0027text-align:right;font-size:15px;line-height:1.65;font-weight:900;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.22);\\u0027><div>작성자 <strong>미래아이엔씨 이태웅 과장</strong></div><div>☎ 02-2633-9029 / 010-2841-1527</div><div>카톡 208km</div></div>";'
     + 'var _ca=document.getElementById(\"db-capture-area\"); if(_ca){_ca.insertBefore(h,_ca.firstChild);} else {document.body.insertBefore(h,document.body.firstChild);}}'
     + 'function isolate(){var area=document.getElementById("db-capture-area");if(!area)return;var hdrEl=document.getElementById("db-export-header");var el=area;'
     + 'while(el&&el!==document.body){var par=el.parentElement;if(!par)break;[].forEach.call(par.children,function(s){if(s!==el&&s!==hdrEl&&s.id!=="db-export-boot"&&s.id!=="db-export-iso"){s.style.display="none";}});el.style.display="";el=par;}'
     + 'var td=document.getElementById("tab-dashboard");if(td){td.style.display="block";td.classList.add("active");}document.body.style.background="#08090c";}'
-    + 'function render(B){var raw=B.raw,cur=B.cur,prev=B.prev,label=(B.period&&B.period.curLabel)||"";'
+    + 'function escT(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}'
+    + 'function syncHead(B){try{var nm=(B.advName&&String(B.advName).trim())?B.advName:"업체명";var rt=document.getElementById("db-result-title");if(rt)rt.innerHTML="📊 <em style=\u0027color:var(--g);font-style:normal\u0027>"+escT(nm)+"</em> 광고 성과 데이터";var rp=document.getElementById("db-result-period");if(rp)rp.textContent=(B.period&&B.period.curLabel)||"";var rv=document.getElementById("db-result-prev");if(rv)rv.textContent=((B.period&&B.period.prevLabel)?"전기간: "+B.period.prevLabel:"");var thp=document.getElementById("db-th-prev");if(thp&&B.period&&B.period.prevLabel)thp.textContent=B.period.prevLabel;var thc=document.getElementById("db-th-cur");if(thc&&B.period&&B.period.curLabel)thc.textContent=B.period.curLabel;}catch(e){}}'
+    + 'function render(B){var raw=B.raw,cur=B.cur,prev=B.prev,label=(B.period&&B.period.curLabel)||"";syncHead(B);'
     + 'var calls=[["dbRenderScorecards",[cur,prev]],["dbRenderCompareTable",[cur,prev]],["dbRenderTypeTbl",[raw,label]],["dbRenderCampTbl",[raw,label]],["dbRenderGroupTbl",[raw,label]],["dbRenderDailyTbl",[(raw&&(raw.recentDays||raw.days))||[]]],["dbRenderPivotHeatmap",[]],["dbRenderDailyTrend",[]],["dbRenderWaterfall",[]],["dbRenderRadar",[]],["dbRenderStackChart",[]],["dbRenderTrendLines",[]],["dbRenderMetricTrendCharts",[]]];'
     + 'calls.forEach(function(c){try{if(typeof window[c[0]]==="function")window[c[0]].apply(null,c[1]);}catch(e){}});'
     + 'try{var s=document.getElementById("db-stack-camp-sel");if(s&&B.stackCamp){s.value=B.stackCamp;if(typeof dbRenderStackChart==="function")dbRenderStackChart();}}catch(e){}}'
@@ -10101,13 +10127,13 @@ function dbRenderScorecards(cur, prev) {
         prev:(typeof _dbPrev!=="undefined")?_dbPrev:null,
         purchase:(typeof dbPurchaseBasedMode!=="undefined")?!!dbPurchaseBasedMode:false,
         sale:(typeof dbCurrentSaleType!=="undefined")?dbCurrentSaleType:"sale",
-        period:pm?{curS:pm.curS,curE:pm.curE,prevS:pm.prevS,prevE:pm.prevE,label:pm.label,curLabel:pm.curLabel}:null,
-        advName:adv.name||"",
+        period:pm?{curS:pm.curS,curE:pm.curE,prevS:pm.prevS,prevE:pm.prevE,label:pm.label,curLabel:pm.curLabel,prevLabel:pm.prevLabel}:null,
+        advName:(typeof dbDashboardAdvName==="function"?dbDashboardAdvName():(adv.name||"업체명")),
         stackCamp:(document.getElementById("db-stack-camp-sel")||{}).value||""
       };
       if(!boot.raw){ if(typeof showToast==="function") showToast("\u26A0 \uBA3C\uC800 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC640\uC8FC\uC138\uC694"); return; }
       var bootJson=JSON.stringify(boot).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");
-      var headCss='<style id="db-export-initial-hide">.dbc-tip{display:none!important;}#db-comment-output-top,#db-comment-output{display:none!important;}body.db-report-html .topbar,body.db-report-html #db-settings-panel,body.db-report-html .tab-panel:not(#tab-dashboard){display:none!important;}body.db-report-html #tab-dashboard{display:block!important;max-width:none!important;width:100%!important;margin:0!important;padding:16px 18px 60px!important;}body.db-report-html #db-capture-area{display:grid!important;width:calc(100% - 24px)!important;margin-left:auto!important;margin-right:auto!important;}body.db-report-html #db-capture-area>#db-export-header{display:flex!important;width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;align-self:stretch!important;}body.db-report-html>#db-export-header{max-width:none!important;}</style>';
+      var headCss='<style id="db-export-initial-hide">.dbc-tip{display:none!important;}#db-comment-output-top,#db-comment-output{display:none!important;}body.db-report-html .topbar,body.db-report-html #db-settings-panel,body.db-report-html .tab-panel:not(#tab-dashboard){display:none!important;}body.db-report-html #tab-dashboard{display:block!important;max-width:none!important;width:100%!important;margin:0!important;padding:16px 18px 60px!important;}body.db-report-html #db-capture-area{display:flex!important;flex-direction:column!important;width:calc(100% - 24px)!important;margin-left:auto!important;margin-right:auto!important;}body.db-report-html #db-top-row{display:grid!important;grid-template-columns:minmax(420px,.72fr) minmax(0,1.28fr)!important;gap:12px!important;align-items:stretch!important;}body.db-report-html #db-capture-area>#db-export-header{display:flex!important;width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;align-self:stretch!important;}body.db-report-html>#db-export-header{max-width:none!important;}</style>';
       var inject='<style id="db-export-iso">#db-comment-output-top,#db-comment-output{display:none!important;}</style>'
         +'<scr'+'ipt>window.__DB_EXPORT__='+bootJson+';<\/scr'+'ipt>'+EXPORT_BOOT_SRC;
       var pad=function(n){return String(n).padStart(2,"0");};
