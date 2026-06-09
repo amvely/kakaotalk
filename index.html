@@ -10134,7 +10134,21 @@ function dbRenderScorecards(cur, prev) {
         setTimeout(function(){URL.revokeObjectURL(a.href);},1500);
         if(typeof showToast==="function") showToast("\u2705 \uC778\uD130\uB799\uD2F0\uBE0C HTML \uC800\uC7A5 \uC644\uB8CC");
       };
-      var build=function(srcHtml){ var idx=srcHtml.lastIndexOf("
+      var build=function(srcHtml){ var idx=srcHtml.lastIndexOf("</body>"); if(idx<0){ var low=srcHtml.toLowerCase().lastIndexOf("</body>"); idx=low; } var out=(idx>=0)?(srcHtml.slice(0,idx)+inject+srcHtml.slice(idx)):(srcHtml+inject); dl(out); };
+      fetch(location.href).then(function(r){return r.text();}).then(function(t){
+        if(t && /<\/body>/i.test(t)) build(t); else build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML);
+      }).catch(function(){ build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML); });
+    }catch(e){ console.error("export error",e); if(typeof showToast==="function") showToast("\uB0B4\uBCF4\uB0B4\uAE30 \uC624\uB958: "+e.message); }
+  };
+  function init(){ killThr();
+    try{ window.dbPrepareCommentOutput(); }catch(e){}
+    ['db-comment','db-plan'].forEach(function(id){ var el=document.getElementById(id); if(el&&!el.__cmEnh){ el.__cmEnh=true; el.addEventListener('input',function(){ try{ window.dbPrepareCommentOutput(); }catch(e){} }); } });
+    if(_dbRawData){ try{dbRenderTypeTbl(_dbRawData,'');}catch(e){} try{dbRenderCampTbl(_dbRawData,'');}catch(e){} try{dbRenderGroupTbl(_dbRawData,'');}catch(e){} try{dbRenderDailyTbl(_dbRawData.recentDays||_dbRawData.days||[]);}catch(e){} try{dbRenderStackChart();}catch(e){} }
+  }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+  var n=0,t=setInterval(function(){killThr(); if(++n>=5)clearInterval(t);},800);
+})();
+
 
 <script id="chatgpt-group-performance-final-fix">
 (function(){
@@ -10320,23 +10334,7 @@ function dbRenderScorecards(cur, prev) {
 })();
 </script>
 
-</body>"); if(idx<0){ var low=srcHtml.toLowerCase().lastIndexOf("</body>"); idx=low; } var out=(idx>=0)?(srcHtml.slice(0,idx)+inject+srcHtml.slice(idx)):(srcHtml+inject); dl(out); };
-      fetch(location.href).then(function(r){return r.text();}).then(function(t){
-        if(t && /<\/body>/i.test(t)) build(t); else build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML);
-      }).catch(function(){ build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML); });
-    }catch(e){ console.error("export error",e); if(typeof showToast==="function") showToast("\uB0B4\uBCF4\uB0B4\uAE30 \uC624\uB958: "+e.message); }
-  };
-
-  function init(){ killThr();
-    try{ window.dbPrepareCommentOutput(); }catch(e){}
-    ['db-comment','db-plan'].forEach(function(id){ var el=document.getElementById(id); if(el&&!el.__cmEnh){ el.__cmEnh=true; el.addEventListener('input',function(){ try{ window.dbPrepareCommentOutput(); }catch(e){} }); } });
-    if(_dbRawData){ try{dbRenderTypeTbl(_dbRawData,'');}catch(e){} try{dbRenderCampTbl(_dbRawData,'');}catch(e){} try{dbRenderGroupTbl(_dbRawData,'');}catch(e){} try{dbRenderDailyTbl(_dbRawData.recentDays||_dbRawData.days||[]);}catch(e){} try{dbRenderStackChart();}catch(e){} }
-  }
-  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
-  var n=0,t=setInterval(function(){killThr(); if(++n>=5)clearInterval(t);},800);
-})();
-
-
+<script id="chatgpt-daily-average-total-fix">
 /* ════════════════════════════════════════════════════════
    Final total/average fix — 최근 7일 성과 평균(일)+TOTAL 정렬
    - 평균(일) 행을 TOTAL 바로 위에 표시
@@ -10449,6 +10447,7 @@ function dbRenderScorecards(cur, prev) {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',rerender); else setTimeout(rerender,0);
 })();
 </script>
+<!-- ChatGPT final patch: dashboard chart/table comparison fixes -->
 
 
 
