@@ -10134,7 +10134,193 @@ function dbRenderScorecards(cur, prev) {
         setTimeout(function(){URL.revokeObjectURL(a.href);},1500);
         if(typeof showToast==="function") showToast("\u2705 \uC778\uD130\uB799\uD2F0\uBE0C HTML \uC800\uC7A5 \uC644\uB8CC");
       };
-      var build=function(srcHtml){ var idx=srcHtml.lastIndexOf("</body>"); if(idx<0){ var low=srcHtml.toLowerCase().lastIndexOf("</body>"); idx=low; } var out=(idx>=0)?(srcHtml.slice(0,idx)+inject+srcHtml.slice(idx)):(srcHtml+inject); dl(out); };
+      var build=function(srcHtml){ var idx=srcHtml.lastIndexOf("
+
+<script id="chatgpt-group-performance-final-fix">
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(v){
+    try{ if(typeof dbHtmlEscape==='function') return dbHtmlEscape(v); }catch(e){}
+    return String(v == null ? '' : v).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});
+  };
+  var num = function(v){
+    if(v == null || v === '') return 0;
+    if(typeof v === 'number') return isFinite(v) ? v : 0;
+    var n = Number(String(v).replace(/[,₩%\s]/g,''));
+    return isFinite(n) ? n : 0;
+  };
+  var first = function(obj, keys){
+    obj = obj || {};
+    for(var i=0;i<keys.length;i++){
+      var k = keys[i];
+      if(obj[k] != null && obj[k] !== '') return obj[k];
+    }
+    return '';
+  };
+  var campIdOf = function(c){
+    try{ if(typeof dbCampIdOf==='function') return String(dbCampIdOf(c)); }catch(e){}
+    return String(first(c,['id','campId','campaignId','nccCampaignId','campaign_id','campaignIdOfAdgroup','name','campNm','campaignName']));
+  };
+  var groupCampIdOf = function(g){
+    try{ if(typeof dbGroupCampIdOf==='function') return String(dbGroupCampIdOf(g)); }catch(e){}
+    return String(first(g,['campId','campaignId','nccCampaignId','campaign_id','campaignIdOfAdgroup']));
+  };
+  var typeOf = function(row, camp){
+    try{
+      if(row && row.campTp && typeof campTpLabel==='function') return campTpLabel(row.campTp);
+      if(camp && typeof dbTypeOfCamp==='function') return dbTypeOfCamp(camp);
+      if(camp && camp.campTp && typeof campTpLabel==='function') return campTpLabel(camp.campTp);
+    }catch(e){}
+    return first(row,['type','_type','campaignType','channel']) || first(camp||{},['type','_type','campaignType','channel']) || '기타';
+  };
+  var normalizeMetrics = function(row){
+    row = row || {};
+    var out = Object.assign({}, row);
+    out.cost = num(first(row,['cost','spend','expense','adCost','totalCost','amount']));
+    out.imp = num(first(row,['imp','impression','impressions','views','showCnt']));
+    out.click = num(first(row,['click','clicks','clk','clickCnt']));
+    out.conv = num(first(row,['conv','conversion','conversions','convCnt','totalConv','ccnt']));
+    out.purchaseCcnt = num(first(row,['purchaseCcnt','purchaseConvCnt','purchaseCount','purchaseCnt','salesCount'])) || out.purchaseCcnt || 0;
+    out.purchaseConvAmt = num(first(row,['purchaseConvAmt','purchaseRevenue','purchaseAmount','sales','salesAmt'])) || out.purchaseConvAmt || 0;
+    out.revenue = num(first(row,['revenue','sales','salesAmt','convAmt','totalSales','purchaseConvAmt'])) || out.purchaseConvAmt || 0;
+    return out;
+  };
+  function realGroupSources(data){
+    data = data || {};
+    var arr = [];
+    ['allGroups','allAdgroups','allAdGroups','adgroups','adGroups','groups','nccAdgroups','nccAdGroups'].forEach(function(k){
+      if(Array.isArray(data[k])) arr = arr.concat(data[k]);
+    });
+    (data.allCamps||[]).forEach(function(c){
+      ['allGroups','groups','adgroups','adGroups','children','nccAdgroups','nccAdGroups'].forEach(function(k){
+        if(Array.isArray(c[k])) arr = arr.concat(c[k].map(function(g){ return Object.assign({}, g, {campId:first(g,['campId','campaignId','nccCampaignId']) || campIdOf(c), campNm:first(g,['campNm','campaignName']) || first(c,['campNm','name','campaignName']), campTp:g.campTp || c.campTp, type:g.type || c.type}); }));
+      });
+    });
+    return arr;
+  }
+  function buildGroupRows(data){
+    data = data || {};
+    var camps = data.allCamps || [];
+    var campMap = {};
+    camps.forEach(function(c){ campMap[campIdOf(c)] = c; });
+    var raw = realGroupSources(data);
+    var rows = raw.map(function(g, idx){
+      var cid = groupCampIdOf(g);
+      var camp = campMap[cid] || camps.find(function(c){ return String(first(c,['campNm','name','campaignName'])) === String(first(g,['campNm','campaignName'])); }) || {};
+      var m = normalizeMetrics(g);
+      return Object.assign({}, g, m, {
+        id: first(g,['id','groupId','adgroupId','nccAdgroupId']) || ('group-'+idx),
+        groupId: first(g,['groupId','adgroupId','nccAdgroupId','id']) || ('group-'+idx),
+        groupNm: first(g,['groupNm','adgroupName','adGroupName','nccAdgroupName','name']) || '(광고그룹)',
+        name: first(g,['groupNm','adgroupName','adGroupName','nccAdgroupName','name']) || '(광고그룹)',
+        campId: cid || campIdOf(camp),
+        campaignId: cid || campIdOf(camp),
+        campNm: first(g,['campNm','campaignName']) || first(camp,['campNm','name','campaignName']) || '-',
+        campaignName: first(g,['campNm','campaignName']) || first(camp,['campNm','name','campaignName']) || '-',
+        campTp: g.campTp || camp.campTp,
+        _campId: cid || campIdOf(camp),
+        _campName: first(g,['campNm','campaignName']) || first(camp,['campNm','name','campaignName']) || '-',
+        _type: typeOf(g,camp)
+      });
+    }).filter(function(g){ return g.groupNm || g.name || num(g.cost)+num(g.imp)+num(g.click)+num(g.conv)+num(g.revenue) > 0; });
+
+    /* 실제 광고그룹 배열이 없는 데이터도 표가 비어 보이지 않도록 캠페인 단위 미분류 광고그룹으로 표시 */
+    if(!rows.length && camps.length){
+      rows = camps.map(function(c, idx){
+        var m = normalizeMetrics(c);
+        var cid = campIdOf(c);
+        return Object.assign({}, c, m, {
+          id:'fallback-group-'+idx,
+          groupId:'fallback-group-'+idx,
+          groupNm:'미분류 광고그룹',
+          name:'미분류 광고그룹',
+          campId:cid,
+          campaignId:cid,
+          campNm:first(c,['campNm','name','campaignName']) || '-',
+          campaignName:first(c,['campNm','name','campaignName']) || '-',
+          _campId:cid,
+          _campName:first(c,['campNm','name','campaignName']) || '-',
+          _type:typeOf(c,c),
+          __fallback:true
+        });
+      }).filter(function(g){ return num(g.cost)+num(g.imp)+num(g.click)+num(g.conv)+num(g.revenue) > 0; });
+    }
+    return rows;
+  }
+  window.dbGetGroups = function(data){ return buildGroupRows(data); };
+  window.dbFilteredGroups = function(data){
+    var rows = buildGroupRows(data);
+    try{ if(typeof dbSelectedType!=='undefined' && dbSelectedType) rows = rows.filter(function(g){ return g._type === dbSelectedType; }); }catch(e){}
+    try{ if(typeof dbSelectedCampId!=='undefined' && dbSelectedCampId) rows = rows.filter(function(g){ return String(g._campId) === String(dbSelectedCampId) || String(g._campName) === String(dbSelectedCampName||''); }); }catch(e){}
+    try{ if(typeof dbGroupSearch!=='undefined' && dbGroupSearch){ rows = rows.filter(function(g){ var text = String(g._campName||'') + ' ' + String(g.groupNm||g.name||''); return typeof dbApplyTermFilter==='function' ? dbApplyTermFilter(text.toLowerCase(), dbGroupSearch, dbGroupFMode) : text.toLowerCase().indexOf(String(dbGroupSearch).toLowerCase()) >= 0; }); } }catch(e){}
+    return rows;
+  };
+  function agg(row){
+    try{ if(typeof dbAggCamp==='function') return dbAggCamp(row||{}); }catch(e){}
+    var cost=num(row.cost), imp=num(row.imp), click=num(row.click), conv=num(row.conv), revenue=num(row.revenue), pc=num(row.purchaseCcnt), pr=num(row.purchaseConvAmt);
+    return {cost:cost,imp:imp,click:click,conv:conv,purchaseCcnt:pc,purchaseConvAmt:pr,revenue:revenue,cpc:click?Math.round(cost/click):0,ctr:imp?click/imp*100:0,cvr:click?conv/click*100:0,roas:cost?revenue/cost*100:0,cpa:conv?Math.round(cost/conv):0,aov:conv?Math.round(revenue/conv):0};
+  }
+  function val(row,k){ var a=agg(row); return num(a[k]); }
+  function fmt(k,v){ try{ if(typeof dbFmt==='function') return dbFmt(k,v); }catch(e){} return Math.round(num(v)).toLocaleString('ko-KR'); }
+  function label(k){ try{ if(typeof dbTblLabel==='function') return dbTblLabel(k); }catch(e){} var d=(window.METRIC_DEFS||[]).find(function(m){return m.key===k;}); return (d&&d.label)||k; }
+  function cols(){ try{ return (typeof dbVisibleTblCols==='function'?dbVisibleTblCols():[]).filter(function(c){return c&&c.key;}); }catch(e){ return []; } }
+  function rateOn(){ return window.__dbDiffRateOn !== false; }
+  function diffCls(k,d){ try{ if(typeof dbDiffClass==='function') return dbDiffClass(k,d); }catch(e){} return d>0?'up':(d<0?'dn':'neu'); }
+  function prevShare(row,k,rows){ var total = rows.reduce(function(s,r){ return s+val(r,k); },0); var prev = 0; try{ prev = val(window._dbPrev || _dbPrev || {}, k); }catch(e){} return total && prev ? val(row,k)/total*prev : 0; }
+  function metricCells(row, rows, cs, isSummary){
+    return cs.map(function(c){
+      var cv = val(row,c.key), html = '<td>'+fmt(c.key,cv)+'</td>';
+      if(rateOn()){
+        if(isSummary){ html += '<td class="db-diff-rate-td">-</td>'; }
+        else{
+          var pv = prevShare(row,c.key,rows), pct = pv ? (cv-pv)/Math.abs(pv)*100 : 0;
+          html += '<td class="db-diff-rate-td '+diffCls(c.key,cv-pv)+'">'+(pv ? ((pct>0?'+':'')+Math.round(pct).toLocaleString('ko-KR')+'%') : '-')+'</td>';
+        }
+      }
+      return html;
+    }).join('');
+  }
+  function sumRows(rows){
+    var out = {cost:0,imp:0,click:0,conv:0,purchaseCcnt:0,purchaseConvAmt:0,revenue:0};
+    (rows||[]).forEach(function(r){ var a=agg(r); Object.keys(out).forEach(function(k){ out[k]+=num(a[k]); }); });
+    return out;
+  }
+  function limitRows(rows){
+    var lim = 10;
+    try{ lim = Number(window.dbGroupRowLimit || dbGroupRowLimit || 10); }catch(e){}
+    return isFinite(lim) ? rows.slice(0, lim) : rows;
+  }
+  function renderGroup(data, periodLabel){
+    var tbl=$('db-group-tbl'), empty=$('db-group-empty'), per=$('db-group-period'), thead=$('db-group-thead-row'), tbody=$('db-group-body');
+    if(!tbl||!empty||!thead||!tbody) return;
+    if(per) per.textContent = periodLabel || '';
+    var all = window.dbFilteredGroups(data||{}).map(function(g){ return Object.assign({}, g, agg(g), {campName:g._campName||g.campNm||g.campaignName||'-', type:g._type||g.type||'', name:g.groupNm||g.name||'(광고그룹)'}); }).sort(function(a,b){ return val(b,'cost')-val(a,'cost'); });
+    var cs = cols();
+    thead.innerHTML = '<th>유형</th><th>캠페인</th><th>광고그룹</th>' + cs.map(function(c){ return '<th>'+esc(label(c.key))+'</th>' + (rateOn()?'<th class="db-diff-rate-th">증감률</th>':''); }).join('');
+    if(!all.length){ empty.style.display='flex'; tbl.style.display='none'; tbody.innerHTML=''; return; }
+    var rows = limitRows(all);
+    var html = rows.map(function(r){ return '<tr><td>'+esc(r.type)+'</td><td class="db-camp-ref" title="'+esc(r.campName)+'">'+esc(r.campName)+'</td><td title="'+esc(r.name)+'">'+esc(r.name)+'</td>'+metricCells(r,all,cs,false)+'</tr>'; }).join('');
+    html += '<tr class="db-total-row"><td>합계 (TOTAL)</td><td></td><td></td>'+metricCells(sumRows(all),all,cs,true)+'</tr>';
+    tbody.innerHTML = html;
+    empty.style.display='none'; tbl.style.display='table';
+    var chipTxt='';
+    try{ if(typeof dbSelectedCampName!=='undefined' && dbSelectedCampName) chipTxt='캠페인: '+dbSelectedCampName; else if(typeof dbSelectedType!=='undefined' && dbSelectedType) chipTxt='유형: '+dbSelectedType; else if(typeof dbGroupSearch!=='undefined' && dbGroupSearch) chipTxt='검색: '+dbGroupSearch; }catch(e){}
+    try{ if(typeof dbSetChip==='function') dbSetChip('db-group-filter-chip', chipTxt, !!chipTxt, (typeof dbSelectedCampName!=='undefined' && dbSelectedCampName) ? 'dbClearCampFilter' : 'dbClearTypeFilter'); }catch(e){}
+  }
+  window.dbRenderGroupTbl = renderGroup;
+  function rerender(){
+    try{
+      var raw = window._dbRawData || (typeof _dbRawData !== 'undefined' ? _dbRawData : null);
+      if(raw) renderGroup(raw, (window.dbPeriodMeta && dbPeriodMeta.curLabel) || '');
+    }catch(e){ console.warn('[group-performance-final-fix]', e); }
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(rerender,0); setTimeout(rerender,500); });
+  else { setTimeout(rerender,0); setTimeout(rerender,500); }
+})();
+</script>
+
+</body>"); if(idx<0){ var low=srcHtml.toLowerCase().lastIndexOf("</body>"); idx=low; } var out=(idx>=0)?(srcHtml.slice(0,idx)+inject+srcHtml.slice(idx)):(srcHtml+inject); dl(out); };
       fetch(location.href).then(function(r){return r.text();}).then(function(t){
         if(t && /<\/body>/i.test(t)) build(t); else build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML);
       }).catch(function(){ build("<!DOCTYPE html>\\n"+document.documentElement.outerHTML); });
