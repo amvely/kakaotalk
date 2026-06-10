@@ -8842,14 +8842,33 @@ function dbRenderScorecards(cur, prev) {
           <div class="db-wf-sum-val" style="color:${diffTotal>=0?'#34d399':'#fb7185'};">
             ${diffTotal>=0?'▲':'▼'}${Math.abs(diffPct).toFixed(1)}%&nbsp;(${diffTotal>=0?'+':''}${fmt(metricKey,diffTotal)})</div></div>`;
 
-      /* 워터폴 데이터 빌드 */
+      /* ── 워터폴 데이터 빌드
+         - origDiffs: 실제 diff 값(tooltip·label에 사용)
+         - MIN_BAR : 전체 범위의 2.5% — 수치가 0이거나 극소여도 막대가 보이게
+         - 음수 막대: float 아래로 당겨 막대 상단이 항상 running 위치에 닿도록
+         ── */
+      const totalRange=Math.max(Math.abs(compTotal),Math.abs(baseTotal))||1;
+      const MIN_BAR=totalRange*0.025;
+      const origDiffs=[]; /* ← tooltip·datalabel에서 실제 diff 읽을 배열 */
       const labels=[compLabel,...items.map(i=>i.name),baseLabel];
       const floatData=[0], barData=[compTotal], colors=['rgba(16,185,129,.92)'];
       let running=compTotal;
       items.forEach(it=>{
         const d=it.diff;
-        if(d>=0){ floatData.push(running); barData.push(d); colors.push('rgba(59,130,246,.94)'); }
-        else     { floatData.push(running+d); barData.push(-d); colors.push('rgba(239,68,68,.94)'); }
+        const absD=Math.abs(d);
+        const dispD=Math.max(MIN_BAR,absD); /* 최소 표시 높이 */
+        origDiffs.push(d);
+        if(d>=0){
+          /* 양수/0: float 그대로, 막대가 위로 */
+          floatData.push(running);
+          barData.push(dispD);
+          colors.push('rgba(59,130,246,.94)');
+        }else{
+          /* 음수: float를 아래로 조정해 막대 상단이 running에 딱 맞게 */
+          floatData.push(running+d-(dispD-absD));
+          barData.push(dispD);
+          colors.push('rgba(239,68,68,.94)');
+        }
         running+=d;
       });
       floatData.push(0); barData.push(baseTotal); colors.push('rgba(99,102,241,.94)');
@@ -8875,9 +8894,12 @@ function dbRenderScorecards(cur, prev) {
               callbacks:{label:ctx=>{
                 if(ctx.datasetIndex===0)return null;
                 const i=ctx.dataIndex;
-                if(i===0||i===labels.length-1) return fmt(metricKey,ctx.parsed.y);
-                const neg=String(colors[i]).includes('239,68,68');
-                return (neg?'-':'+')+fmt(metricKey,ctx.parsed.y);
+                /* 시작(비교기간)·끝(기준기간)은 절대값 표시 */
+                if(i===0) return fmt(metricKey,compTotal);
+                if(i===labels.length-1) return fmt(metricKey,baseTotal);
+                /* 중간 항목: origDiffs 의 실제 diff 표시 (dispD 아닌 실값) */
+                const origD=origDiffs[i-1];
+                return (origD>=0?'+':'')+fmt(metricKey,origD);
               }}
             },
             datalabels:{
@@ -8886,9 +8908,12 @@ function dbRenderScorecards(cur, prev) {
               formatter:(v,ctx)=>{
                 if(ctx.datasetIndex===0) return '';
                 const i=ctx.dataIndex;
-                if(i===0||i===labels.length-1) return fmt(metricKey,v);
-                const neg=String(colors[i]).includes('239,68,68');
-                return (neg?'-':'+')+fmt(metricKey,v);
+                /* 양 끝단 */
+                if(i===0) return fmt(metricKey,compTotal);
+                if(i===labels.length-1) return fmt(metricKey,baseTotal);
+                /* 중간: origDiffs 기준 — 0이어도 '+₩0' 표시 */
+                const origD=origDiffs[i-1];
+                return (origD>=0?'+':'')+fmt(metricKey,origD);
               }
             }
           },
@@ -10109,15 +10134,19 @@ function dbRenderScorecards(cur, prev) {
     + 'calls.forEach(function(c){try{if(typeof window[c[0]]==="function")window[c[0]].apply(null,c[1]);}catch(e){}});'
     + 'try{var s=document.getElementById("db-stack-camp-sel");if(s&&B.stackCamp){s.value=B.stackCamp;if(typeof dbRenderStackChart==="function")dbRenderStackChart();}}catch(e){}}'
     + 'function boot(){var B=window.__DB_EXPORT__;if(!B)return;rev(B.period);'
-    /* ── Bug fix: window.eval() 은 let-스코프 변수에 접근 불가 → window 프로퍼티 직접 할당으로 교체 ── */
-    + 'try{'
-    +   'window._dbRawData=B.raw;'
-    +   'window._dbCur=B.cur;'
-    +   'window._dbPrev=B.prev;'
-    +   'window.dbPurchaseBasedMode=!!B.purchase;'
-    +   'window.dbCurrentSaleType=B.sale||"sale";'
-    +   'window.dbPeriodMeta=B.period||null;'
-    + '}catch(e){}'
+    /* ─────────────────────────────────────────────────────────────────────
+       핵심 수정: 모든 script 블록은 같은 스코프를 공유하므로
+       let _dbRawData / _dbCur / _dbPrev 에 직접 대입해야 함.
+       window.eval()·window 프로퍼티만 설정하면 fullRefresh/bRaw/bCur 가
+       let 변수(=null)를 읽어 "데이터 없음"이 표시되는 원인이었음.
+       ───────────────────────────────────────────────────────────────────── */
+    + 'try{_dbRawData=B.raw;_dbCur=B.cur;_dbPrev=B.prev;}catch(e){}'
+    + 'try{if(typeof dbPeriodMeta!=="undefined")dbPeriodMeta=B.period||null;}catch(e){}'
+    + 'try{if(typeof dbPurchaseBasedMode!=="undefined")dbPurchaseBasedMode=!!B.purchase;}catch(e){}'
+    + 'try{if(typeof dbCurrentSaleType!=="undefined")dbCurrentSaleType=B.sale||"sale";}catch(e){}'
+    /* window 프로퍼티도 병행 설정 — window._dbRawData 패턴 사용 함수 대응 */
+    + 'window._dbRawData=B.raw;window._dbCur=B.cur;window._dbPrev=B.prev;'
+    + 'window.dbPurchaseBasedMode=!!B.purchase;window.dbCurrentSaleType=B.sale||"sale";window.dbPeriodMeta=B.period||null;'
     + 'try{if(typeof switchTab==="function")switchTab("dashboard");}catch(e){}'
     + 'hdr(B);render(B);isolate();setTimeout(function(){render(B);isolate();},250);setTimeout(function(){render(B);isolate();},700);setTimeout(isolate,1400);}'
     + 'if(document.readyState==="complete")setTimeout(boot,150);else window.addEventListener("load",function(){setTimeout(boot,150);});'
