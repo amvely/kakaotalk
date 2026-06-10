@@ -10109,8 +10109,15 @@ function dbRenderScorecards(cur, prev) {
     + 'calls.forEach(function(c){try{if(typeof window[c[0]]==="function")window[c[0]].apply(null,c[1]);}catch(e){}});'
     + 'try{var s=document.getElementById("db-stack-camp-sel");if(s&&B.stackCamp){s.value=B.stackCamp;if(typeof dbRenderStackChart==="function")dbRenderStackChart();}}catch(e){}}'
     + 'function boot(){var B=window.__DB_EXPORT__;if(!B)return;rev(B.period);'
-    + 'try{window.eval("_dbRawData=window.__DB_EXPORT__.raw;_dbCur=window.__DB_EXPORT__.cur;_dbPrev=window.__DB_EXPORT__.prev;dbPurchaseBasedMode=!!window.__DB_EXPORT__.purchase;dbCurrentSaleType=window.__DB_EXPORT__.sale||\\u0027sale\\u0027;");}catch(e){try{window._dbRawData=B.raw;}catch(e2){}}'
-    + 'try{if(B.period)window.eval("dbPeriodMeta=window.__DB_EXPORT__.period;");}catch(e){}'
+    /* ── Bug fix: window.eval() 은 let-스코프 변수에 접근 불가 → window 프로퍼티 직접 할당으로 교체 ── */
+    + 'try{'
+    +   'window._dbRawData=B.raw;'
+    +   'window._dbCur=B.cur;'
+    +   'window._dbPrev=B.prev;'
+    +   'window.dbPurchaseBasedMode=!!B.purchase;'
+    +   'window.dbCurrentSaleType=B.sale||"sale";'
+    +   'window.dbPeriodMeta=B.period||null;'
+    + '}catch(e){}'
     + 'try{if(typeof switchTab==="function")switchTab("dashboard");}catch(e){}'
     + 'hdr(B);render(B);isolate();setTimeout(function(){render(B);isolate();},250);setTimeout(function(){render(B);isolate();},700);setTimeout(isolate,1400);}'
     + 'if(document.readyState==="complete")setTimeout(boot,150);else window.addEventListener("load",function(){setTimeout(boot,150);});'
@@ -10149,7 +10156,11 @@ function dbRenderScorecards(cur, prev) {
       var build=function(srcHtml){
         var out=srcHtml;
         out=out.replace(/<body(\s[^>]*)?>/i,function(m,a){a=a||''; if(/class=["']/.test(a)){return '<body'+a.replace(/class=(["'])([^"']*)\1/i,function(_,q,c){return 'class='+q+(c.indexOf('db-report-html')>=0?c:(c+' db-report-html'))+q;})+'>'; } return '<body'+a+' class="db-report-html">';});
-        var hi=out.toLowerCase().lastIndexOf('</head>'); if(hi>=0) out=out.slice(0,hi)+headCss+out.slice(hi); else out=headCss+out;
+        /* ── Bug fix: lastIndexOf → indexOf
+           '</head>' 문자열이 JS 소스코드 안에도 존재하므로 lastIndexOf 사용 시
+           JS 코드 중간에 CSS가 삽입되어 스크립트 파싱 오류 → 렌더 함수 미등록 → 데이터 미출력
+           indexOf 사용 시 실제 </head> 태그(첫 번째 출현)에만 삽입됨 ── */
+        var hi=out.toLowerCase().indexOf('</head>'); if(hi>=0) out=out.slice(0,hi)+headCss+out.slice(hi); else out=headCss+out;
         var idx=out.toLowerCase().lastIndexOf('</body>'); out=(idx>=0)?(out.slice(0,idx)+inject+out.slice(idx)):(out+inject); dl(out);
       };
       fetch(location.href).then(function(r){return r.text();}).then(function(t){
