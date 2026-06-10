@@ -10127,7 +10127,11 @@ function dbRenderScorecards(cur, prev) {
     + 'function isolate(){var area=document.getElementById("db-capture-area");if(!area)return;var hdrEl=document.getElementById("db-export-header");var el=area;'
     + 'while(el&&el!==document.body){var par=el.parentElement;if(!par)break;[].forEach.call(par.children,function(s){if(s!==el&&s!==hdrEl&&s.id!=="db-export-boot"&&s.id!=="db-export-iso"){s.style.display="none";}});el.style.display="";el=par;}'
     + 'var td=document.getElementById("tab-dashboard");if(td){td.style.display="block";td.classList.add("active");}document.body.style.background="#08090c";}'
-    + 'function escT(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}'
+    /* ── 핵심 버그 수정: 기존 escT 의 "\""(큰따옴표 이스케이프)가 외부 문자열 연결 시
+       boot 스크립트 안에서 """ 로 깨져 SyntaxError → boot() 전체 미정의 → 데이터 미출력.
+       String.fromCharCode(34)=" 로 표현해 따옴표 충돌을 원천 제거. ── */
+    + 'var Q=String.fromCharCode(34);'
+    + 'function escT(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}).split(Q).join("&quot;");}'
     + 'function syncHead(B){try{var nm=(B.advName&&String(B.advName).trim())?B.advName:"업체명";var rt=document.getElementById("db-result-title");if(rt)rt.innerHTML="📊 <em style=\u0027color:var(--g);font-style:normal\u0027>"+escT(nm)+"</em> 광고 성과 데이터";var rp=document.getElementById("db-result-period");if(rp)rp.textContent=(B.period&&B.period.curLabel)||"";var rv=document.getElementById("db-result-prev");if(rv)rv.textContent=((B.period&&B.period.prevLabel)?"전기간: "+B.period.prevLabel:"");var thp=document.getElementById("db-th-prev");if(thp&&B.period&&B.period.prevLabel)thp.textContent=B.period.prevLabel;var thc=document.getElementById("db-th-cur");if(thc&&B.period&&B.period.curLabel)thc.textContent=B.period.curLabel;}catch(e){}}'
     + 'function render(B){var raw=B.raw,cur=B.cur,prev=B.prev,label=(B.period&&B.period.curLabel)||"";syncHead(B);'
     + 'var calls=[["dbRenderScorecards",[cur,prev]],["dbRenderCompareTable",[cur,prev]],["dbRenderTypeTbl",[raw,label]],["dbRenderCampTbl",[raw,label]],["dbRenderGroupTbl",[raw,label]],["dbRenderDailyTbl",[(raw&&(raw.recentDays||raw.days))||[]]],["dbRenderPivotHeatmap",[]],["dbRenderDailyTrend",[]],["dbRenderWaterfall",[]],["dbRenderRadar",[]],["dbRenderStackChart",[]],["dbRenderTrendLines",[]],["dbRenderMetricTrendCharts",[]]];'
