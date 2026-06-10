@@ -3085,10 +3085,26 @@ async function selectAdv(id){
   // toISOString()은 UTC 기준이므로 KST 00:00~08:59 사이에 하루 밀리는 버그 수정 → 로컬 시간 기반으로 변경
   const toISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
-  // 현재 활성 탭 기준으로 동작
-  const activeTab=[...document.querySelectorAll('.tab-btn')].find(b=>b.classList.contains('active'))?.textContent||'';
+  // 현재 활성 탭 기준으로 동작한다.
+  // 성과 대시보드에서 광고주를 선택한 경우에는 탭을 네이버 보고서로 이동시키지 않고,
+  // 현재 대시보드 기간 옵션 그대로 선택 광고주의 API 데이터를 불러온다.
+  const activeBtn=[...document.querySelectorAll('.tab-btn')].find(b=>b.classList.contains('active'));
+  const activeTab=activeBtn?.textContent||'';
+  const isDashboard=activeTab.includes('성과 대시보드') || document.getElementById('tab-dashboard')?.classList.contains('active');
   const goMeta  =activeTab.includes('메타')   && hasMeta(currentAdv);
   const goGoogle=activeTab.includes('구글')   && hasGoogle(currentAdv);
+
+  if(isDashboard){
+    dbSyncPeriodButtons();
+    if(hasNaver(currentAdv)){
+      await dbLoad();
+    } else {
+      showToast('❌ 선택한 광고주에 네이버 API 정보가 없습니다');
+      const empty=document.getElementById('db-compare-body');
+      if(empty) empty.innerHTML='<tr><td colspan="99" style="text-align:center;color:var(--text3);padding:24px">선택한 광고주에 네이버 API 정보가 없습니다.</td></tr>';
+    }
+    return;
+  }
 
   if(goGoogle){
     googlePeriod='D1'; googleCustomRange=null;
@@ -3099,6 +3115,7 @@ async function selectAdv(id){
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.getElementById('tab-google')?.classList.add('active');
     [...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.includes('구글'))?.classList.add('active');
+    const sel=document.getElementById('tab-mobile-sel'); if(sel) sel.value='google';
     syncGooglePeriodButtons();
     await googleFetchAndPreview();
   } else if(goMeta){
@@ -3110,7 +3127,7 @@ async function selectAdv(id){
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.getElementById('tab-meta')?.classList.add('active');
     [...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.includes('메타'))?.classList.add('active');
-    
+    const sel=document.getElementById('tab-mobile-sel'); if(sel) sel.value='meta';
     syncMetaPeriodButtons();
     await metaFetchAndPreview();
   } else {
@@ -3124,6 +3141,7 @@ async function selectAdv(id){
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.getElementById('tab-kakao')?.classList.add('active');
     [...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.includes('네이버'))?.classList.add('active');
+    const sel=document.getElementById('tab-mobile-sel'); if(sel) sel.value='kakao';
     syncKakaoPeriodButtons();
     await loadKakaoData();
   }
@@ -5684,7 +5702,7 @@ function dbRenderMetricToggles() {
 function dbToggleMetric(key, el) {
   if (dbSelectedMetrics.has(key)) { dbSelectedMetrics.delete(key); el.classList.remove('on'); }
   else { dbSelectedMetrics.add(key); el.classList.add('on'); }
-  dbRefreshCompareTable();
+  dbRefreshAllViews();
 }
 
 function dbSetAllMetrics(val) {
@@ -5692,7 +5710,7 @@ function dbSetAllMetrics(val) {
   if (val) visible.forEach(m => dbSelectedMetrics.add(m.key));
   else visible.forEach(m => dbSelectedMetrics.delete(m.key));
   dbRenderMetricToggles();
-  dbRefreshCompareTable();
+  dbRefreshAllViews();
 }
 
 
@@ -6013,7 +6031,7 @@ const DB_TBL_COLS = METRIC_DEFS.map(m => ({
 function dbVisibleTblCols() {
   return DB_TBL_COLS.filter(c => {
     const def = METRIC_DEFS.find(m => m.key === c.key);
-    return def && def[dbCurrentSaleType];
+    return def && def[dbCurrentSaleType] && (!dbSelectedMetrics || dbSelectedMetrics.has(c.key));
   });
 }
 
@@ -10133,7 +10151,7 @@ function dbRenderScorecards(cur, prev) {
     if(!items.length) return;
     /* 지표: 구매기준 ON→5개(…전환수(구매)/매출액(구매)), OFF→4개 */
     var metrics=dbPurchaseBasedMode
-      ? [{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'purchaseCcnt',label:'전환수(구매)'},{key:'purchaseConvAmt',label:'매출액(구매)'}]
+      ? [{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'purchaseCcnt',label:'전환수(구매)'},{key:'purchaseConvAmt',label:'매출액(구매)'}]
       : [{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'conv',label:'전환수'}];
     var totals={}; metrics.forEach(function(m){ totals[m.key]=items.reduce(function(s,it){return s+(+it[m.key]||0);},0)||1; });
     var COLORS=window.DB_STACK_COLORS||['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#eab308','#d946ef','#10b981','#fb7185','#38bdf8','#c084fc','#4ade80'];
@@ -10202,10 +10220,12 @@ function dbRenderScorecards(cur, prev) {
     + 'try{if(typeof dbPeriodMeta!=="undefined")dbPeriodMeta=B.period||null;}catch(e){}'
     + 'try{if(typeof dbPurchaseBasedMode!=="undefined")dbPurchaseBasedMode=!!B.purchase;}catch(e){}'
     + 'try{if(typeof dbCurrentSaleType!=="undefined")dbCurrentSaleType=B.sale||"sale";}catch(e){}'
+    + 'try{if(B.metrics&&B.metrics.length&&typeof dbSelectedMetrics!=="undefined")dbSelectedMetrics=new Set(B.metrics);}catch(e){}'
     /* window 프로퍼티도 병행 설정 — window._dbRawData 패턴 사용 함수 대응 */
     + 'window._dbRawData=B.raw;window._dbCur=B.cur;window._dbPrev=B.prev;'
-    + 'window.dbPurchaseBasedMode=!!B.purchase;window.dbCurrentSaleType=B.sale||"sale";window.dbPeriodMeta=B.period||null;'
-    + 'try{if(typeof switchTab==="function")switchTab("dashboard");}catch(e){}'
+    + 'window.dbPurchaseBasedMode=!!B.purchase;window.dbCurrentSaleType=B.sale||"sale";window.dbPeriodMeta=B.period||null;window.dbSelectedMetrics=B.metrics||[];'
+    + 'try{document.querySelectorAll(".tab-panel").forEach(function(p){p.classList.remove("active");});var td=document.getElementById("tab-dashboard");if(td){td.classList.add("active");td.style.display="block";}}catch(e){}'
+    + 'try{if(typeof dbSyncPurchaseSwitch==="function")dbSyncPurchaseSwitch();if(typeof dbRenderMetricToggles==="function")dbRenderMetricToggles();if(typeof dbInitPivotMetricOptions==="function")dbInitPivotMetricOptions();}catch(e){}'
     + 'hdr(B);render(B);isolate();setTimeout(function(){render(B);isolate();},250);setTimeout(function(){render(B);isolate();},700);setTimeout(isolate,1400);}'
     + 'if(document.readyState==="complete")setTimeout(boot,150);else window.addEventListener("load",function(){setTimeout(boot,150);});'
     + '})();<\/scr'+'ipt>';
@@ -10220,6 +10240,7 @@ function dbRenderScorecards(cur, prev) {
         prev:(typeof _dbPrev!=="undefined")?_dbPrev:null,
         purchase:(typeof dbPurchaseBasedMode!=="undefined")?!!dbPurchaseBasedMode:false,
         sale:(typeof dbCurrentSaleType!=="undefined")?dbCurrentSaleType:"sale",
+        metrics:(typeof dbSelectedMetrics!=="undefined"&&dbSelectedMetrics)?Array.from(dbSelectedMetrics):[],
         period:pm?{curS:pm.curS,curE:pm.curE,prevS:pm.prevS,prevE:pm.prevE,label:pm.label,curLabel:pm.curLabel,prevLabel:pm.prevLabel}:null,
         advName:(typeof dbDashboardAdvName==="function"?dbDashboardAdvName():(adv.name||"업체명")),
         stackCamp:(document.getElementById("db-stack-camp-sel")||{}).value||""
@@ -10302,6 +10323,7 @@ function dbRenderScorecards(cur, prev) {
   };
   function setVal(id,v){var el=$(id); if(el&&v!=null){el.value=v; el.dispatchEvent(new Event('change',{bubbles:true}));}}
   window.dbLoadDashboardOptions=function(){
+    if(window.__DB_EXPORT__) return;
     var k=advKey(); if(!k) return; lastKey=k;
     var opt=read()[k]; if(!opt) return;
     restoring=true;
@@ -10734,6 +10756,126 @@ function dbRenderScorecards(cur, prev) {
     };
     if(typeof renderWhenChart==='function') renderWhenChart(run); else run();
   };
+})();
+</script>
+
+<script id="gpt-final-stack-waterfall-fix">
+(function(){
+  'use strict';
+  function $(id){return document.getElementById(id);} 
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function num(v){v=Number(v);return isFinite(v)?v:0;}
+  function getRaw(){try{return window._dbRawData || (typeof _dbRawData!=='undefined'?_dbRawData:null) || null;}catch(e){return window._dbRawData||null;}}
+  function getPrevRaw(raw){try{return (raw&&raw.prevRawData)||window._dbPrevRawData||(typeof _dbPrevRawData!=='undefined'?_dbPrevRawData:null)||{};}catch(e){return (raw&&raw.prevRawData)||window._dbPrevRawData||{};}}
+  function getCur(){try{return window._dbCur || (typeof _dbCur!=='undefined'?_dbCur:null) || null;}catch(e){return window._dbCur||null;}}
+  function getPrev(){try{return window._dbPrev || (typeof _dbPrev!=='undefined'?_dbPrev:null) || null;}catch(e){return window._dbPrev||null;}}
+  function isPurchase(){try{return !!(typeof dbPurchaseBasedMode!=='undefined'?dbPurchaseBasedMode:window.dbPurchaseBasedMode);}catch(e){return !!window.dbPurchaseBasedMode;}}
+  function fmt(key,val){try{if(typeof window.fmt==='function')return window.fmt(key,val);}catch(e){} try{if(typeof fmt==='function')return fmt(key,val);}catch(e){} var n=num(val); if(['ctr','cvr','roas'].indexOf(key)>=0)return n.toFixed(1)+'%'; if(['cost','revenue','purchaseConvAmt'].indexOf(key)>=0)return Math.round(n).toLocaleString('ko-KR')+'원'; return Math.round(n).toLocaleString('ko-KR');}
+  function label(key){try{if(typeof window.label==='function')return window.label(key);}catch(e){} var L={cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',revenue:'매출액',purchaseCcnt:'전환수(구매)',purchaseConvAmt:'매출액(구매)',cart:'장바구니',ctr:'CTR',cvr:'CVR',roas:'ROAS',cpc:'CPC',cpa:'CPA',aov:'객단가'};return L[key]||key;}
+  function hasRows(raw){return !!(raw&&(((raw.allCamps||[]).length)||((raw.allGroups||[]).length)||((raw.days||raw.recentDays||[]).length)));}
+  function hideChart(cardId, chartName){var card=$(cardId); if(card)card.style.display='none'; if(chartName&&window[chartName]){try{window[chartName].destroy();}catch(e){} window[chartName]=null;} var c=card&&card.querySelector('canvas'); if(c){c.style.height=''; var w=c.parentElement;if(w)w.style.height='';}}
+  function rawVal(row,key){row=row||{}; if(key==='purchaseCcnt')return num(row.purchaseCcnt!=null?row.purchaseCcnt:(row.purchaseConv||row.purchaseCnt)); if(key==='purchaseConvAmt')return num(row.purchaseConvAmt!=null?row.purchaseConvAmt:(row.purchaseRevenue||row.purchaseAmt)); if(key==='revenue')return num(row.revenue!=null?row.revenue:(row.convAmt||row.sales||row.salesAmt)); return num(row[key]);}
+  function rowName(row,dim){row=row||{}; if(dim==='adgroup')return row.groupNm||row.adgroupName||row.nccAdgroupName||row.name||'미분류'; if(dim==='media')return row.media||row.channel||row.type||row.network||'네이버'; return row.campNm||row.campaignName||row.campName||row.name||'미분류';}
+  function rowKey(row,dim){row=row||{}; if(dim==='adgroup')return 'g:'+String(row.groupId||row.adgroupId||row.nccAdgroupId||row.id||row.groupNm||row.name||'미분류'); if(dim==='media')return 'm:'+String(row.media||row.channel||row.type||row.network||'네이버'); return 'c:'+String(row.campId||row.campaignId||row.nccCampaignId||row.id||row.campNm||row.campaignName||row.campName||row.name||'미분류');}
+  function rows(raw,dim){raw=raw||{}; if(dim==='adgroup')return raw.allGroups||[]; if(dim==='media')return raw.allMedia||raw.mediaRows||raw.allCamps||[]; return raw.allCamps||[];}
+  function syncStackSelectOptions(sel,camps){if(!sel)return; var old=sel.value; sel.innerHTML='<option value="">전체 캠페인</option>'+camps.map(function(c){var id=String(c.campId||c.id||c.campaignId||c.campNm||c.name||''); return '<option value="'+esc(id)+'">'+esc(c.campNm||c.name||'(캠페인)')+'</option>';}).join(''); sel.value=old||''; if(sel.value!==old)sel.value='';}
+
+  window.dbRenderStackChart=function(){
+    var card=$('db-stack-card'), raw=getRaw();
+    if(!card || !hasRows(raw)){hideChart('db-stack-card','__dbStackChart');return;}
+    var allCamps=(raw.allCamps||[]).filter(function(c){return rawVal(c,'imp')>0 || rawVal(c,'cost')>0 || rawVal(c,'click')>0 || rawVal(c,'conv')>0 || rawVal(c,'purchaseCcnt')>0 || rawVal(c,'purchaseConvAmt')>0;});
+    if(!allCamps.length){hideChart('db-stack-card','__dbStackChart');return;}
+    card.style.display='block';
+    var dim=$('db-stack-dim'); if(dim)dim.style.display='none';
+    var lim=$('db-stack-limit'); if(lim)lim.style.display='none';
+    var sel=$('db-stack-camp-sel');
+    if(!sel){var hd=card.querySelector('.db-tbl-hd'); if(hd){var box=hd.lastElementChild||hd; sel=document.createElement('select'); sel.id='db-stack-camp-sel'; sel.setAttribute('onchange','dbRenderStackChart();try{dbSaveDashboardOptions&&dbSaveDashboardOptions();}catch(e){}'); sel.style.cssText='background:#1a2535;border:1px solid #2b374b;color:#e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;min-width:130px;'; box.appendChild(sel);}}
+    syncStackSelectOptions(sel,allCamps);
+    var selVal=sel?sel.value:'';
+    var items=[];
+    if(selVal){
+      var c=allCamps.filter(function(x){return String(x.campId||x.id||x.campaignId||x.campNm||x.name||'')===selVal;})[0];
+      var groups=raw.allGroups||[];
+      items=groups.filter(function(g){return c&&(String(g.campId||g.campaignId||'')===String(c.campId||c.id||c.campaignId||'') || (g.campNm&&g.campNm===(c.campNm||c.name)));})
+        .map(function(g){return {name:rowName(g,'adgroup'),cost:rawVal(g,'cost'),imp:rawVal(g,'imp'),click:rawVal(g,'click'),conv:rawVal(g,'conv'),purchaseCcnt:rawVal(g,'purchaseCcnt'),purchaseConvAmt:rawVal(g,'purchaseConvAmt')};});
+    }else{
+      items=allCamps.map(function(c){return {name:rowName(c,'campaign'),cost:rawVal(c,'cost'),imp:rawVal(c,'imp'),click:rawVal(c,'click'),conv:rawVal(c,'conv'),purchaseCcnt:rawVal(c,'purchaseCcnt'),purchaseConvAmt:rawVal(c,'purchaseConvAmt')};});
+    }
+    items=items.filter(function(it){return it.cost||it.imp||it.click||it.conv||it.purchaseCcnt||it.purchaseConvAmt;}).sort(function(a,b){return (b.cost||0)-(a.cost||0);});
+    if(!items.length){hideChart('db-stack-card','__dbStackChart');return;}
+    var metrics=isPurchase()
+      ? [{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'purchaseCcnt',label:'전환수(구매)'},{key:'purchaseConvAmt',label:'매출액(구매)'}]
+      : [{key:'cost',label:'광고비'},{key:'imp',label:'노출수'},{key:'click',label:'클릭수'},{key:'conv',label:'전환수'}];
+    var totals={}; metrics.forEach(function(m){totals[m.key]=items.reduce(function(s,it){return s+num(it[m.key]);},0);});
+    metrics=metrics.filter(function(m){return totals[m.key]>0;});
+    if(!metrics.length){hideChart('db-stack-card','__dbStackChart');return;}
+    totals={}; metrics.forEach(function(m){totals[m.key]=items.reduce(function(s,it){return s+num(it[m.key]);},0)||1;});
+    if(!window.Chart)return;
+    try{if(window.ChartDataLabels && !Chart.registry.plugins.get('datalabels'))Chart.register(ChartDataLabels);}catch(e){}
+    var COLORS=window.DB_STACK_COLORS||['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#eab308','#d946ef','#10b981','#fb7185','#38bdf8','#c084fc','#4ade80'];
+    var datasets=items.map(function(it,i){return {label:it.name,data:metrics.map(function(m){return num(it[m.key])/totals[m.key]*100;}),rawValues:metrics.map(function(m){return num(it[m.key]);}),backgroundColor:COLORS[i%COLORS.length],originalColor:COLORS[i%COLORS.length],borderColor:'#10141d',borderWidth:1};});
+    var canvas=$('db-stack-canvas'); if(!canvas)return;
+    var wrap=canvas.parentElement; if(wrap){wrap.style.position='relative';wrap.style.height=(metrics.length*52+62)+'px';wrap.style.minHeight='0';}
+    canvas.removeAttribute('width'); canvas.removeAttribute('height'); canvas.style.cssText='width:100%;height:100%;display:block;';
+    if(window.__dbStackChart){try{window.__dbStackChart.destroy();}catch(e){}}
+    var hi=null;
+    function setHi(chart,txt){hi=hi===txt?null:txt;chart.data.datasets.forEach(function(ds){ds.backgroundColor=(!hi||ds.label===hi)?ds.originalColor:'rgba(71,85,105,.34)';});chart.update();}
+    window.__dbStackChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels:metrics.map(function(m){return m.label;}),datasets:datasets},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:true},onClick:function(e,els,chart){if(els.length)setHi(chart,chart.data.datasets[els[0].datasetIndex].label);},plugins:{legend:{position:'top',labels:{boxWidth:12,color:'#e2e8f0',font:{size:10,weight:'800'}},onClick:function(e,item,legend){setHi(legend.chart,item.text);}},tooltip:{backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:function(ctx){var m=metrics[ctx.dataIndex];return ctx.dataset.label+': '+ctx.parsed.x.toFixed(1)+'% ('+fmt(m.key,ctx.dataset.rawValues[ctx.dataIndex])+')';}}},datalabels:{display:function(ctx){return ctx.dataset.data[ctx.dataIndex]>=4;},formatter:function(v){return v.toFixed(0)+'%';},color:'#fff',font:{size:10,weight:'800'}}},scales:{x:{stacked:true,min:0,max:100,grid:{color:'rgba(203,213,225,.14)'},ticks:{color:'#dbeafe',font:{weight:'700'},callback:function(v){return v+'%';}}},y:{stacked:true,grid:{display:false},ticks:{color:'#f8fafc',font:{weight:'700'}}}}}});
+  };
+
+  window.dbRenderWaterfall=function(){
+    var run=function(){
+      var card=$('db-waterfall-card'), raw=getRaw(), cur=getCur(), prev=getPrev();
+      if(!card || !window.Chart || !hasRows(raw) || !cur || !prev){hideChart('db-waterfall-card','__dbWaterfallChart');return;}
+      try{if(typeof ensureTopControls==='function')ensureTopControls();}catch(e){}
+      try{if(window.ChartDataLabels && !Chart.registry.plugins.get('datalabels'))Chart.register(ChartDataLabels);}catch(e){}
+      var metricKey=($('db-wf-metric')&&$('db-wf-metric').value)||'cost';
+      var dim=($('db-wf-dim')&&$('db-wf-dim').value)||'campaign';
+      var count=Number(($('db-wf-count-val')&&$('db-wf-count-val').textContent)||12)||12;
+      var prevRaw=getPrevRaw(raw); if(!hasRows(prevRaw)&&raw.prevAllCamps){prevRaw=Object.assign({},prevRaw,{allCamps:raw.prevAllCamps||[],allGroups:raw.prevAllGroups||[]});}
+      var curRows=rows(raw,dim), prevRows=rows(prevRaw,dim);
+      var baseTotal=rawVal(cur,metricKey), compTotal=rawVal(prev,metricKey);
+      if(!curRows.length && !prevRows.length && !baseTotal && !compTotal){hideChart('db-waterfall-card','__dbWaterfallChart');return;}
+      var map={};
+      function add(row,side){var k=rowKey(row,dim), n=rowName(row,dim); if(!map[k])map[k]={name:n,cur:0,prev:0}; map[k][side]+=rawVal(row,metricKey);}
+      curRows.forEach(function(r){add(r,'cur');}); prevRows.forEach(function(r){add(r,'prev');});
+      var items=Object.keys(map).map(function(k){var it=map[k]; it.diff=it.cur-it.prev; return it;})
+        .filter(function(it){return Math.abs(it.diff)>0.000001;})
+        .sort(function(a,b){return Math.abs(b.diff)-Math.abs(a.diff);}).slice(0,count);
+      var diffTotal=baseTotal-compTotal;
+      if(!items.length){
+        if(Math.abs(diffTotal)>0.000001) items=[{name:'기타/미분류',cur:baseTotal,prev:compTotal,diff:diffTotal}];
+        else {hideChart('db-waterfall-card','__dbWaterfallChart');return;}
+      }
+      card.style.display='block';
+      var compLabel=(window.dbPeriodMeta&&dbPeriodMeta.prevLabel)||'이전기간', baseLabel=(window.dbPeriodMeta&&dbPeriodMeta.curLabel)||'조회기간';
+      var diffPct=compTotal?diffTotal/Math.abs(compTotal)*100:0;
+      var sum=$('db-wf-summary');
+      if(sum)sum.innerHTML='<div class="db-wf-sum-card"><div class="db-wf-sum-label">비교 · '+esc(compLabel)+'</div><div class="db-wf-sum-val">'+fmt(metricKey,compTotal)+'</div></div><div class="db-wf-sum-arrow">→</div><div class="db-wf-sum-card"><div class="db-wf-sum-label">기준 · '+esc(baseLabel)+'</div><div class="db-wf-sum-val" style="color:#fff;">'+fmt(metricKey,baseTotal)+'</div></div><div class="db-wf-sum-card" style="border-color:'+(diffTotal>=0?'rgba(52,211,153,.45)':'rgba(248,113,113,.45)')+';"><div class="db-wf-sum-label">증감</div><div class="db-wf-sum-val" style="color:'+(diffTotal>=0?'#34d399':'#fb7185')+';">'+(diffTotal>=0?'▲':'▼')+Math.abs(diffPct).toFixed(1)+'%&nbsp;('+(diffTotal>=0?'+':'')+fmt(metricKey,diffTotal)+')</div></div>';
+      var labels=[compLabel].concat(items.map(function(i){return i.name;}),[baseLabel]);
+      var floatData=[0], barData=[compTotal], colors=['rgba(16,185,129,.92)'], diffs=[], running=compTotal;
+      items.forEach(function(it){var d=it.diff; diffs.push(d); if(d>=0){floatData.push(running);barData.push(d);colors.push('rgba(59,130,246,.94)');}else{floatData.push(running+d);barData.push(-d);colors.push('rgba(239,68,68,.94)');} running+=d;});
+      floatData.push(0); barData.push(baseTotal); colors.push('rgba(99,102,241,.94)');
+      var canvas=$('db-wf-canvas'); if(!canvas)return; var wrap=canvas.parentElement; if(wrap){wrap.style.position='relative';wrap.style.height='320px';wrap.style.minHeight='0';}
+      canvas.removeAttribute('width'); canvas.removeAttribute('height'); canvas.style.cssText='width:100%;height:100%;display:block;';
+      if(window.__dbWaterfallChart){try{window.__dbWaterfallChart.destroy();}catch(e){}}
+      window.__dbWaterfallChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels:labels,datasets:[{data:floatData,backgroundColor:'rgba(0,0,0,0)',borderWidth:0,stack:'wf',datalabels:{display:false}},{data:barData,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:5,stack:'wf'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:80,interaction:{mode:'nearest',intersect:false},plugins:{title:{display:true,text:'선택 지표: '+label(metricKey),color:'#eaf1fb',font:{size:13,weight:'900'},padding:{top:2,bottom:10}},legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:function(ctx){if(ctx.datasetIndex===0)return null;var i=ctx.dataIndex;if(i===0)return fmt(metricKey,compTotal);if(i===labels.length-1)return fmt(metricKey,baseTotal);var d=diffs[i-1];return (d>=0?'+':'')+fmt(metricKey,d);}}},datalabels:{display:true,anchor:'end',align:'end',offset:3,color:'#e0f2fe',font:{size:9,weight:'500'},formatter:function(val,ctx){if(ctx.datasetIndex===0)return '';var i=ctx.dataIndex;if(i===0)return fmt(metricKey,compTotal);if(i===labels.length-1)return fmt(metricKey,baseTotal);var d=diffs[i-1];return (d>=0?'+':'')+fmt(metricKey,d);}}},scales:{x:{stacked:true,grid:{display:false,drawBorder:false},ticks:{color:'#e2e8f0',font:{size:9.5,weight:'500'},maxRotation:20,minRotation:0,autoSkip:false}},y:{stacked:true,beginAtZero:true,grace:'30%',grid:{display:false,drawBorder:false},ticks:{display:false}}}}});
+    };
+    if(typeof window.renderWhenChart==='function')window.renderWhenChart(run);else run();
+  };
+
+  var oldLoad=window.dbLoad;
+  if(typeof oldLoad==='function' && !oldLoad.__gptFinalNoDataPatch){
+    window.dbLoad=async function(){
+      var r;
+      try{r=await oldLoad.apply(this,arguments);}finally{
+        setTimeout(function(){var raw=getRaw(); if(!hasRows(raw)){hideChart('db-waterfall-card','__dbWaterfallChart');hideChart('db-stack-card','__dbStackChart');}},120);
+      }
+      return r;
+    };
+    window.dbLoad.__gptFinalNoDataPatch=true;
+  }
+  document.addEventListener('change',function(e){if(e.target&&e.target.id==='db-stack-camp-sel'){try{window.dbRenderStackChart();}catch(_){}}},true);
 })();
 </script>
 </body>
