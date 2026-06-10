@@ -5644,8 +5644,8 @@ function dbSetAllMetrics(val) {
 
 
 // ── 대시보드 데이터/필터/다운로드/AI 확장 ──
-const DB_SAMPLE_ADV = { id:'sample-dashboard', name:'업체명', emoji:'📊', cat:'', naver:{cid:'sample'} };
-function dbActiveAdv(){ return currentAdv || DB_SAMPLE_ADV; }
+const DB_SAMPLE_ADV = null;
+function dbActiveAdv(){ return (typeof currentAdv!=='undefined' && currentAdv) ? currentAdv : null; }
 function dbDashboardAdvName(){
   try{
     const adv = (typeof dbActiveAdv==='function' ? dbActiveAdv() : null) || currentAdv || {};
@@ -10437,7 +10437,6 @@ function dbRenderScorecards(cur, prev) {
     if(canApi && typeof fetchNaverData==='function'){
       return await fetchNaverData(adv, dkey(ps), dkey(pe));
     }
-    if(typeof dbBuildSampleData==='function') return dbBuildSampleData(ps,pe);
     return null;
   }
 
@@ -10462,12 +10461,12 @@ function dbRenderScorecards(cur, prev) {
         var canUseApi=false; try{canUseApi=!!(window.currentAdv && hasNaver(window.currentAdv));}catch(e){}
         if(canUseApi && typeof fetchNaverData==='function'){
           curData = await fetchNaverData(window.currentAdv, dkey(curS), dkey(curE));
-        }else if(typeof dbBuildSampleData==='function'){
-          curData = dbBuildSampleData(curS,curE);
+        }else{
+          throw new Error('선택한 광고주의 네이버 API 정보(Customer ID / 라이선스 키)를 확인해주세요.');
         }
-        if(!curData || !(((curData.allCamps||[]).length) || ((curData.days||[]).length))) curData = (typeof dbBuildSampleData==='function') ? dbBuildSampleData(curS,curE) : {days:[],allCamps:[],allGroups:[]};
+        if(!curData || !(((curData.allCamps||[]).length) || ((curData.days||[]).length))) throw new Error('API에서 조회기간 데이터가 없습니다.');
         try{ prevData = await loadPrevRawForDashboard(window.currentAdv||adv, meta); }catch(e){ console.warn('[prev waterfall] prev raw load failed:', e); }
-        if(!prevData && typeof dbBuildSampleData==='function') prevData=dbBuildSampleData(meta.ps||meta.prevS||curS, meta.pe||meta.prevE||curE);
+        if(!prevData) prevData={days:[],allCamps:[],allGroups:[]};
         var cur=(curData.curAgg)||aggDays(curData.days||[]);
         var prev=(prevData && (prevData.curAgg||aggDays(prevData.days||[]))) || curData.prevAgg || aggDays([]);
         _dbCur=cur; _dbPrev=prev; _dbRawData=curData; window._dbPrevRawData=prevData; window._dbRawData=curData; window._dbCur=cur; window._dbPrev=prev;
@@ -10594,7 +10593,7 @@ function dbRenderScorecards(cur, prev) {
   function esc2(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 
   window.dbLoad = async function(){
-    var adv = (typeof dbActiveAdv==='function') ? dbActiveAdv() : (window.currentAdv||null);
+    var adv = (typeof currentAdv!=='undefined' && currentAdv) ? currentAdv : (window.currentAdv||null);
     if(typeof showLoading==='function') showLoading();
     try{
       dbPeriodMeta = getPeriodDates(dbPeriod, dbCustomRange);
@@ -10602,25 +10601,21 @@ function dbRenderScorecards(cur, prev) {
       var curLabel=dbPeriodMeta.curLabel, prevLabel=dbPeriodMeta.prevLabel;
       var iso=function(d){return d.getFullYear()+'-'+P(d.getMonth()+1)+'-'+P(d.getDate());};
       var si=$('db-start'), ei=$('db-end'); if(si) si.value=iso(curS); if(ei) ei.value=iso(curE);
-      var titleEl=$('db-adv-title'); if(titleEl&&adv) titleEl.innerHTML=(adv.emoji||'📊')+' <strong>'+esc2((typeof dbDashboardAdvName==='function'?dbDashboardAdvName():adv.name||''))+'</strong> 광고 성과 데이터';
+      var titleEl=$('db-adv-title'); if(!adv) throw new Error('광고주를 먼저 선택해주세요.');
+      if(titleEl&&adv) titleEl.innerHTML=(adv.emoji||'📊')+' <strong>'+esc2((typeof dbDashboardAdvName==='function'?dbDashboardAdvName():adv.name||''))+'</strong> 광고 성과 데이터';
       var rt=$('db-result-title'), rp=$('db-result-period'), rv=$('db-result-prev');
       if(rt && typeof dbDashboardTitleHtml==='function') rt.innerHTML=dbDashboardTitleHtml();
       if(rp) rp.textContent=curLabel||''; if(rv) rv.textContent='전기간: '+(prevLabel||'');
       var thP=$('db-th-prev'), thC=$('db-th-cur'); if(thP) thP.textContent=prevLabel||'이전기간'; if(thC) thC.textContent=curLabel||'조회기간';
 
       var curData, prevData;
-      var canUseApi = !!(window.currentAdv && typeof hasNaver==='function' && hasNaver(window.currentAdv) && typeof fetchNaverData==='function');
-      if(canUseApi){
-        curData = await fetchNaverData(window.currentAdv, ymd2(curS), ymd2(curE));
-        prevData = await fetchNaverData(window.currentAdv, ymd2(ps), ymd2(pe));
-      }else{
-        curData = (typeof dbBuildSampleData==='function') ? dbBuildSampleData(curS,curE) : {};
-        prevData = (typeof dbBuildSampleData==='function') ? dbBuildSampleData(ps,pe) : {};
-      }
+      var apiAdv = (typeof currentAdv!=='undefined' && currentAdv) ? currentAdv : adv;
+      var canUseApi = !!(apiAdv && typeof hasNaver==='function' && hasNaver(apiAdv) && typeof fetchNaverData==='function');
+      if(!canUseApi) throw new Error('선택한 광고주의 네이버 API 정보(Customer ID / 라이선스 키)를 확인해주세요.');
+      curData = await fetchNaverData(apiAdv, ymd2(curS), ymd2(curE));
+      prevData = await fetchNaverData(apiAdv, ymd2(ps), ymd2(pe));
       if(!hasRows(curData) && !hasRows(prevData)){
-        if(canUseApi) throw new Error('API에서 조회기간/이전기간 데이터가 없습니다.');
-        curData = (typeof dbBuildSampleData==='function') ? dbBuildSampleData(curS,curE) : {};
-        prevData = (typeof dbBuildSampleData==='function') ? dbBuildSampleData(ps,pe) : {};
+        throw new Error('API에서 조회기간/이전기간 데이터가 없습니다.');
       }
       var cur = curData.curAgg || agg(curData.days||curData.recentDays||[]);
       var prev = prevData.curAgg || agg(prevData.days||prevData.recentDays||[]);
