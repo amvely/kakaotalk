@@ -1542,6 +1542,60 @@ tr.db-total-row td:first-child{color:#03C75A!important;}
 #db-daily-tbl tr.db-average-row td{background:rgba(30,198,255,.08)!important;color:#dbeafe!important;font-weight:900!important;border-top:1.5px solid rgba(30,198,255,.28)!important;}
 #db-daily-tbl tr.db-total-row td{border-top:1.5px solid rgba(3,199,90,.28)!important;}
 </style>
+
+<style id="db-export-diff-color-fix">
+/* HTML 다운로드 파일에서도 증감/증감률 색상 유지 */
+body.db-report-html #tab-dashboard .cmp-up,
+body.db-report-html #tab-dashboard .up,
+body.db-report-html #tab-dashboard .db-badge.up,
+body.db-report-html #tab-dashboard .db-diff-rate-td.up,
+body.db-report-html #tab-dashboard .db-v13-pct-badge.up,
+body.db-report-html #tab-dashboard .db-v14-pct.up,
+body.db-report-html #tab-dashboard .db-v15-pct.up,
+body.db-report-html #tab-dashboard .db-v15-diff.up,
+body.db-report-html #tab-dashboard .db-delta-pct.up {
+  color:#34d399 !important;
+}
+body.db-report-html #tab-dashboard .cmp-dn,
+body.db-report-html #tab-dashboard .dn,
+body.db-report-html #tab-dashboard .db-badge.dn,
+body.db-report-html #tab-dashboard .db-diff-rate-td.dn,
+body.db-report-html #tab-dashboard .db-v13-pct-badge.dn,
+body.db-report-html #tab-dashboard .db-v14-pct.dn,
+body.db-report-html #tab-dashboard .db-v15-pct.dn,
+body.db-report-html #tab-dashboard .db-v15-diff.dn {
+  color:#fca5a5 !important;
+}
+body.db-report-html #tab-dashboard .neu,
+body.db-report-html #tab-dashboard .db-badge.neu,
+body.db-report-html #tab-dashboard .db-diff-rate-td.neu,
+body.db-report-html #tab-dashboard .db-v13-pct-badge.neu,
+body.db-report-html #tab-dashboard .db-v14-pct.neu,
+body.db-report-html #tab-dashboard .db-v15-pct.neu,
+body.db-report-html #tab-dashboard .db-v15-diff.neu,
+body.db-report-html #tab-dashboard .db-delta-pct.flat {
+  color:#94a3b8 !important;
+}
+body.db-report-html #tab-dashboard .db-diff-rate-td.up {
+  background:rgba(52,211,153,.065) !important;
+}
+body.db-report-html #tab-dashboard .db-diff-rate-td.dn {
+  background:rgba(252,165,165,.065) !important;
+}
+body.db-report-html #tab-dashboard .db-diff-rate-td.neu {
+  background:rgba(148,163,184,.055) !important;
+}
+body.db-report-html #tab-dashboard #db-compare-tbl .db-v13-pct-badge,
+body.db-report-html #tab-dashboard #db-compare-tbl .db-v14-pct,
+body.db-report-html #tab-dashboard #db-compare-tbl .db-v15-pct,
+body.db-report-html #tab-dashboard #db-compare-tbl .db-v15-diff {
+  background:transparent !important;
+  border:none !important;
+  padding:0 !important;
+  border-radius:0 !important;
+  font-weight:800 !important;
+}
+</style>
 </head>
 <body data-theme="dark">
 <!-- ═══ SCREEN 2: 리포트 ═══ -->
@@ -10172,7 +10226,7 @@ function dbRenderScorecards(cur, prev) {
       };
       if(!boot.raw){ if(typeof showToast==="function") showToast("\u26A0 \uBA3C\uC800 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC640\uC8FC\uC138\uC694"); return; }
       var bootJson=JSON.stringify(boot).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029");
-      var headCss='<style id="db-export-initial-hide">.dbc-tip{display:none!important;}#db-comment-output-top,#db-comment-output{display:none!important;}body.db-report-html .topbar,body.db-report-html #db-settings-panel,body.db-report-html .tab-panel:not(#tab-dashboard){display:none!important;}body.db-report-html #tab-dashboard{display:block!important;max-width:none!important;width:100%!important;margin:0!important;padding:16px 18px 60px!important;}body.db-report-html #db-capture-area{display:flex!important;flex-direction:column!important;width:calc(100% - 24px)!important;margin-left:auto!important;margin-right:auto!important;}body.db-report-html #db-top-row{display:grid!important;grid-template-columns:minmax(420px,.72fr) minmax(0,1.28fr)!important;gap:12px!important;align-items:stretch!important;}body.db-report-html #db-capture-area>#db-export-header{display:flex!important;width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;align-self:stretch!important;}body.db-report-html>#db-export-header{max-width:none!important;}</style>';
+      var headCss='<style id="db-export-initial-hide">.dbc-tip{display:none!important;}#db-comment-output-top,#db-comment-output{display:none!important;}body.db-report-html .topbar,body.db-report-html #db-settings-panel,body.db-report-html .tab-panel:not(#tab-dashboard){display:none!important;}body.db-report-html #tab-dashboard{display:block!important;max-width:none!important;width:100%!important;margin:0!important;padding:16px 18px 60px!important;}body.db-report-html #db-capture-area{display:flex!important;flex-direction:column!important;width:calc(100% - 24px)!important;margin-left:auto!important;margin-right:auto!important;}body.db-report-html #db-top-row{display:grid!important;grid-template-columns:minmax(420px,.72fr) minmax(0,1.28fr)!important;gap:12px!important;align-items:stretch!important;}body.db-report-html #db-capture-area>#db-export-header{display:flex!important;width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;align-self:stretch!important;}body.db-report-html>#db-export-header{max-width:none!important;}</style><style id="db-export-diff-color-fix-inline">/* HTML 다운로드 파일에서도 증감/증감률 색상 유지 */body.db-report-html #tab-dashboard .cmp-up,body.db-report-html #tab-dashboard .up,body.db-report-html #tab-dashboard .db-badge.up,body.db-report-html #tab-dashboard .db-diff-rate-td.up,body.db-report-html #tab-dashboard .db-v13-pct-badge.up,body.db-report-html #tab-dashboard .db-v14-pct.up,body.db-report-html #tab-dashboard .db-v15-pct.up,body.db-report-html #tab-dashboard .db-v15-diff.up,body.db-report-html #tab-dashboard .db-delta-pct.up {  color:#34d399 !important;}body.db-report-html #tab-dashboard .cmp-dn,body.db-report-html #tab-dashboard .dn,body.db-report-html #tab-dashboard .db-badge.dn,body.db-report-html #tab-dashboard .db-diff-rate-td.dn,body.db-report-html #tab-dashboard .db-v13-pct-badge.dn,body.db-report-html #tab-dashboard .db-v14-pct.dn,body.db-report-html #tab-dashboard .db-v15-pct.dn,body.db-report-html #tab-dashboard .db-v15-diff.dn {  color:#fca5a5 !important;}body.db-report-html #tab-dashboard .neu,body.db-report-html #tab-dashboard .db-badge.neu,body.db-report-html #tab-dashboard .db-diff-rate-td.neu,body.db-report-html #tab-dashboard .db-v13-pct-badge.neu,body.db-report-html #tab-dashboard .db-v14-pct.neu,body.db-report-html #tab-dashboard .db-v15-pct.neu,body.db-report-html #tab-dashboard .db-v15-diff.neu,body.db-report-html #tab-dashboard .db-delta-pct.flat {  color:#94a3b8 !important;}body.db-report-html #tab-dashboard .db-diff-rate-td.up {  background:rgba(52,211,153,.065) !important;}body.db-report-html #tab-dashboard .db-diff-rate-td.dn {  background:rgba(252,165,165,.065) !important;}body.db-report-html #tab-dashboard .db-diff-rate-td.neu {  background:rgba(148,163,184,.055) !important;}body.db-report-html #tab-dashboard #db-compare-tbl .db-v13-pct-badge,body.db-report-html #tab-dashboard #db-compare-tbl .db-v14-pct,body.db-report-html #tab-dashboard #db-compare-tbl .db-v15-pct,body.db-report-html #tab-dashboard #db-compare-tbl .db-v15-diff {  background:transparent !important;  border:none !important;  padding:0 !important;  border-radius:0 !important;  font-weight:800 !important;}</style>';
       var inject='<style id="db-export-iso">#db-comment-output-top,#db-comment-output{display:none!important;}</style>'
         +'<scr'+'ipt>window.__DB_EXPORT__='+bootJson+';<\/scr'+'ipt>'+EXPORT_BOOT_SRC;
       var pad=function(n){return String(n).padStart(2,"0");};
