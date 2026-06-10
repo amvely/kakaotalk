@@ -10158,7 +10158,6 @@ function dbRenderScorecards(cur, prev) {
 
   window.dbDownloadReportHtml = function(){
     try{
-      try{ if(typeof dbRenderStackChart==="function") dbRenderStackChart(); }catch(e){}
       var adv=(typeof dbActiveAdv==="function"?dbActiveAdv():null)||{};
       var pm=(typeof dbPeriodMeta!=="undefined"&&dbPeriodMeta)?dbPeriodMeta:null;
       var boot={
@@ -10385,5 +10384,156 @@ function dbRenderScorecards(cur, prev) {
 
 
 
+
+
+<script id="hotfix-prev-waterfall-clean">
+(function(){
+  'use strict';
+  function byId(id){return document.getElementById(id);}
+  function esc(v){try{return (typeof dbHtmlEscape==='function')?dbHtmlEscape(v):String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}catch(e){return String(v||'');}}
+  function fmt(k,v){try{return dbFmt(k,Number(v||0));}catch(e){return Math.round(Number(v||0)).toLocaleString('ko-KR');}}
+  function label(k){try{return dbMetricLabel(k);}catch(e){return k;}}
+  function eff(row){try{return dbEffectiveAgg(row||{});}catch(e){return row||{};}}
+  function val(row,k){var a=eff(row||{}); return Number((a&&a[k])||0);}
+  function dkey(d){try{return dateYMD(d);}catch(e){var p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());}}
+  function rowId(row,dim){
+    row=row||{};
+    if(dim==='adgroup') return String(row.id||row.groupId||row.nccAdgroupId||row.adgroupId||row.groupNm||row.name||'')+'|'+String(row.campId||row.campaignId||row.nccCampaignId||row.campNm||row.campaignName||'');
+    if(dim==='type') return String((typeof campTpLabel==='function'?campTpLabel(row.campTp||row.type):(row.type||row.campTp))||'기타');
+    return String(row.id||row.campId||row.nccCampaignId||row.campaignId||row.campNm||row.name||'');
+  }
+  function rowName(row,dim){
+    row=row||{};
+    if(dim==='type') return String((typeof campTpLabel==='function'?campTpLabel(row.campTp||row.type):(row.type||row.campTp))||'기타');
+    if(dim==='adgroup') return String(row.groupNm||row.name||row.adgroupName||'미분류');
+    return String(row.campNm||row.name||row.campaignName||'미분류');
+  }
+  function rowsFor(raw,dim){
+    raw=raw||{};
+    if(dim==='adgroup') return (raw.allGroups||[]);
+    return (raw.allCamps||[]);
+  }
+  function aggregateRows(rows,dim,metricKey){
+    var map={};
+    (rows||[]).forEach(function(r){
+      var k=rowId(r,dim)||rowName(r,dim); if(!k) k='미분류';
+      if(!map[k]) map[k]={name:rowName(r,dim).slice(0,24), value:0};
+      map[k].value += val(r,metricKey);
+    });
+    return map;
+  }
+  function nonZeroDiff(metricKey,d){
+    if(!isFinite(d)) return false;
+    if(['ctr','cvr','roas'].indexOf(metricKey)>=0) return Math.abs(d) >= 0.005;
+    return Math.round(Math.abs(d)) !== 0;
+  }
+
+  /* 조회기간 로드 시 동일 길이의 이전기간 원천 데이터도 함께 보관 */
+  async function loadPrevRawForDashboard(adv, meta){
+    if(!adv || !meta) return null;
+    var ps=meta.ps||meta.prevS, pe=meta.pe||meta.prevE;
+    if(!ps||!pe) return null;
+    var canApi=false; try{canApi=!!(window.currentAdv && hasNaver(window.currentAdv));}catch(e){}
+    if(canApi && typeof fetchNaverData==='function'){
+      return await fetchNaverData(adv, dkey(ps), dkey(pe));
+    }
+    if(typeof dbBuildSampleData==='function') return dbBuildSampleData(ps,pe);
+    return null;
+  }
+
+  if(typeof window.dbLoad==='function' && !window.dbLoad.__prevRawHotfix){
+    var originalDbLoad = window.dbLoad;
+    window.dbLoad = async function(){
+      var adv=null, meta=null, curData=null, prevData=null;
+      showLoading && showLoading();
+      try{
+        adv = (typeof dbActiveAdv==='function') ? dbActiveAdv() : (window.currentAdv||null);
+        dbPeriodMeta = getPeriodDates(dbPeriod, dbCustomRange);
+        meta = dbPeriodMeta;
+        var curS=meta.curS, curE=meta.curE, curLabel=meta.curLabel, prevLabel=meta.prevLabel;
+        var toISO=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+        var si=byId('db-start'), ei=byId('db-end'); if(si) si.value=toISO(curS); if(ei) ei.value=toISO(curE);
+        var titleEl=byId('db-adv-title'); if(titleEl && typeof dbDashboardAdvName==='function') titleEl.innerHTML=(adv&&adv.emoji||'📊')+' <strong>'+esc(dbDashboardAdvName())+'</strong> 광고 성과 데이터';
+        var dd=byId('adv-dd-label'); if(dd && !window.currentAdv && adv){dd.textContent=(adv.emoji||'')+' '+(adv.name||'')+' 🟢'; dd.classList.remove('dd-placeholder');}
+        var rt=byId('db-result-title'), rp=byId('db-result-period'), rv=byId('db-result-prev');
+        if(rt && typeof dbDashboardTitleHtml==='function') rt.innerHTML=dbDashboardTitleHtml();
+        if(rp) rp.textContent=curLabel||''; if(rv) rv.textContent='전기간: '+(prevLabel||'');
+        var thP=byId('db-th-prev'), thC=byId('db-th-cur'); if(thP) thP.textContent=prevLabel||'이전기간'; if(thC) thC.textContent=curLabel||'조회기간';
+        var canUseApi=false; try{canUseApi=!!(window.currentAdv && hasNaver(window.currentAdv));}catch(e){}
+        if(canUseApi && typeof fetchNaverData==='function'){
+          curData = await fetchNaverData(window.currentAdv, dkey(curS), dkey(curE));
+        }else if(typeof dbBuildSampleData==='function'){
+          curData = dbBuildSampleData(curS,curE);
+        }
+        if(!curData || !(((curData.allCamps||[]).length) || ((curData.days||[]).length))) curData = (typeof dbBuildSampleData==='function') ? dbBuildSampleData(curS,curE) : {days:[],allCamps:[],allGroups:[]};
+        try{ prevData = await loadPrevRawForDashboard(window.currentAdv||adv, meta); }catch(e){ console.warn('[prev waterfall] prev raw load failed:', e); }
+        if(!prevData && typeof dbBuildSampleData==='function') prevData=dbBuildSampleData(meta.ps||meta.prevS||curS, meta.pe||meta.prevE||curE);
+        var cur=(curData.curAgg)||aggDays(curData.days||[]);
+        var prev=(prevData && (prevData.curAgg||aggDays(prevData.days||[]))) || curData.prevAgg || aggDays([]);
+        _dbCur=cur; _dbPrev=prev; _dbRawData=curData; window._dbPrevRawData=prevData; window._dbRawData=curData; window._dbCur=cur; window._dbPrev=prev;
+        dbRenderScorecards(cur,prev); dbRenderCompareTable(cur,prev); dbRenderTypeTbl(curData,curLabel); dbRenderCampTbl(curData,curLabel); dbRenderGroupTbl(curData,curLabel); dbRenderDailyTbl(curData.recentDays||curData.days||[]);
+        dbInitPivotMetricOptions(); dbRenderPivotHeatmap(); dbRenderDailyTrend(); dbRenderWaterfall(); dbRenderRadar(); dbRenderStackChart(); dbRenderTrendLines();
+      }catch(err){
+        console.error(err);
+        try{showToast('❌ '+err.message);}catch(e){}
+        var sc=byId('db-scorecards'); if(sc) sc.innerHTML='<div class="db-empty" style="grid-column:1/-1">대시보드 오류: '+esc(err.message)+'</div>';
+      }finally{try{hideLoading();}catch(e){}}
+    };
+    window.dbLoad.__prevRawHotfix=true;
+  }
+
+  /* 워터폴: 현재기간 행과 이전기간 행을 ID/이름 기준으로 매칭해서 실제 증감만 표시 */
+  window.dbRenderWaterfall = function(){
+    var run=function(){
+      try{
+        if(typeof ChartDataLabels!=='undefined' && window.Chart && !Chart.registry.plugins.get('datalabels')) Chart.register(ChartDataLabels);
+        var card=byId('db-waterfall-card'); if(!card) return;
+        var raw=(typeof _dbRawData!=='undefined'&&_dbRawData)||window._dbRawData;
+        var prevRaw=window._dbPrevRawData;
+        var cur=(typeof _dbCur!=='undefined'&&_dbCur)||window._dbCur;
+        var prev=(typeof _dbPrev!=='undefined'&&_dbPrev)||window._dbPrev;
+        if(!raw || !cur){card.style.display='none'; return;} card.style.display='block';
+        var metricKey=(byId('db-wf-metric')&&byId('db-wf-metric').value)||'cost';
+        var dim=(byId('db-wf-dim')&&byId('db-wf-dim').value)||'campaign';
+        var count=Number((byId('db-wf-count-val')&&byId('db-wf-count-val').textContent)||12);
+        var baseTotal=val(cur,metricKey), compTotal=val(prev||{},metricKey);
+        var curMap=aggregateRows(rowsFor(raw,dim),dim,metricKey);
+        var prevMap=aggregateRows(rowsFor(prevRaw,dim),dim,metricKey);
+        var keys={}; Object.keys(curMap).forEach(function(k){keys[k]=1;}); Object.keys(prevMap).forEach(function(k){keys[k]=1;});
+        var items=Object.keys(keys).map(function(k){
+          var c=curMap[k]||{name:k,value:0}, p=prevMap[k]||{name:c.name||k,value:0};
+          return {name:(c.name||p.name||k).slice(0,24), base:c.value||0, comp:p.value||0, diff:(c.value||0)-(p.value||0)};
+        }).filter(function(x){return nonZeroDiff(metricKey,x.diff);}).sort(function(a,b){return Math.abs(b.diff)-Math.abs(a.diff);});
+        if(items.length>count){
+          var top=items.slice(0,Math.max(1,count-1));
+          var rest=items.slice(Math.max(1,count-1)).reduce(function(a,x){a.base+=x.base; a.comp+=x.comp; a.diff+=x.diff; return a;},{name:'기타',base:0,comp:0,diff:0});
+          items=top.concat(nonZeroDiff(metricKey,rest.diff)?[rest]:[]);
+        }
+        var pm=(typeof dbPeriodMeta!=='undefined'&&dbPeriodMeta)||window.dbPeriodMeta||{};
+        var compLabel=pm.prevLabel||'이전기간', baseLabel=pm.curLabel||'조회기간';
+        var diffTotal=baseTotal-compTotal, diffPct=compTotal?diffTotal/compTotal*100:0;
+        var sum=byId('db-wf-summary');
+        if(sum) sum.innerHTML='<div class="db-wf-sum-card"><div class="db-wf-sum-label">비교 · '+esc(compLabel)+'</div><div class="db-wf-sum-val">'+fmt(metricKey,compTotal)+'</div></div><div class="db-wf-sum-arrow">→</div><div class="db-wf-sum-card"><div class="db-wf-sum-label">기준 · '+esc(baseLabel)+'</div><div class="db-wf-sum-val" style="color:#fff;">'+fmt(metricKey,baseTotal)+'</div></div><div class="db-wf-sum-card" style="border-color:'+(diffTotal>=0?'rgba(52,211,153,.45)':'rgba(248,113,113,.45)')+';"><div class="db-wf-sum-label">증감</div><div class="db-wf-sum-val" style="color:'+(diffTotal>=0?'#34d399':'#fb7185')+';">'+(diffTotal>=0?'▲':'▼')+Math.abs(diffPct).toFixed(1)+'%&nbsp;('+(diffTotal>=0?'+':'')+fmt(metricKey,diffTotal)+')</div></div>';
+        var labels=[compLabel].concat(items.map(function(i){return i.name;})).concat([baseLabel]);
+        var floatData=[0], barData=[compTotal], colors=['rgba(16,185,129,.92)'], origDiffs=[];
+        var running=compTotal;
+        items.forEach(function(it){
+          var d=it.diff; origDiffs.push(d);
+          if(d>=0){floatData.push(running); barData.push(d); colors.push('rgba(59,130,246,.94)');}
+          else{floatData.push(running+d); barData.push(-d); colors.push('rgba(239,68,68,.94)');}
+          running+=d;
+        });
+        floatData.push(0); barData.push(baseTotal); colors.push('rgba(99,102,241,.94)');
+        var canvas=byId('db-wf-canvas'); if(!canvas||!window.Chart) return; canvas.style.height='300px';
+        if(window.__dbWaterfallChart){try{window.__dbWaterfallChart.destroy();}catch(e){}}
+        window.__dbWaterfallChart=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels:labels,datasets:[{data:floatData,backgroundColor:'rgba(0,0,0,0)',borderWidth:0,stack:'wf',datalabels:{display:false}},{data:barData,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:5,stack:'wf'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:80,interaction:{mode:'nearest',intersect:false},plugins:{title:{display:true,text:'선택 지표: '+label(metricKey),color:'#eaf1fb',font:{size:13,weight:'900'},padding:{top:2,bottom:10}},legend:{display:false},tooltip:{enabled:true,backgroundColor:'rgba(15,23,42,.96)',titleColor:'#fff',bodyColor:'#e2e8f0',borderColor:'#475569',borderWidth:1,callbacks:{label:function(ctx){if(ctx.datasetIndex===0)return null;var i=ctx.dataIndex;if(i===0)return fmt(metricKey,compTotal);if(i===labels.length-1)return fmt(metricKey,baseTotal);var d=origDiffs[i-1];return (d>=0?'+':'')+fmt(metricKey,d);}}},datalabels:{display:true,anchor:'end',align:'end',offset:3,color:'#e0f2fe',font:{size:9,weight:'500'},formatter:function(v,ctx){if(ctx.datasetIndex===0)return '';var i=ctx.dataIndex;if(i===0)return fmt(metricKey,compTotal);if(i===labels.length-1)return fmt(metricKey,baseTotal);var d=origDiffs[i-1];return (d>=0?'+':'')+fmt(metricKey,d);}}},scales:{x:{stacked:true,grid:{display:false,drawBorder:false},ticks:{color:'#e2e8f0',font:{size:9.5,weight:'500'},maxRotation:20,minRotation:0,autoSkip:false}},y:{stacked:true,beginAtZero:true,grace:'30%',grid:{display:false,drawBorder:false},ticks:{display:false}}}}});
+        setTimeout(function(){try{window.__dbWaterfallChart.resize();}catch(e){}},120);
+      }catch(e){console.warn('[waterfall clean hotfix]',e);}
+    };
+    if(window.Chart) run(); else setTimeout(run,250);
+  };
+
+})();
+</script>
 </body>
 </html>
