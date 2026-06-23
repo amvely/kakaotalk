@@ -26,7 +26,7 @@ function inferSaleType(row){
   if(t.includes('판매') || t.includes('shopping') || t.includes('shop') || t.includes('전환') || t.includes('p-max') || t.includes('pmax')) return 'sales';
   return 'all';
 }
-function blank(){ return {cost:0, imp:0, click:0, conv:0, revenue:0, purchaseCcnt:0, purchaseConvAmt:0}; }
+function blank(){ return {cost:0, imp:0, click:0, conv:0, revenue:0, purchaseCcnt:0, purchaseConvAmt:0, cart:0}; }
 function calc(v={}){
   const out = {
     cost:n(v.cost ?? v.salesAmt ?? v.spend),
@@ -37,6 +37,7 @@ function calc(v={}){
     purchaseCcnt:n(v.purchaseCcnt ?? v.purchaseConversions ?? v.purchaseConv),
     purchaseConvAmt:n(v.purchaseConvAmt ?? v.purchaseRevenue ?? v.purchaseValue)
   };
+  out.cart = n(v.cart ?? Math.max(0, out.conv - out.purchaseCcnt));
   out.ctr = out.imp ? out.click / out.imp * 100 : 0;
   out.cvr = out.click ? out.conv / out.click * 100 : 0;
   out.cpc = out.click ? Math.round(out.cost / out.click) : 0;
@@ -45,7 +46,7 @@ function calc(v={}){
   out.aov = out.conv ? Math.round(out.revenue / out.conv) : 0;
   return out;
 }
-function addTo(acc, m){ acc.cost+=n(m.cost); acc.imp+=n(m.imp); acc.click+=n(m.click); acc.conv+=n(m.conv); acc.revenue+=n(m.revenue); acc.purchaseCcnt+=n(m.purchaseCcnt); acc.purchaseConvAmt+=n(m.purchaseConvAmt); }
+function addTo(acc, m){ acc.cost+=n(m.cost); acc.imp+=n(m.imp); acc.click+=n(m.click); acc.conv+=n(m.conv); acc.revenue+=n(m.revenue); acc.purchaseCcnt+=n(m.purchaseCcnt); acc.purchaseConvAmt+=n(m.purchaseConvAmt); acc.cart+=n(m.cart ?? Math.max(0,n(m.conv)-n(m.purchaseCcnt))); }
 function aggregate(rows){ const acc=blank(); for(const r of rows||[]) addTo(acc, r); return calc(acc); }
 function metricWithPrev(cur, prev){ return {...calc(cur), _prev: calc(prev || {})}; }
 function responseHeaders(res){ res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); }
