@@ -161,13 +161,13 @@ async function fetchNaver(body){
     const type = /비판매/.test(name) ? '비판매' : /판매/.test(name) ? '판매' : naverTypeLabel(c.campaignTp||c.type);
     const saleType = inferSaleType({type,campaignName:name});
     campNameById[rawId]=name; campTypeById[rawId]=type; campSaleById[rawId]=saleType;
-    return {platform:'naver', source:'naver', id:`naver:${rawId}`, rawId, campaignId:rawId, campaignName:name, type, saleType, ...metricWithPrev(curByCamp[rawId]||{}, prevByCamp[rawId]||{})};
+    return {platform:'naver', source:'naver', id:`naver:${rawId}`, rawId, campaignId:rawId, campaignName:name, status:c.status||c.userLock||c.campaignStatus, effectiveStatus:c.status||c.campaignStatus, type, saleType, ...metricWithPrev(curByCamp[rawId]||{}, prevByCamp[rawId]||{})};
   });
   const allGroups = adgroupsRaw.map(g=>{
     const rawId = g.nccAdgroupId||g.adgroupId||g.id;
     const campId = g.nccCampaignId||g.campaignId||g.campId;
     const name = g.name||g.adgroupName||g.groupNm||rawId;
-    return {platform:'naver', source:'naver', id:`naver:${rawId}`, rawId, groupId:rawId, adgroupId:rawId, adgroupName:name, campaignId:campId, campaignKey:`naver:${campId}`, campaignName:campNameById[campId]||campId, type:campTypeById[campId]||'기타', saleType:campSaleById[campId]||'all', ...metricWithPrev(curByGroup[rawId]||{}, prevByGroup[rawId]||{})};
+    return {platform:'naver', source:'naver', id:`naver:${rawId}`, rawId, groupId:rawId, adgroupId:rawId, adgroupName:name, campaignId:campId, campaignKey:`naver:${campId}`, campaignName:campNameById[campId]||campId, status:g.status||g.userLock||g.adgroupStatus, effectiveStatus:g.status||g.adgroupStatus, type:campTypeById[campId]||'기타', saleType:campSaleById[campId]||'all', ...metricWithPrev(curByGroup[rawId]||{}, prevByGroup[rawId]||{})};
   });
   const recentDays = naverAggByDay(dailyRows).map(r=>({...r, source:'naver'}));
   return {allCamps, allGroups, recentDays, creatives:[]};
@@ -242,25 +242,29 @@ async function fetchMetaAccount(accountId, token, body){
   const [prevStartY, prevEndY] = prevRange(body.startDate, body.endDate);
   const prevStart = ymdToISO(prevStartY), prevEnd = ymdToISO(prevEndY);
   const recentStart = ymdToISO(fmtYMD(addDays(parseYMD(body.endDate), -6)));
-  const [curCamp, prevCamp, curAdset, prevAdset, recent, ads, adInsights] = await Promise.all([
+  const [curCamp, prevCamp, curAdset, prevAdset, recent, ads, adInsights, metaCampaigns, metaAdsets] = await Promise.all([
     metaInsights(metaAccountId, token, 'campaign', start, end),
     metaInsights(metaAccountId, token, 'campaign', prevStart, prevEnd),
     metaInsights(metaAccountId, token, 'adset', start, end),
     metaInsights(metaAccountId, token, 'adset', prevStart, prevEnd),
     metaInsights(metaAccountId, token, 'account', recentStart, end, {time_increment:1}),
-    metaGraph(`${metaAccountPath(metaAccountId)}/ads`, {fields:'id,name,campaign_id,adset_id,creative{id,name,thumbnail_url,image_url,image_hash,video_id,title,body,object_story_spec}', limit:500}, token).catch(()=>[]),
-    metaInsights(metaAccountId, token, 'ad', start, end).catch(()=>[])
+    metaGraph(`${metaAccountPath(metaAccountId)}/ads`, {fields:'id,name,campaign_id,adset_id,effective_status,status,configured_status,creative{id,name,thumbnail_url,image_url,image_hash,video_id,title,body,object_story_spec}', limit:500}, token).catch(()=>[]),
+    metaInsights(metaAccountId, token, 'ad', start, end).catch(()=>[]),
+    metaGraph(`${metaAccountPath(metaAccountId)}/campaigns`, {fields:'id,status,effective_status,configured_status', limit:500}, token).catch(()=>[]),
+    metaGraph(`${metaAccountPath(metaAccountId)}/adsets`, {fields:'id,campaign_id,status,effective_status,configured_status', limit:500}, token).catch(()=>[])
   ]);
   const prevCampMap=mapBy(prevCamp,'campaign_id'), prevAdsetMap=mapBy(prevAdset,'adset_id'), adMetricMap=mapBy(adInsights,'ad_id');
+  const metaCampStatus={}; for(const c of metaCampaigns||[]) metaCampStatus[c.id]={status:c.status,effectiveStatus:c.effective_status,configuredStatus:c.configured_status};
+  const metaAdsetStatus={}; for(const a of metaAdsets||[]) metaAdsetStatus[a.id]={status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status};
   const campSaleById={}, campNameById={};
   const allCamps = curCamp.map(r=>{
     const rawId=r.campaign_id; const name=r.campaign_name||rawId; const saleType=inferSaleType({campaignName:name});
     campSaleById[rawId]=saleType; campNameById[rawId]=name;
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevCampMap[rawId]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevCampMap[rawId]||{})};
   });
   const allGroups = curAdset.map(r=>{
     const gid=r.adset_id, cid=r.campaign_id; const name=r.adset_name||gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || name});
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevAdsetMap[gid]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, ...(metaAdsetStatus[gid]||{}), type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevAdsetMap[gid]||{})};
   });
   const recentDays = recent.map(r=>({platform:'meta', source:'meta', accountId:metaAccountId, dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', ...metaMetric(r)}));
   const adInfo = {};
@@ -270,7 +274,7 @@ async function fetchMetaAccount(accountId, token, body){
     const cr=a.creative || {};
     const cid=r.campaign_id || a.campaign_id;
     const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || campNameById[cid]});
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), {})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), {})};
   });
   return {allCamps, allGroups, recentDays, creatives};
 }
@@ -348,12 +352,12 @@ async function fetchGoogle(body){
   const prevStart = ymdToISO(prevStartY), prevEnd = ymdToISO(prevEndY);
   const recentStart = ymdToISO(fmtYMD(addDays(parseYMD(body.endDate), -6)));
   const campaignQuery = (s,e) => `
-    SELECT campaign.id, campaign.name, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
+    SELECT campaign.id, campaign.name, campaign.status, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
     FROM campaign
     WHERE segments.date BETWEEN '${s}' AND '${e}' AND campaign.status != 'REMOVED'
   `.trim();
   const adgroupQuery = (s,e) => `
-    SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
+    SELECT campaign.id, campaign.name, campaign.status, ad_group.id, ad_group.name, ad_group.status, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
     FROM ad_group
     WHERE segments.date BETWEEN '${s}' AND '${e}' AND campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'
   `.trim();
@@ -363,7 +367,7 @@ async function fetchGoogle(body){
     WHERE segments.date BETWEEN '${recentStart}' AND '${end}' AND campaign.status != 'REMOVED'
   `.trim();
   const creativeQuery = `
-    SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, asset.id, asset.name, asset.type, asset.image_asset.full_size.url, asset.youtube_video_asset.youtube_video_id, asset.text_asset.text, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
+    SELECT campaign.id, campaign.name, campaign.status, ad_group.id, ad_group.name, ad_group.status, asset.id, asset.name, asset.type, asset.image_asset.full_size.url, asset.youtube_video_asset.youtube_video_id, asset.text_asset.text, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
     FROM ad_group_ad_asset_view
     WHERE segments.date BETWEEN '${start}' AND '${end}'
   `.trim();
@@ -377,8 +381,8 @@ async function fetchGoogle(body){
   ]);
   const prevCampMap=googleMapBy(prevCamp, r=>r.campaign?.id), prevGroupMap=googleMapBy(prevGroup, r=>r.adGroup?.id || r.ad_group?.id);
   const campSaleById={}, campNameById={};
-  const allCamps = curCamp.map(r=>{ const id=String(r.campaign?.id || ''); const name=r.campaign?.name || id; const saleType=inferSaleType({campaignName:name}); campSaleById[id]=saleType; campNameById[id]=name; return {platform:'google', source:'google', id:`google:${id}`, campaignId:id, campaignName:name, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(googleMetrics(r), prevCampMap[id]||{})}; });
-  const allGroups = curGroup.map(r=>{ const gid=String(r.adGroup?.id || r.ad_group?.id || ''); const cid=String(r.campaign?.id || ''); const name=r.adGroup?.name || r.ad_group?.name || gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign?.name || name}); return {platform:'google', source:'google', id:`google:${gid}`, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`google:${cid}`, campaignName:r.campaign?.name || campNameById[cid] || cid, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(googleMetrics(r), prevGroupMap[gid]||{})}; });
+  const allCamps = curCamp.map(r=>{ const id=String(r.campaign?.id || ''); const name=r.campaign?.name || id; const saleType=inferSaleType({campaignName:name}); campSaleById[id]=saleType; campNameById[id]=name; return {platform:'google', source:'google', id:`google:${id}`, campaignId:id, campaignName:name, status:r.campaign?.status, effectiveStatus:r.campaign?.status, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(googleMetrics(r), prevCampMap[id]||{})}; });
+  const allGroups = curGroup.map(r=>{ const gid=String(r.adGroup?.id || r.ad_group?.id || ''); const cid=String(r.campaign?.id || ''); const name=r.adGroup?.name || r.ad_group?.name || gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign?.name || name}); return {platform:'google', source:'google', id:`google:${gid}`, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`google:${cid}`, campaignName:r.campaign?.name || campNameById[cid] || cid, status:r.adGroup?.status || r.ad_group?.status || r.campaign?.status, effectiveStatus:r.adGroup?.status || r.ad_group?.status || r.campaign?.status, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(googleMetrics(r), prevGroupMap[gid]||{})}; });
   const dailyMap={};
   for(const r of dailyRows){ const dt=isoToYmd(r.segments?.date); if(!dt) continue; if(!dailyMap[dt]) dailyMap[dt]={platform:'google', source:'google', dt, date:`${dt.slice(4,6)}/${dt.slice(6,8)}`, saleType:'all', ...blank()}; addTo(dailyMap[dt], googleMetrics(r)); }
   const recentDays=Object.values(dailyMap).sort((a,b)=>a.dt.localeCompare(b.dt)).map(v=>({...v,...calc(v)}));
