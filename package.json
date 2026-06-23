@@ -1,1 +1,9 @@
-{"scripts":{"dev":"vercel dev"},"dependencies":{}}
+{
+  "name": "ads-dashboard-real-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  }
+}
