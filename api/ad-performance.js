@@ -189,7 +189,27 @@ async function metaGraph(path, params, token){
   }
   return rows;
 }
-function metaAccountPath(accountId){ const id=toStr(accountId); return id.startsWith('act_') ? id : `act_${id}`; }
+function metaAccountPath(accountId){ const id=toStr(accountId).replace(/^act_/,''); return `act_${id}`; }
+function cleanMetaAccountId(accountId){ return toStr(accountId).replace(/^act_/,''); }
+function parseMetaAccountIds(value){
+  if(Array.isArray(value)) return [...new Set(value.map(v=>cleanMetaAccountId(v)).filter(Boolean))];
+  return [...new Set(String(value || '')
+    .split(/[\n,;\s]+/)
+    .map(v=>cleanMetaAccountId(v))
+    .filter(Boolean))];
+}
+async function metaBusinessAccountIds(businessId, token){
+  const bid = toStr(businessId).replace(/^business_/,'');
+  if(!bid) return [];
+  const fields = 'id,name,account_id';
+  const [owned, client] = await Promise.all([
+    metaGraph(`${bid}/owned_ad_accounts`, {fields, limit:500}, token).catch(()=>[]),
+    metaGraph(`${bid}/client_ad_accounts`, {fields, limit:500}, token).catch(()=>[])
+  ]);
+  return [...new Set([...(owned||[]), ...(client||[])]
+    .map(a => cleanMetaAccountId(a.account_id || a.id))
+    .filter(Boolean))];
+}
 function metaActionValue(arr, keys){
   if(!Array.isArray(arr)) return 0;
   const lowered = keys.map(k=>k.toLowerCase());
@@ -216,29 +236,33 @@ async function metaInsights(account, token, level, startISO, endISO, extra={}){
     ...extra
   }, token);
 }
-async function fetchMeta(body){
-  const cfg = body.meta || {};
-  const accountId = toStr(cfg.accountId || body.metaAccountId || process.env.META_AD_ACCOUNT_ID);
-  const token = toStr(cfg.token || body.metaToken || process.env.META_ACCESS_TOKEN);
-  if(!accountId || !token) return {skipped:true, reason:'Meta API 설정 없음'};
+async function fetchMetaAccount(accountId, token, body){
+  const metaAccountId = cleanMetaAccountId(accountId);
   const start = ymdToISO(body.startDate), end = ymdToISO(body.endDate);
   const [prevStartY, prevEndY] = prevRange(body.startDate, body.endDate);
   const prevStart = ymdToISO(prevStartY), prevEnd = ymdToISO(prevEndY);
   const recentStart = ymdToISO(fmtYMD(addDays(parseYMD(body.endDate), -6)));
   const [curCamp, prevCamp, curAdset, prevAdset, recent, ads, adInsights] = await Promise.all([
-    metaInsights(accountId, token, 'campaign', start, end),
-    metaInsights(accountId, token, 'campaign', prevStart, prevEnd),
-    metaInsights(accountId, token, 'adset', start, end),
-    metaInsights(accountId, token, 'adset', prevStart, prevEnd),
-    metaInsights(accountId, token, 'account', recentStart, end, {time_increment:1}),
-    metaGraph(`${metaAccountPath(accountId)}/ads`, {fields:'id,name,campaign_id,adset_id,creative{id,name,thumbnail_url,image_url,image_hash,video_id,title,body,object_story_spec}', limit:500}, token).catch(()=>[]),
-    metaInsights(accountId, token, 'ad', start, end).catch(()=>[])
+    metaInsights(metaAccountId, token, 'campaign', start, end),
+    metaInsights(metaAccountId, token, 'campaign', prevStart, prevEnd),
+    metaInsights(metaAccountId, token, 'adset', start, end),
+    metaInsights(metaAccountId, token, 'adset', prevStart, prevEnd),
+    metaInsights(metaAccountId, token, 'account', recentStart, end, {time_increment:1}),
+    metaGraph(`${metaAccountPath(metaAccountId)}/ads`, {fields:'id,name,campaign_id,adset_id,creative{id,name,thumbnail_url,image_url,image_hash,video_id,title,body,object_story_spec}', limit:500}, token).catch(()=>[]),
+    metaInsights(metaAccountId, token, 'ad', start, end).catch(()=>[])
   ]);
   const prevCampMap=mapBy(prevCamp,'campaign_id'), prevAdsetMap=mapBy(prevAdset,'adset_id'), adMetricMap=mapBy(adInsights,'ad_id');
   const campSaleById={}, campNameById={};
-  const allCamps = curCamp.map(r=>{ const id=r.campaign_id; const name=r.campaign_name||id; const saleType=inferSaleType({campaignName:name}); campSaleById[id]=saleType; campNameById[id]=name; return {platform:'meta', source:'meta', id:`meta:${id}`, campaignId:id, campaignName:name, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevCampMap[id]||{})}; });
-  const allGroups = curAdset.map(r=>{ const gid=r.adset_id, cid=r.campaign_id; const name=r.adset_name||gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || name}); return {platform:'meta', source:'meta', id:`meta:${gid}`, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevAdsetMap[gid]||{})}; });
-  const recentDays = recent.map(r=>({platform:'meta', source:'meta', dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', ...metaMetric(r)}));
+  const allCamps = curCamp.map(r=>{
+    const rawId=r.campaign_id; const name=r.campaign_name||rawId; const saleType=inferSaleType({campaignName:name});
+    campSaleById[rawId]=saleType; campNameById[rawId]=name;
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevCampMap[rawId]||{})};
+  });
+  const allGroups = curAdset.map(r=>{
+    const gid=r.adset_id, cid=r.campaign_id; const name=r.adset_name||gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || name});
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), prevAdsetMap[gid]||{})};
+  });
+  const recentDays = recent.map(r=>({platform:'meta', source:'meta', accountId:metaAccountId, dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', ...metaMetric(r)}));
   const adInfo = {};
   for(const a of ads||[]) adInfo[a.id] = a;
   const creatives = (adInsights||[]).map(r=>{
@@ -246,9 +270,33 @@ async function fetchMeta(body){
     const cr=a.creative || {};
     const cid=r.campaign_id || a.campaign_id;
     const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || campNameById[cid]});
-    return {platform:'meta', source:'meta', id:`meta:${r.ad_id}`, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), {})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:saleType==='nonsales'?'비판매':'판매', saleType, ...metricWithPrev(metaMetric(r), {})};
   });
   return {allCamps, allGroups, recentDays, creatives};
+}
+async function fetchMeta(body){
+  const cfg = body.meta || {};
+  const token = toStr(cfg.token || body.metaToken || process.env.META_ACCESS_TOKEN);
+  const businessId = toStr(cfg.businessId || body.metaBusinessId || process.env.META_BUSINESS_ID);
+  let accountIds = parseMetaAccountIds(cfg.accountIds || cfg.accountId || body.metaAccountIds || body.metaAccountId || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID);
+  if(!accountIds.length && businessId && token) accountIds = await metaBusinessAccountIds(businessId, token);
+  if(!accountIds.length || !token) return {skipped:true, reason:'Meta API 설정 없음'};
+  const settled = await Promise.allSettled(accountIds.map(accountId => fetchMetaAccount(accountId, token, body)));
+  const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], metaAccounts:accountIds};
+  for(let i=0;i<settled.length;i++){
+    const r = settled[i];
+    const accountId = accountIds[i];
+    if(r.status === 'fulfilled'){
+      merged.allCamps.push(...(r.value.allCamps||[]));
+      merged.allGroups.push(...(r.value.allGroups||[]));
+      merged.recentDays.push(...(r.value.recentDays||[]));
+      merged.creatives.push(...(r.value.creatives||[]));
+    }else{
+      merged.errors.push({platform:'meta', accountId, message:r.reason?.message || String(r.reason)});
+    }
+  }
+  if(!merged.allCamps.length && merged.errors.length) throw new Error(`Meta 전체 광고계정 조회 실패: ${merged.errors.map(e=>`act_${e.accountId}: ${e.message}`).join(' / ')}`);
+  return merged;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -347,6 +395,7 @@ function mergePayload(parts){
     out.allGroups.push(...(p.allGroups||[]));
     out.recentDays.push(...(p.recentDays||[]));
     out.creatives.push(...(p.creatives||[]));
+    out.errors.push(...(p.errors||[]));
   }
   out.curAgg = aggregate(out.allCamps);
   out.prevAgg = aggregate(out.allCamps.map(c=>c._prev||{}));
@@ -363,7 +412,7 @@ module.exports = async function handler(req,res){
   body.startDate = startDate; body.endDate = endDate;
   const enabled = {
     naver: !!(toStr(body.naver?.cid || process.env.NAVER_CUSTOMER_ID) && toStr(body.naver?.lic || process.env.NAVER_ACCESS_LICENSE) && toStr(body.naver?.sec || process.env.NAVER_SECRET_KEY)),
-    meta: !!(toStr(body.meta?.accountId || process.env.META_AD_ACCOUNT_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
+    meta: !!(toStr(body.meta?.accountIds || body.meta?.accountId || body.metaBusinessId || body.meta?.businessId || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_BUSINESS_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
     google: !!(toStr(body.google?.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.cid || process.env.GOOGLE_CUSTOMER_ID))
   };
   if(!enabled.naver && !enabled.meta && !enabled.google) return res.status(400).json({error:'API 연결 정보가 없습니다. 화면의 API 설정 또는 Vercel 환경변수에 네이버/메타/구글 자격 정보를 입력하세요.'});
