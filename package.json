@@ -1,9 +1,1 @@
-{
-  "name": "naver-ad-report",
-  "version": "1.0.0",
-  "description": "카카오톡 보고서 솔루션",
-  "private": true,
-  "engines": {
-    "node": ">=18"
-  }
-}
+{"scripts":{"dev":"vercel dev"},"dependencies":{}}
