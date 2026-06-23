@@ -1,12 +1,5 @@
 {
   "version": 2,
-  "public": true,
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    }
-  ],
   "functions": {
     "api/*.js": {
       "maxDuration": 30
