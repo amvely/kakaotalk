@@ -331,6 +331,71 @@ function metaActionValue(arr, config){
   }
   return matches.reduce((sum, m) => sum + m.value, 0);
 }
+
+function metaActionDebug(arr, config){
+  const cfg = config || metaConversionConfig({});
+  const all = Array.isArray(arr) ? arr.map(a => ({action_type: normalizeMetaActionType(a?.action_type ?? a?.actionType), value:n(a?.value)})).filter(a => a.action_type || a.value) : [];
+  const matched = all.filter(a => isMetaSelectedActionType(a.action_type, cfg));
+  let selected = null;
+  if(matched.length){
+    if(cfg.dedupeAliases){
+      for(const preferred of (cfg.actionTypes || [])){
+        selected = matched.find(m => m.action_type === preferred);
+        if(selected) break;
+      }
+      if(!selected){
+        for(const suffix of (cfg.suffixes || [])){
+          selected = matched.find(m => m.action_type.endsWith(suffix));
+          if(selected) break;
+        }
+      }
+      if(!selected) selected = matched[0];
+    }else{
+      selected = {action_type:'custom_sum', value: matched.reduce((sum, m) => sum + n(m.value), 0)};
+    }
+  }
+  return {selected, matched, all};
+}
+function metaConversionDebugParts(row, config){
+  const cfg = config || metaConversionConfig({});
+  return {
+    actions: metaActionDebug(row?.actions, cfg),
+    action_values: metaActionDebug(row?.action_values, cfg),
+    catalog_segment_actions: metaActionDebug(row?.catalog_segment_actions, cfg),
+    catalog_segment_value: metaActionDebug(row?.catalog_segment_value, cfg)
+  };
+}
+function compactMetaDebugRow(row, level, accountId, metricMode, conversionConfig){
+  const metric = metaMetric(row, metricMode, conversionConfig);
+  const d = metaConversionDebugParts(row, conversionConfig);
+  return {
+    accountId,
+    level,
+    metricMode,
+    conversionBasis: conversionConfig.basis,
+    conversionBasisLabel: conversionConfig.label,
+    id: row.campaign_id || row.adset_id || row.ad_id || row.account_id || '',
+    campaignId: row.campaign_id || '',
+    campaignName: row.campaign_name || '',
+    adsetId: row.adset_id || '',
+    adsetName: row.adset_name || '',
+    adId: row.ad_id || '',
+    adName: row.ad_name || '',
+    dateStart: row.date_start || '',
+    dateStop: row.date_stop || '',
+    spend:n(row.spend),
+    impressions:n(row.impressions),
+    clicks:n(row.clicks),
+    selectedConversionCcnt: metric.selectedConversionCcnt,
+    selectedConversionValue: metric.selectedConversionValue,
+    normalConversionCcnt: metric.normalConversionCcnt,
+    normalConversionValue: metric.normalConversionValue,
+    sharedConversionCcnt: metric.sharedConversionCcnt,
+    sharedConversionValue: metric.sharedConversionValue,
+    metricSource: metric.metricSource,
+    actionDebug: d
+  };
+}
 function metaDirectKeys(prefix, config){
   const out=[];
   for(const type of (config?.actionTypes || [])){
@@ -528,7 +593,12 @@ async function fetchMetaAccount(accountId, token, body){
     const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || campNameById[cid]});
     return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), {})};
   });
-  return {allCamps, allGroups, recentDays, creatives};
+  const debugRows = [
+    ...curCamp.map(r => compactMetaDebugRow(r, 'campaign', metaAccountId, metricMode, conversionConfig)),
+    ...curAdset.map(r => compactMetaDebugRow(r, 'adset', metaAccountId, metricMode, conversionConfig))
+  ].filter(r => r.spend || r.impressions || r.clicks || r.selectedConversionCcnt || r.selectedConversionValue || r.normalConversionCcnt || r.sharedConversionCcnt || r.normalConversionValue || r.sharedConversionValue).slice(0, 500);
+  const debugDailyRows = recent.map(r => compactMetaDebugRow(r, 'account_daily', metaAccountId, metricMode, conversionConfig)).slice(0, 60);
+  return {allCamps, allGroups, recentDays, creatives, debug:{accountId:metaAccountId, metricMode, conversionConfig, rows:debugRows, dailyRows:debugDailyRows}};
 }
 async function fetchMeta(body){
   const cfg = body.meta || {};
@@ -542,7 +612,7 @@ async function fetchMeta(body){
   if(!accountIds.length || !token) return {skipped:true, reason:'Meta API 설정 없음'};
   const settled = await Promise.allSettled(accountIds.map(accountId => fetchMetaAccount(accountId, token, body)));
   const conversionConfig = metaConversionConfig(body);
-  const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], metaAccounts:accountIds, metaCollaborativeAccounts:collabAccountIds, metaConversionBasis:conversionConfig.basis, metaConversionBasisLabel:conversionConfig.label, metaConversionActionTypes:conversionConfig.actionTypes};
+  const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], metaAccounts:accountIds, metaCollaborativeAccounts:collabAccountIds, metaConversionBasis:conversionConfig.basis, metaConversionBasisLabel:conversionConfig.label, metaConversionActionTypes:conversionConfig.actionTypes, debug:{meta:{accounts:[], conversionConfig, rows:[], dailyRows:[], errors:[]}}};
   for(let i=0;i<settled.length;i++){
     const r = settled[i];
     const accountId = accountIds[i];
@@ -551,8 +621,15 @@ async function fetchMeta(body){
       merged.allGroups.push(...(r.value.allGroups||[]));
       merged.recentDays.push(...(r.value.recentDays||[]));
       merged.creatives.push(...(r.value.creatives||[]));
+      if(r.value.debug){
+        merged.debug.meta.accounts.push({accountId, metricMode:r.value.debug.metricMode, conversionConfig:r.value.debug.conversionConfig});
+        merged.debug.meta.rows.push(...(r.value.debug.rows||[]));
+        merged.debug.meta.dailyRows.push(...(r.value.debug.dailyRows||[]));
+      }
     }else{
-      merged.errors.push({platform:'meta', accountId, message:r.reason?.message || String(r.reason)});
+      const err = {platform:'meta', accountId, message:r.reason?.message || String(r.reason)};
+      merged.errors.push(err);
+      merged.debug.meta.errors.push(err);
     }
   }
   if(!merged.allCamps.length && merged.errors.length) throw new Error(`Meta 전체 광고계정 조회 실패: ${merged.errors.map(e=>`act_${e.accountId}: ${e.message}`).join(' / ')}`);
@@ -561,6 +638,11 @@ async function fetchMeta(body){
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GOOGLE ADS
+function googleCleanCustomerId(v){ return String(v || '').replace(/[^0-9]/g,''); }
+function parseGoogleCustomerIds(value){
+  if(Array.isArray(value)) return [...new Set(value.map(googleCleanCustomerId).filter(Boolean))];
+  return [...new Set(String(value || '').split(/[\n,;\s]+/).map(googleCleanCustomerId).filter(Boolean))];
+}
 async function googleRefreshAccessToken(clientId, clientSecret, refreshToken){
   const params = new URLSearchParams({client_id:clientId, client_secret:clientSecret, refresh_token:refreshToken, grant_type:'refresh_token'});
   const resp = await fetch(GOOGLE_OAUTH_URL, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:params.toString()});
@@ -568,14 +650,20 @@ async function googleRefreshAccessToken(clientId, clientSecret, refreshToken){
   if(!resp.ok || !data.access_token) throw new Error(`Google Access Token 갱신 실패: ${data.error_description || data.error || resp.status}`);
   return data.access_token;
 }
+function googleApiErrorMessage(status, text){
+  let err={}; try{err=JSON.parse(text)}catch{}
+  const base = err?.error?.message || text.slice(0,500) || String(status);
+  const details = Array.isArray(err?.error?.details) ? err.error.details.map(d => d?.errors ? d.errors.map(e => e.message || e.errorCode && JSON.stringify(e.errorCode)).filter(Boolean).join(', ') : '').filter(Boolean).join(' / ') : '';
+  return `Google Ads API 오류 (${status}) ${base}${details ? ' / ' + details : ''}`;
+}
 async function googleSearch(accessToken, devtok, mcc, cid, query){
-  const cleanCid = String(cid).replace(/-/g,'');
+  const cleanCid = googleCleanCustomerId(cid);
   const headers = {'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`};
   if(devtok) headers['developer-token']=devtok;
-  if(mcc) headers['login-customer-id']=String(mcc).replace(/-/g,'');
+  if(mcc) headers['login-customer-id']=googleCleanCustomerId(mcc);
   const resp = await fetch(`${GOOGLE_ADS_BASE}/customers/${cleanCid}/googleAds:searchStream`, {method:'POST', headers, body:JSON.stringify({query})});
   const text = await resp.text();
-  if(!resp.ok){ let err={}; try{err=JSON.parse(text)}catch{}; throw new Error(`Google Ads API 오류 (${resp.status}) ${err?.error?.message || text.slice(0,300)}`); }
+  if(!resp.ok) throw new Error(googleApiErrorMessage(resp.status, text));
   const rows=[];
   try{
     const parsed=JSON.parse(text); const chunks=Array.isArray(parsed)?parsed:[parsed];
@@ -585,6 +673,22 @@ async function googleSearch(accessToken, devtok, mcc, cid, query){
   }
   return rows;
 }
+async function googleDiscoverCustomerIds(accessToken, devtok, managerId){
+  const mid = googleCleanCustomerId(managerId);
+  if(!mid) return {customerIds:[], rows:[], error:''};
+  const query = `
+    SELECT customer_client.client_customer, customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.status
+    FROM customer_client
+    WHERE customer_client.status = 'ENABLED'
+  `.trim();
+  try{
+    const rows = await googleSearch(accessToken, devtok, mid, mid, query);
+    const customerIds = [...new Set(rows.filter(r => !(r.customerClient?.manager ?? r.customer_client?.manager)).map(r => googleCleanCustomerId(r.customerClient?.clientCustomer || r.customer_client?.client_customer || r.customerClient?.id || r.customer_client?.id)).filter(Boolean))];
+    return {customerIds, rows, error:''};
+  }catch(e){
+    return {customerIds:[], rows:[], error:e.message};
+  }
+}
 function googleMetrics(row){
   const m=row.metrics || {};
   const cost = n(m.costMicros ?? m.cost_micros) / 1000000;
@@ -593,16 +697,7 @@ function googleMetrics(row){
   return calc({cost, imp:m.impressions, click:m.clicks, conv, revenue, purchaseCcnt:conv, purchaseConvAmt:revenue});
 }
 function googleMapBy(rows, path){ const map={}; for(const r of rows||[]){ const id=path(r); if(id) map[id]=googleMetrics(r); } return map; }
-async function fetchGoogle(body){
-  const cfg = body.google || {};
-  const clientId = toStr(cfg.clientId || body.googleClientId || process.env.GOOGLE_CLIENT_ID);
-  const clientSecret = toStr(cfg.clientSecret || body.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET);
-  const refreshTok = toStr(cfg.refreshTok || body.googleRefreshTok || process.env.GOOGLE_REFRESH_TOKEN);
-  const cid = toStr(cfg.cid || body.googleCid || process.env.GOOGLE_CUSTOMER_ID);
-  const devtok = toStr(cfg.devtok || body.googleDevtok || process.env.GOOGLE_DEVELOPER_TOKEN);
-  const mcc = toStr(cfg.mcc || body.googleMcc || process.env.GOOGLE_MCC_ID);
-  if(!clientId || !clientSecret || !refreshTok || !cid) return {skipped:true, reason:'Google Ads API 설정 없음'};
-  const token = await googleRefreshAccessToken(clientId, clientSecret, refreshTok);
+async function fetchGoogleCustomer(body, token, cid, devtok, mcc){
   const start = ymdToISO(body.startDate), end = ymdToISO(body.endDate);
   const [prevStartY, prevEndY] = prevRange(body.startDate, body.endDate);
   const prevStart = ymdToISO(prevStartY), prevEnd = ymdToISO(prevEndY);
@@ -627,27 +722,92 @@ async function fetchGoogle(body){
     FROM ad_group_ad_asset_view
     WHERE segments.date BETWEEN '${start}' AND '${end}'
   `.trim();
+  const debug = {customerId:googleCleanCustomerId(cid), loginCustomerId:googleCleanCustomerId(mcc), queries:[], rowCounts:{}};
+  const run = async (name, query, optional=false) => {
+    try{
+      const rows = await googleSearch(token, devtok, mcc, cid, query);
+      debug.queries.push({name, ok:true, rows:rows.length});
+      debug.rowCounts[name]=rows.length;
+      return rows;
+    }catch(e){
+      debug.queries.push({name, ok:false, rows:0, error:e.message});
+      debug.rowCounts[name]=0;
+      if(optional) return [];
+      throw e;
+    }
+  };
   const [curCamp, prevCamp, curGroup, prevGroup, dailyRows, creativeRows] = await Promise.all([
-    googleSearch(token, devtok, mcc, cid, campaignQuery(start,end)),
-    googleSearch(token, devtok, mcc, cid, campaignQuery(prevStart,prevEnd)),
-    googleSearch(token, devtok, mcc, cid, adgroupQuery(start,end)),
-    googleSearch(token, devtok, mcc, cid, adgroupQuery(prevStart,prevEnd)),
-    googleSearch(token, devtok, mcc, cid, dailyQuery).catch(()=>[]),
-    googleSearch(token, devtok, mcc, cid, creativeQuery).catch(()=>[])
+    run('campaign_current', campaignQuery(start,end)),
+    run('campaign_previous', campaignQuery(prevStart,prevEnd)),
+    run('adgroup_current', adgroupQuery(start,end)),
+    run('adgroup_previous', adgroupQuery(prevStart,prevEnd)),
+    run('daily_recent', dailyQuery, true),
+    run('creative_asset', creativeQuery, true)
   ]);
   const prevCampMap=googleMapBy(prevCamp, r=>r.campaign?.id), prevGroupMap=googleMapBy(prevGroup, r=>r.adGroup?.id || r.ad_group?.id);
   const campSaleById={}, campNameById={};
-  const allCamps = curCamp.map(r=>{ const id=String(r.campaign?.id || ''); const name=r.campaign?.name || id; const saleType=inferSaleType({campaignName:name}); campSaleById[id]=saleType; campNameById[id]=name; return {platform:'google', source:'google', id:`google:${id}`, campaignId:id, campaignName:name, status:r.campaign?.status, effectiveStatus:r.campaign?.status, type:(r.campaign?.advertisingChannelType||r.campaign?.advertising_channel_type||r.campaign?.advertisingChannelSubType||r.campaign?.advertising_channel_sub_type||'Google 캠페인'), saleType, ...metricWithPrev(googleMetrics(r), prevCampMap[id]||{})}; });
-  const allGroups = curGroup.map(r=>{ const gid=String(r.adGroup?.id || r.ad_group?.id || ''); const cid=String(r.campaign?.id || ''); const name=r.adGroup?.name || r.ad_group?.name || gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign?.name || name}); return {platform:'google', source:'google', id:`google:${gid}`, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`google:${cid}`, campaignName:r.campaign?.name || campNameById[cid] || cid, status:r.adGroup?.status || r.ad_group?.status || r.campaign?.status, effectiveStatus:r.adGroup?.status || r.ad_group?.status || r.campaign?.status, type:(r.campaign?.advertisingChannelType||r.campaign?.advertising_channel_type||r.campaign?.advertisingChannelSubType||r.campaign?.advertising_channel_sub_type||'Google 캠페인'), saleType, ...metricWithPrev(googleMetrics(r), prevGroupMap[gid]||{})}; });
+  const allCamps = curCamp.map(r=>{ const id=String(r.campaign?.id || ''); const name=r.campaign?.name || id; const saleType=inferSaleType({campaignName:name}); campSaleById[id]=saleType; campNameById[id]=name; return {platform:'google', source:'google', accountId:googleCleanCustomerId(cid), id:`google:${googleCleanCustomerId(cid)}:${id}`, campaignId:id, campaignName:name, status:r.campaign?.status, effectiveStatus:r.campaign?.status, type:(r.campaign?.advertisingChannelType||r.campaign?.advertising_channel_type||r.campaign?.advertisingChannelSubType||r.campaign?.advertising_channel_sub_type||'Google 캠페인'), saleType, ...metricWithPrev(googleMetrics(r), prevCampMap[id]||{})}; });
+  const allGroups = curGroup.map(r=>{ const gid=String(r.adGroup?.id || r.ad_group?.id || ''); const campaignId=String(r.campaign?.id || ''); const name=r.adGroup?.name || r.ad_group?.name || gid; const saleType=campSaleById[campaignId] || inferSaleType({campaignName:r.campaign?.name || name}); return {platform:'google', source:'google', accountId:googleCleanCustomerId(cid), id:`google:${googleCleanCustomerId(cid)}:${gid}`, groupId:gid, adgroupId:gid, adgroupName:name, campaignId, campaignKey:`google:${googleCleanCustomerId(cid)}:${campaignId}`, campaignName:r.campaign?.name || campNameById[campaignId] || campaignId, status:r.adGroup?.status || r.ad_group?.status || r.campaign?.status, effectiveStatus:r.adGroup?.status || r.ad_group?.status || r.campaign?.status, type:(r.campaign?.advertisingChannelType||r.campaign?.advertising_channel_type||r.campaign?.advertisingChannelSubType||r.campaign?.advertising_channel_sub_type||'Google 캠페인'), saleType, ...metricWithPrev(googleMetrics(r), prevGroupMap[gid]||{})}; });
   const dailyMap={};
-  for(const r of dailyRows){ const dt=isoToYmd(r.segments?.date); if(!dt) continue; if(!dailyMap[dt]) dailyMap[dt]={platform:'google', source:'google', dt, date:`${dt.slice(4,6)}/${dt.slice(6,8)}`, saleType:'all', ...blank()}; addTo(dailyMap[dt], googleMetrics(r)); }
+  for(const r of dailyRows){ const dt=isoToYmd(r.segments?.date); if(!dt) continue; if(!dailyMap[dt]) dailyMap[dt]={platform:'google', source:'google', accountId:googleCleanCustomerId(cid), dt, date:`${dt.slice(4,6)}/${dt.slice(6,8)}`, saleType:'all', ...blank()}; addTo(dailyMap[dt], googleMetrics(r)); }
   const recentDays=Object.values(dailyMap).sort((a,b)=>a.dt.localeCompare(b.dt)).map(v=>({...v,...calc(v)}));
-  const creatives = creativeRows.map(r=>{ const cid=String(r.campaign?.id || ''); const aid=String(r.asset?.id || ''); const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign?.name}); return {platform:'google', source:'google', id:`google:${aid}`, creativeId:aid, creativeName:r.asset?.name || r.asset?.textAsset?.text || aid, creativeType:String(r.asset?.type || '').toLowerCase() || (r.asset?.imageAsset ? 'image' : 'asset'), imageUrl:r.asset?.imageAsset?.fullSize?.url || r.asset?.image_asset?.full_size?.url, thumbnailUrl:r.asset?.imageAsset?.fullSize?.url || r.asset?.image_asset?.full_size?.url, videoId:r.asset?.youtubeVideoAsset?.youtubeVideoId || r.asset?.youtube_video_asset?.youtube_video_id, campaignId:cid, campaignName:r.campaign?.name || campNameById[cid] || cid, adgroupId:String(r.adGroup?.id || r.ad_group?.id || ''), adgroupName:r.adGroup?.name || r.ad_group?.name || '', type:(r.campaign?.advertisingChannelType||r.campaign?.advertising_channel_type||r.campaign?.advertisingChannelSubType||r.campaign?.advertising_channel_sub_type||'Google 캠페인'), saleType, ...metricWithPrev(googleMetrics(r), {})}; });
-  return {allCamps, allGroups, recentDays, creatives};
+  const creatives = creativeRows.map(r=>{ const campaignId=String(r.campaign?.id || ''); const aid=String(r.asset?.id || ''); const saleType=campSaleById[campaignId] || inferSaleType({campaignName:r.campaign?.name}); return {platform:'google', source:'google', accountId:googleCleanCustomerId(cid), id:`google:${googleCleanCustomerId(cid)}:${aid}`, creativeId:aid, creativeName:r.asset?.name || r.asset?.textAsset?.text || aid, creativeType:String(r.asset?.type || '').toLowerCase() || (r.asset?.imageAsset ? 'image' : 'asset'), imageUrl:r.asset?.imageAsset?.fullSize?.url || r.asset?.image_asset?.full_size?.url, thumbnailUrl:r.asset?.imageAsset?.fullSize?.url || r.asset?.image_asset?.full_size?.url, videoId:r.asset?.youtubeVideoAsset?.youtubeVideoId || r.asset?.youtube_video_asset?.youtube_video_id, campaignId, campaignName:r.campaign?.name || campNameById[campaignId] || campaignId, adgroupId:String(r.adGroup?.id || r.ad_group?.id || ''), adgroupName:r.adGroup?.name || r.ad_group?.name || '', type:(r.campaign?.advertisingChannelType||r.campaign?.advertising_channel_type||r.campaign?.advertisingChannelSubType||r.campaign?.advertising_channel_sub_type||'Google 캠페인'), saleType, ...metricWithPrev(googleMetrics(r), {})}; });
+  debug.totals = {campaigns:allCamps.length, adgroups:allGroups.length, recentDays:recentDays.length, creatives:creatives.length, cost:aggregate(allCamps).cost, imp:aggregate(allCamps).imp, click:aggregate(allCamps).click, conv:aggregate(allCamps).conv, revenue:aggregate(allCamps).revenue};
+  return {allCamps, allGroups, recentDays, creatives, debug};
+}
+async function fetchGoogle(body){
+  const cfg = body.google || {};
+  const clientId = toStr(cfg.clientId || body.googleClientId || process.env.GOOGLE_CLIENT_ID);
+  const clientSecret = toStr(cfg.clientSecret || body.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET);
+  const refreshTok = toStr(cfg.refreshTok || body.googleRefreshTok || process.env.GOOGLE_REFRESH_TOKEN);
+  const devtok = toStr(cfg.devtok || body.googleDevtok || process.env.GOOGLE_DEVELOPER_TOKEN);
+  const mcc = toStr(cfg.mcc || cfg.loginCustomerId || body.googleMcc || process.env.GOOGLE_MCC_ID);
+  let customerIds = parseGoogleCustomerIds(cfg.customerIds || cfg.cids || cfg.cid || body.googleCustomerIds || body.googleCids || body.googleCid || process.env.GOOGLE_CUSTOMER_IDS || process.env.GOOGLE_CUSTOMER_ID);
+  if(!clientId || !clientSecret || !refreshTok || !devtok || (!customerIds.length && !mcc)) return {skipped:true, reason:'Google Ads API 설정 없음 또는 Developer Token/Customer ID 누락'};
+  const token = await googleRefreshAccessToken(clientId, clientSecret, refreshTok);
+  const debug = {requestedCustomerIds:customerIds, loginCustomerId:googleCleanCustomerId(mcc), discoveredCustomerIds:[], accounts:[], errors:[]};
+  if(!customerIds.length && mcc){
+    const discovered = await googleDiscoverCustomerIds(token, devtok, mcc);
+    debug.discovery = discovered.error ? {ok:false, error:discovered.error} : {ok:true, rows:discovered.rows.length};
+    debug.discoveredCustomerIds = discovered.customerIds;
+    customerIds = discovered.customerIds;
+  }
+  if(!customerIds.length) return {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[{platform:'google', message:'조회할 Google Ads Customer ID가 없습니다. MCC만 입력했다면 하위 광고계정 자동 조회 권한을 확인하세요.'}], debug:{google:debug}};
+  let settled = await Promise.allSettled(customerIds.map(id => fetchGoogleCustomer(body, token, id, devtok, mcc)));
+  const anySuccess = settled.some(r => r.status === 'fulfilled' && ((r.value.allCamps||[]).length || (r.value.recentDays||[]).length));
+  const managerLikeFailure = settled.some(r => r.status === 'rejected' && /manager|customer_client|login-customer|Metrics cannot be requested/i.test(r.reason?.message || ''));
+  if(!anySuccess && mcc && managerLikeFailure){
+    const discovered = await googleDiscoverCustomerIds(token, devtok, mcc);
+    debug.discoveryFallback = discovered.error ? {ok:false, error:discovered.error} : {ok:true, rows:discovered.rows.length};
+    const retryIds = discovered.customerIds.filter(id => !customerIds.includes(id));
+    if(retryIds.length){
+      debug.discoveredCustomerIds = [...new Set([...(debug.discoveredCustomerIds||[]), ...retryIds])];
+      const retrySettled = await Promise.allSettled(retryIds.map(id => fetchGoogleCustomer(body, token, id, devtok, mcc)));
+      customerIds = [...customerIds, ...retryIds];
+      settled = [...settled, ...retrySettled];
+    }
+  }
+  const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], debug:{google:debug}};
+  for(let i=0;i<settled.length;i++){
+    const r=settled[i], accountId=customerIds[i];
+    if(r.status === 'fulfilled'){
+      merged.allCamps.push(...(r.value.allCamps||[]));
+      merged.allGroups.push(...(r.value.allGroups||[]));
+      merged.recentDays.push(...(r.value.recentDays||[]));
+      merged.creatives.push(...(r.value.creatives||[]));
+      merged.debug.google.accounts.push(r.value.debug);
+    }else{
+      const err={platform:'google', accountId, message:r.reason?.message || String(r.reason)};
+      merged.errors.push(err);
+      merged.debug.google.errors.push(err);
+    }
+  }
+  if(!merged.allCamps.length && merged.errors.length) throw new Error(`Google 전체 광고계정 조회 실패: ${merged.errors.map(e=>`${e.accountId}: ${e.message}`).join(' / ')}`);
+  return merged;
 }
 
 function mergePayload(parts){
-  const out={allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], skipped:[]};
+  const out={allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], skipped:[], debug:{meta:{accounts:[], rows:[], dailyRows:[], errors:[]}, google:{accounts:[], errors:[], requestedCustomerIds:[], discoveredCustomerIds:[]}}};
   for(const p of parts){
     if(!p) continue;
     if(p.skipped){ out.skipped.push(p.reason); continue; }
@@ -656,7 +816,25 @@ function mergePayload(parts){
     out.recentDays.push(...(p.recentDays||[]));
     out.creatives.push(...(p.creatives||[]));
     out.errors.push(...(p.errors||[]));
+    if(p.debug?.meta){
+      out.debug.meta.conversionConfig = p.debug.meta.conversionConfig || out.debug.meta.conversionConfig;
+      out.debug.meta.accounts.push(...(p.debug.meta.accounts||[]));
+      out.debug.meta.rows.push(...(p.debug.meta.rows||[]));
+      out.debug.meta.dailyRows.push(...(p.debug.meta.dailyRows||[]));
+      out.debug.meta.errors.push(...(p.debug.meta.errors||[]));
+    }
+    if(p.debug?.google){
+      out.debug.google.requestedCustomerIds.push(...(p.debug.google.requestedCustomerIds||[]));
+      out.debug.google.discoveredCustomerIds.push(...(p.debug.google.discoveredCustomerIds||[]));
+      out.debug.google.accounts.push(...(p.debug.google.accounts||[]));
+      out.debug.google.errors.push(...(p.debug.google.errors||[]));
+      if(p.debug.google.discovery) out.debug.google.discovery = p.debug.google.discovery;
+      if(p.debug.google.discoveryFallback) out.debug.google.discoveryFallback = p.debug.google.discoveryFallback;
+      if(p.debug.google.loginCustomerId) out.debug.google.loginCustomerId = p.debug.google.loginCustomerId;
+    }
   }
+  out.debug.google.requestedCustomerIds = [...new Set(out.debug.google.requestedCustomerIds.filter(Boolean))];
+  out.debug.google.discoveredCustomerIds = [...new Set(out.debug.google.discoveredCustomerIds.filter(Boolean))];
   out.curAgg = aggregate(out.allCamps);
   out.prevAgg = aggregate(out.allCamps.map(c=>c._prev||{}));
   return out;
@@ -673,7 +851,7 @@ module.exports = async function handler(req,res){
   const enabled = {
     naver: !!(toStr(body.naver?.cid || process.env.NAVER_CUSTOMER_ID) && toStr(body.naver?.lic || process.env.NAVER_ACCESS_LICENSE) && toStr(body.naver?.sec || process.env.NAVER_SECRET_KEY)),
     meta: !!(toStr(body.meta?.accountIds || body.meta?.accountId || body.meta?.collaborativeAccountIds || body.meta?.collabAccountIds || body.meta?.sharedAccountIds || body.meta?.catalogAccountIds || body.metaBusinessId || body.meta?.businessId || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS || process.env.META_BUSINESS_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
-    google: !!(toStr(body.google?.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.cid || process.env.GOOGLE_CUSTOMER_ID))
+    google: !!(toStr(body.google?.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.devtok || process.env.GOOGLE_DEVELOPER_TOKEN) && (toStr(body.google?.cid || body.google?.cids || body.google?.customerIds || process.env.GOOGLE_CUSTOMER_ID || process.env.GOOGLE_CUSTOMER_IDS) || toStr(body.google?.mcc || process.env.GOOGLE_MCC_ID)))
   };
   if(!enabled.naver && !enabled.meta && !enabled.google) return res.status(400).json({error:'API 연결 정보가 없습니다. 화면의 API 설정 또는 Vercel 환경변수에 네이버/메타/구글 자격 정보를 입력하세요.'});
   const tasks = [];
@@ -685,6 +863,7 @@ module.exports = async function handler(req,res){
   for(const r of results){ if(r.error) payload.errors.push({platform:r.platform, message:r.error.message}); }
   if(!payload.allCamps.length && payload.errors.length) return res.status(502).json({...payload, error:`연결된 API에서 데이터를 가져오지 못했습니다. ${joinErrors(payload.errors)}`});
   const metaConvCfg = metaConversionConfig(body);
-  payload.meta = {startDate, endDate, generatedAt:new Date().toISOString(), enabled, metaConversionBasis:metaConvCfg.basis, metaConversionBasisLabel:metaConvCfg.label, metaConversionActionTypes:metaConvCfg.actionTypes};
+  payload.meta = {startDate, endDate, generatedAt:new Date().toISOString(), enabled, metaConversionBasis:metaConvCfg.basis, metaConversionBasisLabel:metaConvCfg.label, metaConversionActionTypes:metaConvCfg.actionTypes, debug:payload.debug?.meta};
+  payload.google = {debug:payload.debug?.google};
   return res.json(payload);
 };
