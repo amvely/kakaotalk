@@ -255,12 +255,22 @@ function metaMetric(row){
   const purchaseKeys=['purchase','omni_purchase','offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase'];
   const sharedPurchaseActionKeys=['catalog_segment_actions_purchase','catalog_segment_actions_omni_purchase','catalog_segment_actions.offsite_conversion.fb_pixel_purchase','catalog_segment_actions.onsite_conversion.purchase'];
   const sharedPurchaseValueKeys=['catalog_segment_value_purchase','catalog_segment_value_omni_purchase','catalog_segment_value.offsite_conversion.fb_pixel_purchase','catalog_segment_value.onsite_conversion.purchase'];
+
+  // Meta 광고계정별 자동 분기 기준:
+  // - 협력광고 계정/row: catalog_segment_*의 공유 항목 구매/구매 전환값을 사용합니다.
+  // - 일반광고 계정/row: actions/action_values의 일반 구매/구매 전환값을 사용합니다.
+  // - 같은 row에서 둘 다 잡히는 경우 중복을 막기 위해 공유 항목 값을 우선합니다.
+  // - 여러 광고계정은 fetchMeta()에서 계정별 결과를 merge하므로 최종 대시보드에서는 자연스럽게 합산됩니다.
   const sharedPurchaseCcnt = metaActionValue(row.catalog_segment_actions, purchaseKeys) + metaDirectValue(row, sharedPurchaseActionKeys);
-  const normalPurchaseCcnt = metaActionValue(row.actions, purchaseKeys);
-  const purchaseCcnt = sharedPurchaseCcnt + normalPurchaseCcnt;
   const sharedPurchaseConvAmt = metaActionValue(row.catalog_segment_value, purchaseKeys) + metaDirectValue(row, sharedPurchaseValueKeys);
+  const hasSharedPurchaseMetric = sharedPurchaseCcnt > 0 || sharedPurchaseConvAmt > 0;
+
+  const normalPurchaseCcnt = metaActionValue(row.actions, purchaseKeys);
   const normalPurchaseConvAmt = metaActionValue(row.action_values, purchaseKeys);
-  const purchaseConvAmt = sharedPurchaseConvAmt + normalPurchaseConvAmt;
+
+  const purchaseCcnt = hasSharedPurchaseMetric ? sharedPurchaseCcnt : normalPurchaseCcnt;
+  const purchaseConvAmt = hasSharedPurchaseMetric ? sharedPurchaseConvAmt : normalPurchaseConvAmt;
+
   return calc({
     cost:row.spend,
     imp:row.impressions,
