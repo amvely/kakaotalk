@@ -217,41 +217,51 @@ async function metaBusinessAccountIds(businessId, token){
 const META_CONVERSION_PRESETS = {
   purchase: {
     label:'구매',
+    // Meta가 purchase/omni_purchase/offsite_conversion.* 등을 동시에 내려줄 수 있어
+    // 구매 별칭을 모두 더하지 않고 우선순위상 첫 값을 사용합니다.
     actionTypes:[
-      'purchase','omni_purchase','offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase',
-      'app_custom_event.fb_mobile_purchase','offline_conversion.purchase'
+      'offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase',
+      'app_custom_event.fb_mobile_purchase','offline_conversion.purchase',
+      'purchase','omni_purchase'
     ],
-    suffixes:['.purchase','.fb_pixel_purchase','.fb_mobile_purchase']
+    suffixes:['.fb_pixel_purchase','.fb_mobile_purchase','.purchase'],
+    dedupeAliases:true
   },
   lead: {
     label:'리드',
-    actionTypes:['lead','omni_lead','offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','onsite_conversion.lead','app_custom_event.fb_mobile_lead'],
-    suffixes:['.lead','.fb_pixel_lead','.fb_mobile_lead']
+    actionTypes:['offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','onsite_conversion.lead','app_custom_event.fb_mobile_lead','lead','omni_lead'],
+    suffixes:['.fb_pixel_lead','.fb_mobile_lead','.lead'],
+    dedupeAliases:true
   },
   add_to_cart: {
     label:'장바구니',
-    actionTypes:['add_to_cart','omni_add_to_cart','offsite_conversion.fb_pixel_add_to_cart','onsite_conversion.add_to_cart','app_custom_event.fb_mobile_add_to_cart'],
-    suffixes:['.add_to_cart','.fb_pixel_add_to_cart','.fb_mobile_add_to_cart']
+    actionTypes:['offsite_conversion.fb_pixel_add_to_cart','onsite_conversion.add_to_cart','app_custom_event.fb_mobile_add_to_cart','add_to_cart','omni_add_to_cart'],
+    suffixes:['.fb_pixel_add_to_cart','.fb_mobile_add_to_cart','.add_to_cart'],
+    dedupeAliases:true
   },
   initiate_checkout: {
     label:'체크아웃 시작',
-    actionTypes:['initiate_checkout','omni_initiated_checkout','offsite_conversion.fb_pixel_initiate_checkout','onsite_conversion.initiate_checkout','app_custom_event.fb_mobile_initiated_checkout'],
-    suffixes:['.initiate_checkout','.fb_pixel_initiate_checkout','.fb_mobile_initiated_checkout']
+    actionTypes:['offsite_conversion.fb_pixel_initiate_checkout','onsite_conversion.initiate_checkout','app_custom_event.fb_mobile_initiated_checkout','initiate_checkout','omni_initiated_checkout'],
+    suffixes:['.fb_pixel_initiate_checkout','.fb_mobile_initiated_checkout','.initiate_checkout'],
+    dedupeAliases:true
   },
   complete_registration: {
     label:'회원가입 완료',
-    actionTypes:['complete_registration','omni_complete_registration','offsite_conversion.fb_pixel_complete_registration','app_custom_event.fb_mobile_complete_registration'],
-    suffixes:['.complete_registration','.fb_pixel_complete_registration','.fb_mobile_complete_registration']
+    actionTypes:['offsite_conversion.fb_pixel_complete_registration','app_custom_event.fb_mobile_complete_registration','complete_registration','omni_complete_registration'],
+    suffixes:['.fb_pixel_complete_registration','.fb_mobile_complete_registration','.complete_registration'],
+    dedupeAliases:true
   },
   contact: {
     label:'문의',
-    actionTypes:['contact','omni_contact','offsite_conversion.fb_pixel_contact'],
-    suffixes:['.contact','.fb_pixel_contact']
+    actionTypes:['offsite_conversion.fb_pixel_contact','contact','omni_contact'],
+    suffixes:['.fb_pixel_contact','.contact'],
+    dedupeAliases:true
   },
   subscribe: {
     label:'구독',
-    actionTypes:['subscribe','omni_subscribe','offsite_conversion.fb_pixel_subscribe'],
-    suffixes:['.subscribe','.fb_pixel_subscribe']
+    actionTypes:['offsite_conversion.fb_pixel_subscribe','subscribe','omni_subscribe'],
+    suffixes:['.fb_pixel_subscribe','.subscribe'],
+    dedupeAliases:true
   }
 };
 function normalizeMetaActionType(v){
@@ -284,7 +294,8 @@ function metaConversionConfig(body={}){
     basis: preset ? basis : (customTypes.length ? 'custom' : 'custom'),
     label: preset ? preset.label : '커스텀 전환',
     actionTypes: [...new Set(safeActionTypes.map(normalizeMetaActionType).filter(Boolean))],
-    suffixes: preset ? (preset.suffixes || []) : []
+    suffixes: preset ? (preset.suffixes || []) : [],
+    dedupeAliases: !!preset?.dedupeAliases
   };
 }
 function isMetaSelectedActionType(actionType, config){
@@ -296,12 +307,29 @@ function isMetaSelectedActionType(actionType, config){
 }
 function metaActionValue(arr, config){
   if(!Array.isArray(arr)) return 0;
-  let total = 0;
+  const cfg = config || metaConversionConfig({});
+  const matches = [];
   for(const a of arr){
-    const type = a?.action_type ?? a?.actionType;
-    if(isMetaSelectedActionType(type, config)) total += n(a?.value);
+    const type = normalizeMetaActionType(a?.action_type ?? a?.actionType);
+    if(isMetaSelectedActionType(type, cfg)) matches.push({type, value:n(a?.value)});
   }
-  return total;
+  if(!matches.length) return 0;
+
+  // preset 기준(구매/리드/장바구니 등)은 Meta가 같은 이벤트를 여러 alias로 내려줄 수 있으므로
+  // alias들을 합산하지 않고 우선순위상 첫 action_type 값만 사용합니다.
+  // custom 기준은 사용자가 여러 action_type을 직접 넣는 케이스라 명시값들을 합산합니다.
+  if(cfg.dedupeAliases){
+    for(const preferred of (cfg.actionTypes || [])){
+      const found = matches.find(m => m.type === preferred);
+      if(found) return found.value;
+    }
+    for(const suffix of (cfg.suffixes || [])){
+      const found = matches.find(m => m.type.endsWith(suffix));
+      if(found) return found.value;
+    }
+    return matches[0].value;
+  }
+  return matches.reduce((sum, m) => sum + m.value, 0);
 }
 function metaDirectKeys(prefix, config){
   const out=[];
@@ -320,10 +348,15 @@ function metaDirectValue(row, keys){
   }
   return total;
 }
+function metaActionOrDirectValue(row, arrayField, directPrefix, config){
+  const arrayVal = metaActionValue(row?.[arrayField], config);
+  if(arrayVal) return arrayVal;
+  return metaDirectValue(row, metaDirectKeys(directPrefix, config));
+}
 function metaConversionParts(row, config){
   return {
-    sharedCcnt: metaActionValue(row.catalog_segment_actions, config) + metaDirectValue(row, metaDirectKeys('catalog_segment_actions', config)),
-    sharedConvAmt: metaActionValue(row.catalog_segment_value, config) + metaDirectValue(row, metaDirectKeys('catalog_segment_value', config)),
+    sharedCcnt: metaActionOrDirectValue(row, 'catalog_segment_actions', 'catalog_segment_actions', config),
+    sharedConvAmt: metaActionOrDirectValue(row, 'catalog_segment_value', 'catalog_segment_value', config),
     normalCcnt: metaActionValue(row.actions, config),
     normalConvAmt: metaActionValue(row.action_values, config)
   };
@@ -384,22 +417,23 @@ function metaMetric(row, mode='auto', conversionConfig=metaConversionConfig({}))
   const hasSharedMetric = p.sharedCcnt > 0 || p.sharedConvAmt > 0;
   let selectedCcnt, selectedConvAmt, metricSource;
 
-  // 메타 전환 기준이 '구매'인 경우에는 일반 구매(actions/action_values)와
-  // 협력광고의 공유 구매(catalog_segment_actions/catalog_segment_value)를 합산합니다.
-  // 리드/문의 등 비구매 기준은 동일 action_type 기준으로 normal + shared를 합산하되,
-  // shared 값이 없으면 일반 actions만 사용됩니다.
+  // 계정 단위로 기준을 분리합니다.
+  // - 일반 광고계정: actions/action_values 기준
+  // - 협력광고 계정: catalog_segment_actions/catalog_segment_value(공유 전환) 기준만 사용
+  // 최종 합계는 계정별 결과를 합산하므로, 전체로 보면 일반 구매 + 협력 공유 구매가 됩니다.
+  // 단, 협력광고 계정 안에서 일반 구매와 공유 구매를 다시 더하지 않습니다.
   if(mode === 'normal'){
     selectedCcnt = p.normalCcnt;
     selectedConvAmt = p.normalConvAmt;
     metricSource = 'meta_standard_actions';
   }else if(mode === 'shared'){
-    selectedCcnt = p.normalCcnt + p.sharedCcnt;
-    selectedConvAmt = p.normalConvAmt + p.sharedConvAmt;
-    metricSource = 'meta_shared_catalog_plus_actions';
+    selectedCcnt = p.sharedCcnt;
+    selectedConvAmt = p.sharedConvAmt;
+    metricSource = 'meta_shared_catalog_segment_only';
   }else if(hasSharedMetric){
-    selectedCcnt = p.normalCcnt + p.sharedCcnt;
-    selectedConvAmt = p.normalConvAmt + p.sharedConvAmt;
-    metricSource = 'meta_auto_catalog_plus_actions';
+    selectedCcnt = p.sharedCcnt;
+    selectedConvAmt = p.sharedConvAmt;
+    metricSource = 'meta_auto_catalog_segment_only';
   }else{
     selectedCcnt = p.normalCcnt;
     selectedConvAmt = p.normalConvAmt;
@@ -420,6 +454,10 @@ function metaMetric(row, mode='auto', conversionConfig=metaConversionConfig({}))
   out.conversionBasis = conversionConfig.basis;
   out.conversionBasisLabel = conversionConfig.label;
   out.metricSource = metricSource;
+  out.normalConversionCcnt = p.normalCcnt;
+  out.normalConversionValue = p.normalConvAmt;
+  out.sharedConversionCcnt = p.sharedCcnt;
+  out.sharedConversionValue = p.sharedConvAmt;
   return out;
 }
 function metaMetricMode(accountId, body){
