@@ -251,25 +251,42 @@ function metaObjectiveLabel(value){
   };
   return map[s] || raw || 'Meta 캠페인';
 }
-function metaMetric(row){
+function metaPurchaseParts(row){
   const purchaseKeys=['purchase','omni_purchase','offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase'];
   const sharedPurchaseActionKeys=['catalog_segment_actions_purchase','catalog_segment_actions_omni_purchase','catalog_segment_actions.offsite_conversion.fb_pixel_purchase','catalog_segment_actions.onsite_conversion.purchase'];
   const sharedPurchaseValueKeys=['catalog_segment_value_purchase','catalog_segment_value_omni_purchase','catalog_segment_value.offsite_conversion.fb_pixel_purchase','catalog_segment_value.onsite_conversion.purchase'];
+  return {
+    sharedPurchaseCcnt: metaActionValue(row.catalog_segment_actions, purchaseKeys) + metaDirectValue(row, sharedPurchaseActionKeys),
+    sharedPurchaseConvAmt: metaActionValue(row.catalog_segment_value, purchaseKeys) + metaDirectValue(row, sharedPurchaseValueKeys),
+    normalPurchaseCcnt: metaActionValue(row.actions, purchaseKeys),
+    normalPurchaseConvAmt: metaActionValue(row.action_values, purchaseKeys)
+  };
+}
+function metaMetric(row, mode='auto'){
+  const p = metaPurchaseParts(row);
+  const hasSharedPurchaseMetric = p.sharedPurchaseCcnt > 0 || p.sharedPurchaseConvAmt > 0;
+  let purchaseCcnt, purchaseConvAmt, metricSource;
 
-  // Meta 광고계정별 자동 분기 기준:
-  // - 협력광고 계정/row: catalog_segment_*의 공유 항목 구매/구매 전환값을 사용합니다.
-  // - 일반광고 계정/row: actions/action_values의 일반 구매/구매 전환값을 사용합니다.
-  // - 같은 row에서 둘 다 잡히는 경우 중복을 막기 위해 공유 항목 값을 우선합니다.
-  // - 여러 광고계정은 fetchMeta()에서 계정별 결과를 merge하므로 최종 대시보드에서는 자연스럽게 합산됩니다.
-  const sharedPurchaseCcnt = metaActionValue(row.catalog_segment_actions, purchaseKeys) + metaDirectValue(row, sharedPurchaseActionKeys);
-  const sharedPurchaseConvAmt = metaActionValue(row.catalog_segment_value, purchaseKeys) + metaDirectValue(row, sharedPurchaseValueKeys);
-  const hasSharedPurchaseMetric = sharedPurchaseCcnt > 0 || sharedPurchaseConvAmt > 0;
-
-  const normalPurchaseCcnt = metaActionValue(row.actions, purchaseKeys);
-  const normalPurchaseConvAmt = metaActionValue(row.action_values, purchaseKeys);
-
-  const purchaseCcnt = hasSharedPurchaseMetric ? sharedPurchaseCcnt : normalPurchaseCcnt;
-  const purchaseConvAmt = hasSharedPurchaseMetric ? sharedPurchaseConvAmt : normalPurchaseConvAmt;
+  // mode='shared'는 협력광고 계정으로 명시된 경우입니다.
+  // 이 경우 일반 actions/action_values 구매가 같이 내려와도 절대 섞지 않고,
+  // 광고관리자 컬럼인 공유 항목 구매/공유 항목 구매 전환값만 사용합니다.
+  if(mode === 'shared'){
+    purchaseCcnt = p.sharedPurchaseCcnt;
+    purchaseConvAmt = p.sharedPurchaseConvAmt;
+    metricSource = 'meta_shared_catalog_segment';
+  }else if(mode === 'normal'){
+    purchaseCcnt = p.normalPurchaseCcnt;
+    purchaseConvAmt = p.normalPurchaseConvAmt;
+    metricSource = 'meta_standard_purchase';
+  }else if(hasSharedPurchaseMetric){
+    purchaseCcnt = p.sharedPurchaseCcnt;
+    purchaseConvAmt = p.sharedPurchaseConvAmt;
+    metricSource = 'meta_auto_shared_catalog_segment';
+  }else{
+    purchaseCcnt = p.normalPurchaseCcnt;
+    purchaseConvAmt = p.normalPurchaseConvAmt;
+    metricSource = 'meta_auto_standard_purchase';
+  }
 
   return calc({
     cost:row.spend,
@@ -278,10 +295,27 @@ function metaMetric(row){
     conv:purchaseCcnt,
     revenue:purchaseConvAmt,
     purchaseCcnt,
-    purchaseConvAmt
+    purchaseConvAmt,
+    metricSource
   });
 }
-function mapBy(rows, idKey){ const map={}; for(const r of rows||[]){ const id=r[idKey]; if(!id) continue; map[id]=metaMetric(r); } return map; }
+function metaMetricMode(accountId, body){
+  const cfg = body.meta || {};
+  const sharedIds = parseMetaAccountIds(
+    cfg.collaborativeAccountIds || cfg.collabAccountIds || cfg.sharedAccountIds || cfg.catalogAccountIds ||
+    body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds ||
+    process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS
+  );
+  const normalIds = parseMetaAccountIds(
+    cfg.standardAccountIds || cfg.normalAccountIds || body.metaStandardAccountIds || body.metaNormalAccountIds ||
+    process.env.META_STANDARD_ACCOUNT_IDS || process.env.META_NORMAL_ACCOUNT_IDS
+  );
+  const id = cleanMetaAccountId(accountId);
+  if(sharedIds.includes(id)) return 'shared';
+  if(normalIds.includes(id)) return 'normal';
+  return 'auto';
+}
+function mapBy(rows, idKey, mode='auto'){ const map={}; for(const r of rows||[]){ const id=r[idKey]; if(!id) continue; map[id]=metaMetric(r, mode); } return map; }
 async function metaInsights(account, token, level, startISO, endISO, extra={}){
   return metaGraph(`${metaAccountPath(account)}/insights`, {
     level,
@@ -293,6 +327,7 @@ async function metaInsights(account, token, level, startISO, endISO, extra={}){
 }
 async function fetchMetaAccount(accountId, token, body){
   const metaAccountId = cleanMetaAccountId(accountId);
+  const metricMode = metaMetricMode(metaAccountId, body);
   const start = ymdToISO(body.startDate), end = ymdToISO(body.endDate);
   const [prevStartY, prevEndY] = prevRange(body.startDate, body.endDate);
   const prevStart = ymdToISO(prevStartY), prevEnd = ymdToISO(prevEndY);
@@ -308,20 +343,20 @@ async function fetchMetaAccount(accountId, token, body){
     metaGraph(`${metaAccountPath(metaAccountId)}/campaigns`, {fields:'id,status,effective_status,configured_status,objective,buying_type', limit:500}, token).catch(()=>[]),
     metaGraph(`${metaAccountPath(metaAccountId)}/adsets`, {fields:'id,campaign_id,status,effective_status,configured_status', limit:500}, token).catch(()=>[])
   ]);
-  const prevCampMap=mapBy(prevCamp,'campaign_id'), prevAdsetMap=mapBy(prevAdset,'adset_id'), adMetricMap=mapBy(adInsights,'ad_id');
+  const prevCampMap=mapBy(prevCamp,'campaign_id', metricMode), prevAdsetMap=mapBy(prevAdset,'adset_id', metricMode), adMetricMap=mapBy(adInsights,'ad_id', metricMode);
   const metaCampStatus={}; for(const c of metaCampaigns||[]) metaCampStatus[c.id]={status:c.status,effectiveStatus:c.effective_status,configuredStatus:c.configured_status,objective:c.objective,objectiveLabel:metaObjectiveLabel(c.objective),buyingType:c.buying_type,type:metaObjectiveLabel(c.objective||c.buying_type||'Meta 캠페인')};
   const metaAdsetStatus={}; for(const a of metaAdsets||[]) metaAdsetStatus[a.id]={status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status};
   const campSaleById={}, campNameById={};
   const allCamps = curCamp.map(r=>{
     const rawId=r.campaign_id; const name=r.campaign_name||rawId; const metaType=(metaCampStatus[rawId]?.type||metaCampStatus[rawId]?.objective||'Meta 캠페인'); const saleType=inferSaleType({type:metaType,campaignName:name});
     campSaleById[rawId]=saleType; campNameById[rawId]=name;
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:metaType, saleType, ...metricWithPrev(metaMetric(r), prevCampMap[rawId]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:metaType, saleType, metricMode, ...metricWithPrev(metaMetric(r, metricMode), prevCampMap[rawId]||{})};
   });
   const allGroups = curAdset.map(r=>{
     const gid=r.adset_id, cid=r.campaign_id; const name=r.adset_name||gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || name});
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, ...(metaAdsetStatus[gid]||{}), type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, ...metricWithPrev(metaMetric(r), prevAdsetMap[gid]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, ...(metaAdsetStatus[gid]||{}), type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, ...metricWithPrev(metaMetric(r, metricMode), prevAdsetMap[gid]||{})};
   });
-  const recentDays = recent.map(r=>({platform:'meta', source:'meta', accountId:metaAccountId, dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', ...metaMetric(r)}));
+  const recentDays = recent.map(r=>({platform:'meta', source:'meta', accountId:metaAccountId, dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', metricMode, ...metaMetric(r, metricMode)}));
   const adInfo = {};
   for(const a of ads||[]) adInfo[a.id] = a;
   const creatives = (adInsights||[]).map(r=>{
@@ -329,7 +364,7 @@ async function fetchMetaAccount(accountId, token, body){
     const cr=a.creative || {};
     const cid=r.campaign_id || a.campaign_id;
     const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || campNameById[cid]});
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, ...metricWithPrev(metaMetric(r), {})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, ...metricWithPrev(metaMetric(r, metricMode), {})};
   });
   return {allCamps, allGroups, recentDays, creatives};
 }
@@ -341,7 +376,8 @@ async function fetchMeta(body){
   if(!accountIds.length && businessId && token) accountIds = await metaBusinessAccountIds(businessId, token);
   if(!accountIds.length || !token) return {skipped:true, reason:'Meta API 설정 없음'};
   const settled = await Promise.allSettled(accountIds.map(accountId => fetchMetaAccount(accountId, token, body)));
-  const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], metaAccounts:accountIds};
+  const collabAccountIds = parseMetaAccountIds(cfg.collaborativeAccountIds || cfg.collabAccountIds || cfg.sharedAccountIds || cfg.catalogAccountIds || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS);
+  const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], metaAccounts:accountIds, metaCollaborativeAccounts:collabAccountIds};
   for(let i=0;i<settled.length;i++){
     const r = settled[i];
     const accountId = accountIds[i];
