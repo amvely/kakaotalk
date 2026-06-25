@@ -196,7 +196,7 @@ async function metaAdImagesByHash(accountId, token, hashes){
   const uniq=[...new Set((hashes||[]).map(toStr).filter(Boolean))];
   if(!uniq.length) return {};
   try{
-    const rows = await metaGraph(`${metaAccountPath(accountId)}/adimages`, {fields:'hash,url,permalink_url,url_128,width,height', hashes:uniq, limit:500}, token);
+    const rows = await metaGraph(`${metaAccountPath(accountId)}/adimages`, {fields:'hash,url,permalink_url,url_128,width,height,original_width,original_height', hashes:uniq, limit:500}, token);
     const map={};
     for(const r of rows||[]){ if(r.hash) map[r.hash]=r; }
     return map;
@@ -219,11 +219,9 @@ async function metaStoryMediaById(token, ids){
 }
 function metaCreativeType(cr={}, storyMedia={}){
   const spec=cr.object_story_spec || {};
-  if(cr.video_id || spec.video_data || String(storyMedia.type||'').includes('video')) return 'video';
-  if(Array.isArray(spec?.link_data?.child_attachments) && spec.link_data.child_attachments.length > 1) return 'carousel';
   const feed=cr.asset_feed_spec || {};
-  if(Array.isArray(feed.videos) && feed.videos.length) return 'video';
-  if(Array.isArray(feed.images) && feed.images.length > 1) return 'carousel';
+  if(cr.video_id || spec.video_data || String(storyMedia.type||'').includes('video') || (Array.isArray(feed.videos) && feed.videos.length)) return 'video';
+  // Meta 관리자 화면의 소재 유형 표기와 맞추기 위해 캐러셀/동적 이미지도 대시보드에서는 이미지로 표시합니다.
   return 'image';
 }
 function metaStoryPicture(cr={}){
@@ -266,54 +264,47 @@ async function metaBusinessAccountIds(businessId, token){
 const META_CONVERSION_PRESETS = {
   purchase: {
     label:'구매',
-    // Meta가 purchase/omni_purchase/offsite_conversion.* 등을 동시에 내려줄 수 있어
-    // 구매 별칭을 모두 더하지 않고 Ads Manager 통합 구매값 우선순위상 첫 값을 사용합니다.
-    actionTypes:[
-      // Meta Ads Manager의 '공유 항목의 구매' / '구매' 집계와 맞추기 위해
-      // 통합 purchase/omni_purchase 값을 우선 사용합니다.
-      // offsite/app action_type은 purchase/omni가 없을 때의 fallback입니다.
-      'purchase','omni_purchase',
-      'offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase',
-      'app_custom_event.fb_mobile_purchase','offline_conversion.purchase'
-    ],
-    suffixes:['.purchase','.fb_pixel_purchase','.fb_mobile_purchase'],
-    dedupeAliases:true
+    // 일반 광고계정은 사용자가 준 기준대로 웹 픽셀 구매만 사용합니다.
+    actionTypes:['offsite_conversion.fb_pixel_purchase'],
+    suffixes:[],
+    dedupeAliases:true,
+    // 협력광고 계정은 기존 공유 구매 기준을 유지합니다.
+    // Meta 관리자 '공유 항목의 구매'와 맞추기 위해 purchase/omni_purchase를 우선 사용하고,
+    // 없을 때만 픽셀/앱/오프라인 구매를 fallback으로 사용합니다.
+    sharedActionTypes:['purchase','omni_purchase','offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase','app_custom_event.fb_mobile_purchase','offline_conversion.purchase'],
+    sharedSuffixes:['.purchase','.fb_pixel_purchase','.fb_mobile_purchase']
   },
   lead: {
     label:'리드',
-    actionTypes:['lead','omni_lead','offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','onsite_conversion.lead','app_custom_event.fb_mobile_lead'],
-    suffixes:['.fb_pixel_lead','.fb_mobile_lead','.lead'],
-    dedupeAliases:true
+    actionTypes:['offsite_conversion.fb_pixel_lead'],
+    suffixes:[],
+    dedupeAliases:true,
+    sharedActionTypes:['lead','omni_lead','offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','onsite_conversion.lead','app_custom_event.fb_mobile_lead'],
+    sharedSuffixes:['.fb_pixel_lead','.fb_mobile_lead','.lead']
   },
   add_to_cart: {
     label:'장바구니',
-    actionTypes:['add_to_cart','omni_add_to_cart','offsite_conversion.fb_pixel_add_to_cart','onsite_conversion.add_to_cart','app_custom_event.fb_mobile_add_to_cart'],
-    suffixes:['.fb_pixel_add_to_cart','.fb_mobile_add_to_cart','.add_to_cart'],
-    dedupeAliases:true
+    actionTypes:['offsite_conversion.fb_pixel_add_to_cart'],
+    suffixes:[],
+    dedupeAliases:true,
+    sharedActionTypes:['add_to_cart','omni_add_to_cart','offsite_conversion.fb_pixel_add_to_cart','onsite_conversion.add_to_cart','app_custom_event.fb_mobile_add_to_cart'],
+    sharedSuffixes:['.fb_pixel_add_to_cart','.fb_mobile_add_to_cart','.add_to_cart']
   },
-  initiate_checkout: {
-    label:'체크아웃 시작',
-    actionTypes:['initiate_checkout','omni_initiated_checkout','offsite_conversion.fb_pixel_initiate_checkout','onsite_conversion.initiate_checkout','app_custom_event.fb_mobile_initiated_checkout'],
-    suffixes:['.fb_pixel_initiate_checkout','.fb_mobile_initiated_checkout','.initiate_checkout'],
-    dedupeAliases:true
+  link_click: {
+    label:'링크 클릭',
+    actionTypes:['link_click'],
+    suffixes:[],
+    dedupeAliases:true,
+    sharedActionTypes:['link_click'],
+    sharedSuffixes:[]
   },
-  complete_registration: {
-    label:'회원가입 완료',
-    actionTypes:['complete_registration','omni_complete_registration','offsite_conversion.fb_pixel_complete_registration','app_custom_event.fb_mobile_complete_registration'],
-    suffixes:['.fb_pixel_complete_registration','.fb_mobile_complete_registration','.complete_registration'],
-    dedupeAliases:true
-  },
-  contact: {
-    label:'문의',
-    actionTypes:['contact','omni_contact','offsite_conversion.fb_pixel_contact'],
-    suffixes:['.fb_pixel_contact','.contact'],
-    dedupeAliases:true
-  },
-  subscribe: {
-    label:'구독',
-    actionTypes:['subscribe','omni_subscribe','offsite_conversion.fb_pixel_subscribe'],
-    suffixes:['.fb_pixel_subscribe','.subscribe'],
-    dedupeAliases:true
+  landing_page_view: {
+    label:'랜딩페이지 조회',
+    actionTypes:['landing_page_view'],
+    suffixes:[],
+    dedupeAliases:true,
+    sharedActionTypes:['landing_page_view'],
+    sharedSuffixes:[]
   }
 };
 function normalizeMetaActionType(v){
@@ -344,12 +335,24 @@ function metaConversionConfig(body={}){
   // basis는 리포트 라벨/중복 alias 처리 기준으로 유지합니다.
   const actionTypes = customTypes.length ? customTypes : (preset ? preset.actionTypes : parseMetaActionTypes(rawBasis));
   const safeActionTypes = actionTypes.length ? actionTypes : META_CONVERSION_PRESETS.purchase.actionTypes;
+  const sharedTypes = preset ? (preset.sharedActionTypes || preset.actionTypes || []) : safeActionTypes;
   return {
     basis: preset ? basis : 'custom',
     label: preset ? preset.label : '커스텀 전환',
     actionTypes: [...new Set(safeActionTypes.map(normalizeMetaActionType).filter(Boolean))],
     suffixes: preset ? (preset.suffixes || []) : [],
-    dedupeAliases: !!preset?.dedupeAliases
+    dedupeAliases: !!preset?.dedupeAliases,
+    sharedActionTypes: [...new Set((sharedTypes || []).map(normalizeMetaActionType).filter(Boolean))],
+    sharedSuffixes: preset ? (preset.sharedSuffixes || preset.suffixes || []) : []
+  };
+}
+function metaSharedConversionConfig(config){
+  const cfg = config || metaConversionConfig({});
+  return {
+    ...cfg,
+    actionTypes: (cfg.sharedActionTypes && cfg.sharedActionTypes.length) ? cfg.sharedActionTypes : cfg.actionTypes,
+    suffixes: cfg.sharedSuffixes || cfg.suffixes || [],
+    dedupeAliases: true
   };
 }
 function isMetaSelectedActionType(actionType, config){
@@ -439,7 +442,7 @@ function compactMetaDebugRow(row, level, accountId, metricMode, conversionConfig
     dateStop: row.date_stop || '',
     spend:n(row.spend),
     impressions:n(row.impressions),
-    clicks:n(row.clicks),
+    clicks:n(row.inline_link_clicks ?? row.clicks),
     selectedConversionCcnt: metric.selectedConversionCcnt,
     selectedConversionValue: metric.selectedConversionValue,
     normalConversionCcnt: metric.normalConversionCcnt,
@@ -473,9 +476,10 @@ function metaActionOrDirectValue(row, arrayField, directPrefix, config){
   return metaDirectValue(row, metaDirectKeys(directPrefix, config));
 }
 function metaConversionParts(row, config){
+  const sharedConfig = metaSharedConversionConfig(config);
   return {
-    sharedCcnt: metaActionOrDirectValue(row, 'catalog_segment_actions', 'catalog_segment_actions', config),
-    sharedConvAmt: metaActionOrDirectValue(row, 'catalog_segment_value', 'catalog_segment_value', config),
+    sharedCcnt: metaActionOrDirectValue(row, 'catalog_segment_actions', 'catalog_segment_actions', sharedConfig),
+    sharedConvAmt: metaActionOrDirectValue(row, 'catalog_segment_value', 'catalog_segment_value', sharedConfig),
     normalCcnt: metaActionValue(row.actions, config),
     normalConvAmt: metaActionValue(row.action_values, config)
   };
@@ -562,7 +566,7 @@ function metaMetric(row, mode='auto', conversionConfig=metaConversionConfig({}))
   const out = calc({
     cost:row.spend,
     imp:row.impressions,
-    click:row.clicks,
+    click:(row.inline_link_clicks ?? row.clicks),
     conv:selectedCcnt,
     revenue:selectedConvAmt,
     purchaseCcnt:selectedCcnt,
@@ -599,7 +603,7 @@ function mapBy(rows, idKey, mode='auto', conversionConfig=metaConversionConfig({
 async function metaInsights(account, token, level, startISO, endISO, extra={}){
   return metaGraph(`${metaAccountPath(account)}/insights`, {
     level,
-    fields:'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,actions,action_values,catalog_segment_actions,catalog_segment_value,date_start,date_stop',
+    fields:'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,inline_link_clicks,actions,action_values,catalog_segment_actions,catalog_segment_value,date_start,date_stop',
     time_range:{since:startISO, until:endISO},
     limit:500,
     ...extra
@@ -613,13 +617,14 @@ async function fetchMetaAccount(accountId, token, body){
   const [prevStartY, prevEndY] = prevRange(body.startDate, body.endDate);
   const prevStart = ymdToISO(prevStartY), prevEnd = ymdToISO(prevEndY);
   const recentStart = ymdToISO(fmtYMD(addDays(parseYMD(body.endDate), -6)));
-  const [curCamp, prevCamp, curAdset, prevAdset, recent, ads, adInsights, prevAdInsights, metaCampaigns, metaAdsets] = await Promise.all([
+  const [accountInfo, curCamp, prevCamp, curAdset, prevAdset, recent, ads, adInsights, prevAdInsights, metaCampaigns, metaAdsets] = await Promise.all([
+    metaGraph(metaAccountPath(metaAccountId), {fields:'id,name,account_id,currency,timezone_name'}, token).catch(()=>({})),
     metaInsights(metaAccountId, token, 'campaign', start, end),
     metaInsights(metaAccountId, token, 'campaign', prevStart, prevEnd),
     metaInsights(metaAccountId, token, 'adset', start, end),
     metaInsights(metaAccountId, token, 'adset', prevStart, prevEnd),
     metaInsights(metaAccountId, token, 'account', recentStart, end, {time_increment:1}),
-    metaGraph(`${metaAccountPath(metaAccountId)}/ads`, {fields:'id,name,campaign_id,adset_id,effective_status,status,configured_status,creative{id,name,thumbnail_url,image_url,image_hash,video_id,title,body,object_story_spec,effective_object_story_id,object_story_id,effective_instagram_media_id,instagram_permalink_url,asset_feed_spec}', limit:500}, token).catch(()=>[]),
+    metaGraph(`${metaAccountPath(metaAccountId)}/ads`, {fields:'id,name,campaign_id,adset_id,effective_status,status,configured_status,creative{id,name,thumbnail_url,image_url,high_resolution_initialize_image_url,image_hash,video_id,title,body,object_story_spec,effective_object_story_id,object_story_id,effective_instagram_media_id,instagram_permalink_url,asset_feed_spec}', limit:500}, token).catch(() => metaGraph(`${metaAccountPath(metaAccountId)}/ads`, {fields:'id,name,campaign_id,adset_id,effective_status,status,configured_status,creative{id,name,thumbnail_url,image_url,image_hash,video_id,title,body,object_story_spec,effective_object_story_id,object_story_id,effective_instagram_media_id,instagram_permalink_url,asset_feed_spec}', limit:500}, token).catch(()=>[])),
     metaInsights(metaAccountId, token, 'ad', start, end).catch(()=>[]),
     metaInsights(metaAccountId, token, 'ad', prevStart, prevEnd).catch(()=>[]),
     metaGraph(`${metaAccountPath(metaAccountId)}/campaigns`, {fields:'id,status,effective_status,configured_status,objective,buying_type', limit:500}, token).catch(()=>[]),
@@ -628,17 +633,18 @@ async function fetchMetaAccount(accountId, token, body){
   const prevCampMap=mapBy(prevCamp,'campaign_id', metricMode, conversionConfig), prevAdsetMap=mapBy(prevAdset,'adset_id', metricMode, conversionConfig), adMetricMap=mapBy(adInsights,'ad_id', metricMode, conversionConfig), prevAdMetricMap=mapBy(prevAdInsights,'ad_id', metricMode, conversionConfig);
   const metaCampStatus={}; for(const c of metaCampaigns||[]) metaCampStatus[c.id]={status:c.status,effectiveStatus:c.effective_status,configuredStatus:c.configured_status,objective:c.objective,objectiveLabel:metaObjectiveLabel(c.objective),buyingType:c.buying_type,type:metaObjectiveLabel(c.objective||c.buying_type||'Meta 캠페인')};
   const metaAdsetStatus={}; for(const a of metaAdsets||[]) metaAdsetStatus[a.id]={name:a.name,status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status};
+  const accountName = accountInfo?.name || `act_${metaAccountId}`;
   const campSaleById={}, campNameById={};
   const allCamps = curCamp.map(r=>{
     const rawId=r.campaign_id; const name=r.campaign_name||rawId; const metaType=(metaCampStatus[rawId]?.type||metaCampStatus[rawId]?.objective||'Meta 캠페인'); const saleType=inferSaleType({type:metaType,campaignName:name});
     campSaleById[rawId]=saleType; campNameById[rawId]=name;
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:metaType, saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevCampMap[rawId]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, accountName, metaAccountName:accountName, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:metaType, saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevCampMap[rawId]||{})};
   });
   const allGroups = curAdset.map(r=>{
     const gid=r.adset_id, cid=r.campaign_id; const name=r.adset_name||gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || name});
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, ...(metaAdsetStatus[gid]||{}), type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevAdsetMap[gid]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, accountName, metaAccountName:accountName, id:`meta:${metaAccountId}:${gid}`, rawId:gid, groupId:gid, adgroupId:gid, adgroupName:name, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name||campNameById[cid]||cid, ...(metaAdsetStatus[gid]||{}), type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevAdsetMap[gid]||{})};
   });
-  const recentDays = recent.map(r=>({platform:'meta', source:'meta', accountId:metaAccountId, dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', metricMode, ...metaMetric(r, metricMode, conversionConfig)}));
+  const recentDays = recent.map(r=>({platform:'meta', source:'meta', accountId:metaAccountId, accountName, metaAccountName:accountName, dt:isoToYmd(r.date_start), date:isoToYmd(r.date_start).slice(4,6)+'/'+isoToYmd(r.date_start).slice(6,8), saleType:'all', metricMode, ...metaMetric(r, metricMode, conversionConfig)}));
   const adInfo = {};
   for(const a of ads||[]) adInfo[a.id] = a;
   const imageHashes=[...new Set((ads||[]).map(a=>a?.creative?.image_hash).filter(Boolean))];
@@ -655,11 +661,11 @@ async function fetchMetaAccount(accountId, token, body){
     const storyId=cr.effective_object_story_id || cr.object_story_id || '';
     const storyMedia=storyId ? (storyMediaById[storyId] || {}) : {};
     const storyPicture=metaStoryPicture(cr);
-    const imageUrl=hashImage?.permalink_url || hashImage?.url || storyMedia.image || cr.image_url || storyPicture || cr.thumbnail_url || '';
-    const thumbUrl=hashImage?.url_128 || cr.thumbnail_url || imageUrl;
+    const imageUrl=cr.high_resolution_initialize_image_url || hashImage?.permalink_url || hashImage?.url || storyMedia.image || cr.image_url || storyPicture || cr.thumbnail_url || '';
+    const thumbUrl=cr.high_resolution_initialize_image_url || hashImage?.permalink_url || hashImage?.url_128 || cr.thumbnail_url || imageUrl;
     const adName=cleanCreativeName(a.name || r.ad_name || cr.name, '이름 없는 광고 소재');
     const creativeType=metaCreativeType(cr, storyMedia);
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, adId:r.ad_id, creativeId: cr.id || r.ad_id, adName, creativeName:adName, creativeRawName:cr.name || '', status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType, thumbnailUrl: thumbUrl, imageUrl, fullSizeImageUrl:imageUrl, imageHash:cr.image_hash, imageWidth:hashImage?.width, imageHeight:hashImage?.height, videoId: cr.video_id, storyId, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:adsetId, adgroupName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', adsetName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevAdMetricMap[r.ad_id]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, accountName, metaAccountName:accountName, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, adId:r.ad_id, creativeId: cr.id || r.ad_id, adName, creativeName:adName, creativeRawName:cr.name || '', status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType, thumbnailUrl: thumbUrl, imageUrl, fullSizeImageUrl:imageUrl, imageHash:cr.image_hash, imageWidth:hashImage?.original_width || hashImage?.width, imageHeight:hashImage?.original_height || hashImage?.height, videoId: cr.video_id, storyId, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:adsetId, adgroupName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', adsetName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevAdMetricMap[r.ad_id]||{})};
   });
   return {allCamps, allGroups, recentDays, creatives, debug:{accountId:metaAccountId, metricMode, conversionConfig, rows:[], dailyRows:[]}};
 }
