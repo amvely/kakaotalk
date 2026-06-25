@@ -218,13 +218,16 @@ const META_CONVERSION_PRESETS = {
   purchase: {
     label:'구매',
     // Meta가 purchase/omni_purchase/offsite_conversion.* 등을 동시에 내려줄 수 있어
-    // 구매 별칭을 모두 더하지 않고 우선순위상 첫 값을 사용합니다.
+    // 구매 별칭을 모두 더하지 않고 Ads Manager 통합 구매값 우선순위상 첫 값을 사용합니다.
     actionTypes:[
+      // Meta Ads Manager의 '공유 항목의 구매' / '구매' 집계와 맞추기 위해
+      // 통합 purchase/omni_purchase 값을 우선 사용합니다.
+      // offsite/app action_type은 purchase/omni가 없을 때의 fallback입니다.
+      'purchase','omni_purchase',
       'offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase',
-      'app_custom_event.fb_mobile_purchase','offline_conversion.purchase',
-      'purchase','omni_purchase'
+      'app_custom_event.fb_mobile_purchase','offline_conversion.purchase'
     ],
-    suffixes:['.fb_pixel_purchase','.fb_mobile_purchase','.purchase'],
+    suffixes:['.purchase','.fb_pixel_purchase','.fb_mobile_purchase'],
     dedupeAliases:true
   },
   lead: {
