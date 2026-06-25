@@ -196,7 +196,7 @@ async function metaAdImagesByHash(accountId, token, hashes){
   const uniq=[...new Set((hashes||[]).map(toStr).filter(Boolean))];
   if(!uniq.length) return {};
   try{
-    const rows = await metaGraph(`${metaAccountPath(accountId)}/adimages`, {fields:'hash,url,permalink_url,url_128', hashes:uniq, limit:500}, token);
+    const rows = await metaGraph(`${metaAccountPath(accountId)}/adimages`, {fields:'hash,url,permalink_url,url_128,width,height', hashes:uniq, limit:500}, token);
     const map={};
     for(const r of rows||[]){ if(r.hash) map[r.hash]=r; }
     return map;
@@ -659,7 +659,7 @@ async function fetchMetaAccount(accountId, token, body){
     const thumbUrl=hashImage?.url_128 || cr.thumbnail_url || imageUrl;
     const adName=cleanCreativeName(a.name || r.ad_name || cr.name, '이름 없는 광고 소재');
     const creativeType=metaCreativeType(cr, storyMedia);
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, adId:r.ad_id, creativeId: cr.id || r.ad_id, adName, creativeName:adName, creativeRawName:cr.name || '', status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType, thumbnailUrl: thumbUrl, imageUrl, fullSizeImageUrl:imageUrl, imageHash:cr.image_hash, videoId: cr.video_id, storyId, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:adsetId, adgroupName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', adsetName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevAdMetricMap[r.ad_id]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, adId:r.ad_id, creativeId: cr.id || r.ad_id, adName, creativeName:adName, creativeRawName:cr.name || '', status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType, thumbnailUrl: thumbUrl, imageUrl, fullSizeImageUrl:imageUrl, imageHash:cr.image_hash, imageWidth:hashImage?.width, imageHeight:hashImage?.height, videoId: cr.video_id, storyId, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:adsetId, adgroupName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', adsetName:metaAdsetStatus[adsetId]?.name || r.adset_name || adsetId || '', type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), prevAdMetricMap[r.ad_id]||{})};
   });
   return {allCamps, allGroups, recentDays, creatives, debug:{accountId:metaAccountId, metricMode, conversionConfig, rows:[], dailyRows:[]}};
 }
