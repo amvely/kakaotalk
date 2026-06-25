@@ -218,20 +218,64 @@ function metaActionValue(arr, keys){
   for(const a of arr){ const type=String(a.action_type||a.actionType||'').toLowerCase(); if(lowered.some(k=>type===k || type.endsWith(`.${k}`) || type.includes(k))) total += n(a.value); }
   return total;
 }
+function metaDirectValue(row, keys){
+  let total=0;
+  for(const k of keys){
+    total += n(row?.[k]);
+    if(k.includes('.')) total += n(row?.[k.replace(/\./g,'_')]);
+  }
+  return total;
+}
+function metaObjectiveLabel(value){
+  const raw = String(value || '').trim();
+  const s = raw.toUpperCase();
+  const map = {
+    OUTCOME_SALES:'판매 목표',
+    OUTCOME_LEADS:'잠재 고객 목표',
+    OUTCOME_TRAFFIC:'트래픽 목표',
+    OUTCOME_ENGAGEMENT:'참여 목표',
+    OUTCOME_AWARENESS:'인지도 목표',
+    OUTCOME_APP_PROMOTION:'앱 홍보 목표',
+    PRODUCT_CATALOG_SALES:'카탈로그 판매',
+    CONVERSIONS:'전환',
+    LINK_CLICKS:'트래픽',
+    REACH:'도달',
+    BRAND_AWARENESS:'브랜드 인지도',
+    VIDEO_VIEWS:'동영상 조회',
+    LEAD_GENERATION:'잠재 고객',
+    MESSAGES:'메시지',
+    POST_ENGAGEMENT:'게시물 참여',
+    APP_INSTALLS:'앱 설치',
+    EVENT_RESPONSES:'이벤트 응답',
+    STORE_VISITS:'매장 방문'
+  };
+  return map[s] || raw || 'Meta 캠페인';
+}
 function metaMetric(row){
   const purchaseKeys=['purchase','omni_purchase','offsite_conversion.fb_pixel_purchase','onsite_conversion.purchase'];
-  const convKeys=[...purchaseKeys,'lead','offsite_conversion.fb_pixel_lead','complete_registration','submit_application'];
-  const purchaseCcnt = metaActionValue(row.actions, purchaseKeys);
-  const conv = metaActionValue(row.actions, convKeys) || n(row.conversions);
-  const purchaseConvAmt = metaActionValue(row.action_values, purchaseKeys);
-  const revenue = purchaseConvAmt || metaActionValue(row.action_values, convKeys) || n(row.conversion_values);
-  return calc({cost:row.spend, imp:row.impressions, click:row.clicks, conv, revenue, purchaseCcnt: purchaseCcnt || conv, purchaseConvAmt: purchaseConvAmt || revenue});
+  const sharedPurchaseActionKeys=['catalog_segment_actions_purchase','catalog_segment_actions_omni_purchase','catalog_segment_actions.offsite_conversion.fb_pixel_purchase','catalog_segment_actions.onsite_conversion.purchase'];
+  const sharedPurchaseValueKeys=['catalog_segment_value_purchase','catalog_segment_value_omni_purchase','catalog_segment_value.offsite_conversion.fb_pixel_purchase','catalog_segment_value.onsite_conversion.purchase'];
+  const sharedPurchaseCcnt = metaActionValue(row.catalog_segment_actions, purchaseKeys) + metaDirectValue(row, sharedPurchaseActionKeys);
+  const normalPurchaseCcnt = metaActionValue(row.actions, purchaseKeys);
+  const purchaseCcnt = sharedPurchaseCcnt + normalPurchaseCcnt;
+  const sharedPurchaseConvAmt = metaActionValue(row.catalog_segment_value, purchaseKeys) + metaDirectValue(row, sharedPurchaseValueKeys);
+  const normalPurchaseConvAmt = metaActionValue(row.action_values, purchaseKeys);
+  const purchaseConvAmt = sharedPurchaseConvAmt + normalPurchaseConvAmt;
+  return calc({
+    cost:row.spend,
+    imp:row.impressions,
+    click:row.clicks,
+    conv:purchaseCcnt,
+    revenue:purchaseConvAmt,
+    purchaseCcnt,
+    purchaseConvAmt
+  });
 }
 function mapBy(rows, idKey){ const map={}; for(const r of rows||[]){ const id=r[idKey]; if(!id) continue; map[id]=metaMetric(r); } return map; }
 async function metaInsights(account, token, level, startISO, endISO, extra={}){
   return metaGraph(`${metaAccountPath(account)}/insights`, {
     level,
-    fields:'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,actions,action_values,date_start,date_stop',
+    fields:'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,actions,action_values,catalog_segment_actions,catalog_segment_value,date_start,date_stop',
     time_range:{since:startISO, until:endISO},
     limit:500,
     ...extra
@@ -255,13 +299,13 @@ async function fetchMetaAccount(accountId, token, body){
     metaGraph(`${metaAccountPath(metaAccountId)}/adsets`, {fields:'id,campaign_id,status,effective_status,configured_status', limit:500}, token).catch(()=>[])
   ]);
   const prevCampMap=mapBy(prevCamp,'campaign_id'), prevAdsetMap=mapBy(prevAdset,'adset_id'), adMetricMap=mapBy(adInsights,'ad_id');
-  const metaCampStatus={}; for(const c of metaCampaigns||[]) metaCampStatus[c.id]={status:c.status,effectiveStatus:c.effective_status,configuredStatus:c.configured_status,objective:c.objective,buyingType:c.buying_type,type:c.objective||c.buying_type||'Meta 캠페인'};
+  const metaCampStatus={}; for(const c of metaCampaigns||[]) metaCampStatus[c.id]={status:c.status,effectiveStatus:c.effective_status,configuredStatus:c.configured_status,objective:c.objective,objectiveLabel:metaObjectiveLabel(c.objective),buyingType:c.buying_type,type:metaObjectiveLabel(c.objective||c.buying_type||'Meta 캠페인')};
   const metaAdsetStatus={}; for(const a of metaAdsets||[]) metaAdsetStatus[a.id]={status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status};
   const campSaleById={}, campNameById={};
   const allCamps = curCamp.map(r=>{
-    const rawId=r.campaign_id; const name=r.campaign_name||rawId; const saleType=inferSaleType({campaignName:name});
+    const rawId=r.campaign_id; const name=r.campaign_name||rawId; const metaType=(metaCampStatus[rawId]?.type||metaCampStatus[rawId]?.objective||'Meta 캠페인'); const saleType=inferSaleType({type:metaType,campaignName:name});
     campSaleById[rawId]=saleType; campNameById[rawId]=name;
-    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:(metaCampStatus[rawId]?.type||metaCampStatus[rawId]?.objective||'Meta 캠페인'), saleType, ...metricWithPrev(metaMetric(r), prevCampMap[rawId]||{})};
+    return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${rawId}`, rawId, campaignId:rawId, campaignName:name, ...(metaCampStatus[rawId]||{}), type:metaType, saleType, ...metricWithPrev(metaMetric(r), prevCampMap[rawId]||{})};
   });
   const allGroups = curAdset.map(r=>{
     const gid=r.adset_id, cid=r.campaign_id; const name=r.adset_name||gid; const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || name});
