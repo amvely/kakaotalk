@@ -232,37 +232,37 @@ const META_CONVERSION_PRESETS = {
   },
   lead: {
     label:'리드',
-    actionTypes:['offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','onsite_conversion.lead','app_custom_event.fb_mobile_lead','lead','omni_lead'],
+    actionTypes:['lead','omni_lead','offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','onsite_conversion.lead','app_custom_event.fb_mobile_lead'],
     suffixes:['.fb_pixel_lead','.fb_mobile_lead','.lead'],
     dedupeAliases:true
   },
   add_to_cart: {
     label:'장바구니',
-    actionTypes:['offsite_conversion.fb_pixel_add_to_cart','onsite_conversion.add_to_cart','app_custom_event.fb_mobile_add_to_cart','add_to_cart','omni_add_to_cart'],
+    actionTypes:['add_to_cart','omni_add_to_cart','offsite_conversion.fb_pixel_add_to_cart','onsite_conversion.add_to_cart','app_custom_event.fb_mobile_add_to_cart'],
     suffixes:['.fb_pixel_add_to_cart','.fb_mobile_add_to_cart','.add_to_cart'],
     dedupeAliases:true
   },
   initiate_checkout: {
     label:'체크아웃 시작',
-    actionTypes:['offsite_conversion.fb_pixel_initiate_checkout','onsite_conversion.initiate_checkout','app_custom_event.fb_mobile_initiated_checkout','initiate_checkout','omni_initiated_checkout'],
+    actionTypes:['initiate_checkout','omni_initiated_checkout','offsite_conversion.fb_pixel_initiate_checkout','onsite_conversion.initiate_checkout','app_custom_event.fb_mobile_initiated_checkout'],
     suffixes:['.fb_pixel_initiate_checkout','.fb_mobile_initiated_checkout','.initiate_checkout'],
     dedupeAliases:true
   },
   complete_registration: {
     label:'회원가입 완료',
-    actionTypes:['offsite_conversion.fb_pixel_complete_registration','app_custom_event.fb_mobile_complete_registration','complete_registration','omni_complete_registration'],
+    actionTypes:['complete_registration','omni_complete_registration','offsite_conversion.fb_pixel_complete_registration','app_custom_event.fb_mobile_complete_registration'],
     suffixes:['.fb_pixel_complete_registration','.fb_mobile_complete_registration','.complete_registration'],
     dedupeAliases:true
   },
   contact: {
     label:'문의',
-    actionTypes:['offsite_conversion.fb_pixel_contact','contact','omni_contact'],
+    actionTypes:['contact','omni_contact','offsite_conversion.fb_pixel_contact'],
     suffixes:['.fb_pixel_contact','.contact'],
     dedupeAliases:true
   },
   subscribe: {
     label:'구독',
-    actionTypes:['offsite_conversion.fb_pixel_subscribe','subscribe','omni_subscribe'],
+    actionTypes:['subscribe','omni_subscribe','offsite_conversion.fb_pixel_subscribe'],
     suffixes:['.fb_pixel_subscribe','.subscribe'],
     dedupeAliases:true
   }
@@ -596,12 +596,7 @@ async function fetchMetaAccount(accountId, token, body){
     const saleType=campSaleById[cid] || inferSaleType({campaignName:r.campaign_name || campNameById[cid]});
     return {platform:'meta', source:'meta', accountId:metaAccountId, id:`meta:${metaAccountId}:${r.ad_id}`, rawId:r.ad_id, creativeId: cr.id || r.ad_id, creativeName: cr.name || a.name || r.ad_name || r.ad_id, status:a.status,effectiveStatus:a.effective_status,configuredStatus:a.configured_status, creativeType: cr.video_id ? 'video' : 'image', thumbnailUrl: cr.thumbnail_url, imageUrl: cr.image_url, videoId: cr.video_id, campaignId:cid, campaignKey:`meta:${metaAccountId}:${cid}`, campaignName:r.campaign_name || campNameById[cid] || cid, adgroupId:r.adset_id || a.adset_id, type:(metaCampStatus[cid]?.type||metaCampStatus[cid]?.objective||'Meta 캠페인'), saleType, metricMode, conversionBasis:conversionConfig.basis, conversionBasisLabel:conversionConfig.label, ...metricWithPrev(metaMetric(r, metricMode, conversionConfig), {})};
   });
-  const debugRows = [
-    ...curCamp.map(r => compactMetaDebugRow(r, 'campaign', metaAccountId, metricMode, conversionConfig)),
-    ...curAdset.map(r => compactMetaDebugRow(r, 'adset', metaAccountId, metricMode, conversionConfig))
-  ].filter(r => r.spend || r.impressions || r.clicks || r.selectedConversionCcnt || r.selectedConversionValue || r.normalConversionCcnt || r.sharedConversionCcnt || r.normalConversionValue || r.sharedConversionValue).slice(0, 500);
-  const debugDailyRows = recent.map(r => compactMetaDebugRow(r, 'account_daily', metaAccountId, metricMode, conversionConfig)).slice(0, 60);
-  return {allCamps, allGroups, recentDays, creatives, debug:{accountId:metaAccountId, metricMode, conversionConfig, rows:debugRows, dailyRows:debugDailyRows}};
+  return {allCamps, allGroups, recentDays, creatives, debug:{accountId:metaAccountId, metricMode, conversionConfig, rows:[], dailyRows:[]}};
 }
 async function fetchMeta(body){
   const cfg = body.meta || {};
