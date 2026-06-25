@@ -384,21 +384,22 @@ function metaMetric(row, mode='auto', conversionConfig=metaConversionConfig({}))
   const hasSharedMetric = p.sharedCcnt > 0 || p.sharedConvAmt > 0;
   let selectedCcnt, selectedConvAmt, metricSource;
 
-  // mode='shared'는 협력광고 계정으로 명시된 경우입니다.
-  // 이 경우 일반 actions/action_values가 같이 내려와도 절대 섞지 않고,
-  // catalog_segment_actions/catalog_segment_value만 사용합니다.
-  if(mode === 'shared'){
-    selectedCcnt = p.sharedCcnt;
-    selectedConvAmt = p.sharedConvAmt;
-    metricSource = 'meta_shared_catalog_segment';
-  }else if(mode === 'normal'){
+  // 메타 전환 기준이 '구매'인 경우에는 일반 구매(actions/action_values)와
+  // 협력광고의 공유 구매(catalog_segment_actions/catalog_segment_value)를 합산합니다.
+  // 리드/문의 등 비구매 기준은 동일 action_type 기준으로 normal + shared를 합산하되,
+  // shared 값이 없으면 일반 actions만 사용됩니다.
+  if(mode === 'normal'){
     selectedCcnt = p.normalCcnt;
     selectedConvAmt = p.normalConvAmt;
     metricSource = 'meta_standard_actions';
+  }else if(mode === 'shared'){
+    selectedCcnt = p.normalCcnt + p.sharedCcnt;
+    selectedConvAmt = p.normalConvAmt + p.sharedConvAmt;
+    metricSource = 'meta_shared_catalog_plus_actions';
   }else if(hasSharedMetric){
-    selectedCcnt = p.sharedCcnt;
-    selectedConvAmt = p.sharedConvAmt;
-    metricSource = 'meta_auto_shared_catalog_segment';
+    selectedCcnt = p.normalCcnt + p.sharedCcnt;
+    selectedConvAmt = p.normalConvAmt + p.sharedConvAmt;
+    metricSource = 'meta_auto_catalog_plus_actions';
   }else{
     selectedCcnt = p.normalCcnt;
     selectedConvAmt = p.normalConvAmt;
@@ -495,11 +496,13 @@ async function fetchMeta(body){
   const cfg = body.meta || {};
   const token = toStr(cfg.token || body.metaToken || process.env.META_ACCESS_TOKEN);
   const businessId = toStr(cfg.businessId || body.metaBusinessId || process.env.META_BUSINESS_ID);
-  let accountIds = parseMetaAccountIds(cfg.accountIds || cfg.accountId || body.metaAccountIds || body.metaAccountId || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID);
+  const normalAccountIds = parseMetaAccountIds(cfg.accountIds || cfg.accountId || body.metaAccountIds || body.metaAccountId || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID);
+  const collabAccountIds = parseMetaAccountIds(cfg.collaborativeAccountIds || cfg.collabAccountIds || cfg.sharedAccountIds || cfg.catalogAccountIds || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS);
+  let accountIds = [...new Set([...normalAccountIds, ...collabAccountIds])];
   if(!accountIds.length && businessId && token) accountIds = await metaBusinessAccountIds(businessId, token);
+  accountIds = [...new Set([...accountIds, ...collabAccountIds])];
   if(!accountIds.length || !token) return {skipped:true, reason:'Meta API 설정 없음'};
   const settled = await Promise.allSettled(accountIds.map(accountId => fetchMetaAccount(accountId, token, body)));
-  const collabAccountIds = parseMetaAccountIds(cfg.collaborativeAccountIds || cfg.collabAccountIds || cfg.sharedAccountIds || cfg.catalogAccountIds || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS);
   const conversionConfig = metaConversionConfig(body);
   const merged = {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], metaAccounts:accountIds, metaCollaborativeAccounts:collabAccountIds, metaConversionBasis:conversionConfig.basis, metaConversionBasisLabel:conversionConfig.label, metaConversionActionTypes:conversionConfig.actionTypes};
   for(let i=0;i<settled.length;i++){
@@ -631,7 +634,7 @@ module.exports = async function handler(req,res){
   body.startDate = startDate; body.endDate = endDate;
   const enabled = {
     naver: !!(toStr(body.naver?.cid || process.env.NAVER_CUSTOMER_ID) && toStr(body.naver?.lic || process.env.NAVER_ACCESS_LICENSE) && toStr(body.naver?.sec || process.env.NAVER_SECRET_KEY)),
-    meta: !!(toStr(body.meta?.accountIds || body.meta?.accountId || body.metaBusinessId || body.meta?.businessId || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_BUSINESS_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
+    meta: !!(toStr(body.meta?.accountIds || body.meta?.accountId || body.meta?.collaborativeAccountIds || body.meta?.collabAccountIds || body.meta?.sharedAccountIds || body.meta?.catalogAccountIds || body.metaBusinessId || body.meta?.businessId || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS || process.env.META_BUSINESS_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
     google: !!(toStr(body.google?.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.cid || process.env.GOOGLE_CUSTOMER_ID))
   };
   if(!enabled.naver && !enabled.meta && !enabled.google) return res.status(400).json({error:'API 연결 정보가 없습니다. 화면의 API 설정 또는 Vercel 환경변수에 네이버/메타/구글 자격 정보를 입력하세요.'});
