@@ -390,6 +390,26 @@
 .api-debug-code{white-space:pre-wrap;word-break:break-word;background:#111827;color:#e5e7eb;border-radius:11px;padding:10px;margin-top:8px;max-height:220px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
 @media(max-width:780px){.api-debug-grid{grid-template-columns:1fr}}
 
+
+
+/* === v22: compact advertiser dropdown + remove debug/meta action clutter === */
+.api-debug-panel{display:none!important}
+.sidebar-advertiser-card{overflow:visible!important}
+.side-section-label{text-transform:uppercase!important}
+.side-advertiser-dropdown{position:relative;width:100%;margin-bottom:8px;z-index:60}
+.side-advertiser-button{width:100%;min-height:38px;border:1px solid #334155;background:#0b1220;color:#fff;border-radius:12px;padding:9px 11px;font-size:13px;font-weight:950;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.side-advertiser-button:hover,.side-advertiser-dropdown.open .side-advertiser-button{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.12)}
+.side-advertiser-button .placeholder{color:#94a3b8}
+.side-advertiser-caret{font-size:10px;color:#94a3b8;transition:transform .16s ease}
+.side-advertiser-dropdown.open .side-advertiser-caret{transform:rotate(180deg);color:#e2e8f0}
+.side-advertiser-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#0b1220;border:1px solid #334155;border-radius:14px;padding:7px;box-shadow:0 18px 42px rgba(0,0,0,.34);z-index:80;display:none;max-height:230px;overflow:auto;scrollbar-width:thin;scrollbar-color:#475569 #111827}
+.side-advertiser-dropdown.open .side-advertiser-menu{display:flex;flex-direction:column;gap:6px}
+.side-advertiser-menu::-webkit-scrollbar{width:9px}.side-advertiser-menu::-webkit-scrollbar-track{background:#111827;border-radius:999px}.side-advertiser-menu::-webkit-scrollbar-thumb{background:#475569;border-radius:999px;border:2px solid #111827}.side-advertiser-menu::-webkit-scrollbar-thumb:hover{background:#64748b}
+.side-adv-item{width:100%;border:1px solid #263449;background:#111c2f;color:#cbd5e1;border-radius:11px;padding:9px 10px;font-size:12px;font-weight:900;text-align:left;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center;min-height:38px}
+.side-adv-item:hover{border-color:#38bdf8;background:#172033;color:#fff}.side-adv-item.active{background:linear-gradient(135deg,#1d4ed8,#0f766e);border-color:#38bdf8;color:#fff}
+.side-adv-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:950;color:inherit}.media-boxes{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}.media-box{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:950;line-height:1;border:1px solid #334155;background:#1e293b;color:#64748b}.media-box.on.naver{background:#03c75a;border-color:#03c75a;color:#052e16}.media-box.on.meta{background:#1877f2;border-color:#1877f2;color:#fff}.media-box.on.google{background:#fbbc04;border-color:#fbbc04;color:#422006}.side-adv-empty{font-size:11px;color:#94a3b8;background:#0f172a;border:1px dashed #334155;border-radius:11px;padding:10px;text-align:center}
+#metaActionTypeBox,#metaConversionCustomField{display:none!important}
+
 </style>
 </head>
 <body>
@@ -399,16 +419,18 @@
 
     <div class="sidebar-advertiser-card" id="sidebarAdvertiserCard">
       <div class="side-section-label">ADVERTISER</div>
-      <input class="sidebar-advertiser-search" id="sideAdvertiserSearch" placeholder="광고주 검색" oninput="renderAdvertiserSelect()" />
-      <div class="side-advertiser-list" id="sideAdvertiserList"></div>
-      <div class="side-advertiser-actions">
-        <button type="button" onclick="addAdvertiser()">추가</button>
-        <button type="button" onclick="renameAdvertiser()">수정</button>
-        <button type="button" onclick="deleteAdvertiser()">삭제</button>
+      <input id="advertiserSearch" class="sidebar-advertiser-search" type="search" placeholder="광고주 검색" autocomplete="off" oninput="renderAdvertiserSelect();document.getElementById('advertiserDropdown')?.classList.add('open')" onfocus="document.getElementById('advertiserDropdown')?.classList.add('open')" onclick="event.stopPropagation()">
+      <div class="side-advertiser-dropdown" id="advertiserDropdown">
+        <button type="button" class="side-advertiser-button" onclick="toggleAdvertiserDropdown(event)"><span id="advertiserDropdownLabel" class="placeholder">광고주 선택…</span><span class="side-advertiser-caret">▼</span></button>
+        <div class="side-advertiser-menu" id="advertiserList"></div>
       </div>
-      <p>광고주를 선택한 뒤 API 설정을 저장하세요. Google MCC 공통값은 전체 광고주에 공통 적용됩니다.</p>
+      <div class="side-advertiser-actions">
+        <button type="button" onclick="openAdvertiserModal('add')">추가</button>
+        <button type="button" onclick="openAdvertiserModal('rename')">수정</button>
+        <button type="button" onclick="openAdvertiserModal('delete')">삭제</button>
+      </div>
+      <p id="advertiserInfo" style="display:none"></p>
     </div>
-
     <div class="nav-title">REPORT</div>
     <button class="nav-item active" data-tab="dashboard">📊 성과 대시보드</button>
     <button class="nav-item" data-tab="creative">🧪 소재 분석</button>
@@ -428,7 +450,6 @@
         <div class="platform-row"><button class="platform-chip active" data-platform="all"><span class="dot"></span>전체</button><button class="platform-chip" data-platform="naver"><span class="dot naver"></span>네이버</button><button class="platform-chip" data-platform="meta"><span class="dot meta"></span>메타</button><button class="platform-chip" data-platform="google"><span class="dot google"></span>구글</button></div></div>
         <div class="switches"><div class="option-row"><button class="seg-btn active" data-sale="sales">판매</button><button class="seg-btn" data-sale="nonsales">비판매</button></div><div class="diff-toggle" id="diffModeToggle"><button class="active" data-diff="rate" onclick="setDiffMode('rate')">증감률</button><button data-diff="amount" onclick="setDiffMode('amount')">증감</button></div><input type="checkbox" id="purchaseBasis" checked style="display:none"></div>
       </div><div class="status-line" id="statusLine"><div class="api-leds" id="apiLeds"><span class="led-chip idle"><i></i>네이버 대기</span><span class="led-chip idle"><i></i>메타 대기</span><span class="led-chip idle"><i></i>구글 대기</span></div><span class="status-msg"></span></div>
-      <div class="api-debug-panel" id="apiDebugPanel"></div>
     </section>
 
     <section class="tab-panel active" id="tab-dashboard">
@@ -468,6 +489,9 @@
 <div class="loading-backdrop" id="loadingOverlay"><div class="loading-card"><div class="loading-spinner"></div><strong>데이터를 불러오는 중입니다</strong><p>선택한 기간의 광고 성과를 불러오고 있습니다.</p></div></div>
 
 
+
+<div class="modal-backdrop" id="advertiserModal"><div class="modal setup-modal"><div class="modal-head"><div><h3 id="advertiserModalTitle">광고주 관리</h3><div class="mini" id="advertiserModalSub">광고주명을 입력하고 바로 가이드/API 설정으로 이동할 수 있습니다.</div></div><button class="btn" onclick="closeAdvertiserModal()">닫기</button></div><div class="modal-body"><div class="setup-shell"><aside class="setup-side"><div class="side-label">ADVERTISERS</div><div class="setup-side-title">광고주 목록</div><p class="setup-side-desc">광고주별 네이버·Meta·Google CID/API 설정이 따로 저장됩니다. Google MCC 공통 5개 값은 전체 광고주에 공통 적용됩니다.</p><div class="setup-stat-grid"><div class="setup-stat"><span>등록 광고주</span><b id="advertiserManageCount">0</b></div><div class="setup-stat"><span>선택 상태</span><b id="advertiserManageSelected">-</b></div></div><div class="side-label">LIST</div><div class="setup-list" id="advertiserManageList"></div></aside><section class="setup-content"><div class="setup-card"><h4 id="advertiserModalSectionTitle">광고주 정보</h4><p class="setup-desc" id="advertiserModalDesc">광고주명을 입력해 등록하세요. 저장 후 바로 API 설정 팝업이 열립니다.</p><div class="setup-form-grid"><div class="field full"><label>광고주명</label><input id="advertiserModalName" placeholder="예: 스탁사인"></div></div><div class="modal-inline-error" id="advertiserModalError"></div><div class="advertiser-delete-warning" id="advertiserDeleteWarning">선택한 광고주와 저장된 API 설정을 삭제합니다. 삭제 후에는 복구할 수 없습니다.</div></div><div class="setup-card soft v19-quick-api-card"><h4>가이드/API 설정 바로가기</h4><p>광고주를 선택하거나 등록한 뒤 바로 API 연결 가이드와 API 입력창을 열 수 있습니다.</p><div class="button-row"><button type="button" class="btn ghost" onclick="closeAdvertiserModal();openApiGuide(event)">API 등록 가이드</button><button type="button" class="btn primary" onclick="closeAdvertiserModal();openSettings()">선택 광고주 API 설정</button></div></div><div class="setup-card soft"><h4>권장 흐름</h4><div class="guide-steps"><div class="guide-step"><div><b>광고주 등록</b><span>광고주명을 등록하고 선택합니다.</span></div></div><div class="guide-step"><div><b>API 설정 저장</b><span>선택 광고주 기준으로 매체별 API 값을 입력합니다.</span></div></div><div class="guide-step"><div><b>데이터 불러오기</b><span>기간을 선택하고 실제 API 데이터를 조회합니다.</span></div></div></div></div></section></div></div><div class="modal-foot"><button class="btn ghost" onclick="openAdvertiserModal('add')">새 광고주</button><button class="btn ghost" onclick="closeAdvertiserModal()">취소</button><button class="btn primary" id="advertiserModalAction" onclick="saveAdvertiserModal()">저장</button></div></div></div>
+
 <div class="modal-backdrop" id="settingsModal"><div class="modal setup-modal uni-modal"><div class="modal-head"><div><h3>API 설정</h3><div class="mini">입력한 API 설정은 선택한 광고주별로 저장됩니다. Google MCC 공통 설정 5개 값은 전체 광고주에 공통 적용됩니다. 매체 탭의 <b>가이드 보기</b>를 누르면 위쪽에 설정 가이드가 펼쳐집니다.</div></div><button class="btn" onclick="closeSettings()">닫기</button></div><div class="modal-body"><div class="setup-content"><div class="v18-tab-card-row"><button type="button" class="v18-tab-card active" data-settings-tab="naver" onclick="openSettingsTab('naver')"><i>🟢</i><span>네이버<small>검색광고 API</small></span></button><button type="button" class="v18-tab-card" data-settings-tab="meta" onclick="openSettingsTab('meta')"><i>🔵</i><span>Meta<small>시스템 사용자 + 전환 기준</small></span></button><button type="button" class="v18-tab-card" data-settings-tab="google" onclick="openSettingsTab('google')"><i>🟡</i><span>Google<small>OAuth + Ads API</small></span></button></div><section class="v18-settings-section active" id="settingsTab_naver"><div class="settings-platform-card naver"><div class="settings-platform-head"><h4>네이버 검색광고 API</h4><span>광고주 계정 기준</span></div><div class="settings-platform-body"><div class="setup-form-grid"><div class="field"><label>Customer ID</label><input id="naverCid" autocomplete="off" spellcheck="false"></div><div class="field"><label>Access License</label><input id="naverLic" autocomplete="off" spellcheck="false"></div><div class="field full"><label>Secret Key</label><input id="naverSec" class="v18-secret" type="text" autocomplete="off" data-lpignore="true" data-1p-ignore="true" spellcheck="false"></div></div></div></div></section><section class="v18-settings-section" id="settingsTab_meta"><button type="button" class="guide-toggle-btn" id="guideBtn_meta" onclick="toggleGuide('meta')"><span>📖 가이드 보기</span><i>▾</i></button><div class="uni-guide" id="guide_meta"><div class="gd-inner">
 <div class="gd-head"><h4>🔵 Meta API 설정 가이드</h4><p>시스템 사용자(System User) 방식으로 발급된 토큰은 만료 기간이 없습니다.</p></div>
 <div class="gd-tip">💡 <b>시스템 사용자 토큰 방식</b>을 사용합니다. 개인 Facebook 계정과 독립적으로 동작하며, 한 번 발급 후 만료 걱정 없이 계속 사용할 수 있습니다.</div>
@@ -494,9 +518,7 @@
 <div class="gd-warn">⚠️ 토큰은 광고 데이터 접근 권한을 가진 민감 정보입니다. 외부에 공유하지 마세요.</div>
 </div></div>
 <div class="settings-platform-card meta"><div class="settings-platform-head"><h4>Meta Marketing API</h4><span>일반/협력광고 + 전환 기준</span></div><div class="settings-platform-body"><div class="setup-form-grid"><div class="field"><label>Business Portfolio ID <span class="mini">선택</span></label><input id="metaBusinessId" placeholder="Business ID가 있으면 입력" autocomplete="off" spellcheck="false"></div><div class="field"><label>Access Token</label><input id="metaToken" class="v18-secret" type="text" autocomplete="off" data-lpignore="true" data-1p-ignore="true" spellcheck="false"></div><div class="field full"><label>일반 Ad Account ID 여러 개</label><textarea id="metaAccountIds" autocomplete="off" spellcheck="false" placeholder="act_1234567890
-act_9876543210"></textarea><div class="mini">일반 광고계정 ID를 줄바꿈/쉼표로 입력합니다. 일반 구매/리드/장바구니는 actions/action_values 기준입니다.</div></div><div class="field full"><label>협력광고 Ad Account ID <span class="mini">선택</span></label><textarea id="metaCollaborativeAccountIds" autocomplete="off" spellcheck="false" placeholder="act_협력광고계정ID"></textarea><div class="mini">여기에 입력된 계정도 실제 조회 대상에 포함됩니다. 협력광고 계정은 catalog_segment_actions / catalog_segment_value 기준으로 계산합니다.</div></div><div class="field full"><label>메타 전환 기준</label><select id="metaConversionBasis" onchange="onMetaConversionBasisChange()"><option value="purchase">구매</option><option value="lead">리드</option><option value="add_to_cart">장바구니 담기</option><option value="link_click">링크 클릭</option><option value="landing_page_view">랜딩페이지 조회</option><option value="custom">커스텀</option></select><div class="mini"></div></div><div class="v18-action-box" id="metaActionTypeBox"><div class="v18-action-box-head"><div><b>사용 action_type 체크</b><span></span></div><button type="button" class="btn ghost" onclick="checkAllMetaActionTypes(true)">전체 선택</button></div><div class="v18-action-grid" id="metaActionTypeChecks"></div></div><div class="field full" id="metaConversionCustomField"><label>커스텀 action_type 직접 입력 <span class="mini">선택</span></label><textarea id="metaConversionCustomTypes" autocomplete="off" spellcheck="false" placeholder="예: offsite_conversion.fb_pixel_custom_event_purchase
-예: custom_event_name
-예: offsite_conversion.fb_pixel_custom_lead"></textarea><div class="mini"></div></div></div></div></div></section><section class="v18-settings-section" id="settingsTab_google"><button type="button" class="guide-toggle-btn" id="guideBtn_google" onclick="toggleGuide('google')"><span>📖 가이드 보기</span><i>▾</i></button><div class="uni-guide" id="guide_google"><div class="gd-inner">
+act_9876543210"></textarea><div class="mini">일반 광고계정 ID를 줄바꿈/쉼표로 입력합니다. 일반 구매/리드/장바구니는 actions/action_values 기준입니다.</div></div><div class="field full"><label>협력광고 Ad Account ID <span class="mini">선택</span></label><textarea id="metaCollaborativeAccountIds" autocomplete="off" spellcheck="false" placeholder="act_협력광고계정ID"></textarea><div class="mini">여기에 입력된 계정도 실제 조회 대상에 포함됩니다. 협력광고 계정은 catalog_segment_actions / catalog_segment_value 기준으로 계산합니다.</div></div><div class="field full"><label>메타 전환 기준</label><select id="metaConversionBasis" onchange="onMetaConversionBasisChange()"><option value="purchase">구매</option><option value="lead">리드</option><option value="add_to_cart">장바구니 담기</option><option value="link_click">링크 클릭</option><option value="landing_page_view">랜딩페이지 조회</option><option value="custom">커스텀</option></select><div class="mini"></div></div></div></div></div></section><section class="v18-settings-section" id="settingsTab_google"><button type="button" class="guide-toggle-btn" id="guideBtn_google" onclick="toggleGuide('google')"><span>📖 가이드 보기</span><i>▾</i></button><div class="uni-guide" id="guide_google"><div class="gd-inner">
 <div class="gd-head"><h4>🔴 Google MCC 공통 설정 <span class="gd-pill pink">1회 설정 · 공통 저장</span></h4><p>MCC(관리자) 계정 기준으로 1회만 입력하면, MCC 하위 계정 조회에 공통 적용됩니다.</p></div>
 <div class="gd-order"><div class="gd-order-title">📋 MCC 최초 설정 순서</div>
 
@@ -987,6 +1009,105 @@ document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>btn.addEventListen
   window.openSettings=function(){if(typeof prevOpenSettings==='function')prevOpenSettings.apply(this,arguments);setTimeout(enhanceGoogleCommonSettings,0);};
   const prevOpenSettingsTab=window.openSettingsTab;
   window.openSettingsTab=function(tab){if(typeof prevOpenSettingsTab==='function')prevOpenSettingsTab.apply(this,arguments);setTimeout(enhanceGoogleCommonSettings,0);};
+})();
+</script>
+
+
+<script>
+(function(){
+  let advertiserModalMode='add';
+  function apiStatus(settings={}){try{return advertiserApiStatus(settings||{})}catch(e){return {naver:false,meta:false,google:false}}}
+  window.advertiserMediaBoxes=function(settings={}){const st=apiStatus(settings);return `<span class="media-boxes"><span class="media-box ${st.naver?'on naver':''}" title="네이버">N</span><span class="media-box ${st.meta?'on meta':''}" title="Meta">M</span><span class="media-box ${st.google?'on google':''}" title="Google">G</span></span>`}
+  function selectedName(){try{return selectedAdvertiser()?.name||'광고주 선택…'}catch(e){return '광고주 선택…'}}
+  window.renderAdvertiserSelect=function(){
+    const list=typeof getAdvertisers==='function'?getAdvertisers():[];
+    const sel=typeof selectedAdvertiserId==='function'?selectedAdvertiserId():'';
+    const q=String(document.getElementById('advertiserSearch')?.value||'').trim().toLowerCase();
+    const filtered=q?list.filter(a=>String(a.name||'').toLowerCase().includes(q)):list;
+    const listEl=document.getElementById('advertiserList');
+    if(listEl){
+      listEl.innerHTML=list.length?(filtered.length?filtered.map(a=>`<button type="button" class="side-adv-item ${a.id===sel?'active':''}" onclick='changeAdvertiser(${JSON.stringify(String(a.id))})'><span class="side-adv-name">${escapeHtml(a.name||'광고주')}</span>${advertiserMediaBoxes(a.settings||{})}</button>`).join(''):'<div class="side-adv-empty">검색 결과가 없습니다.</div>'):'<div class="side-adv-empty">등록된 광고주가 없습니다.<br>아래 추가 버튼으로 등록하세요.</div>';
+    }
+    const label=document.getElementById('advertiserDropdownLabel');
+    if(label){const cur=selectedAdvertiser();label.textContent=cur?(cur.name||'광고주'):'광고주 선택…';label.classList.toggle('placeholder',!cur)}
+    try{syncMetaConversionControls('settings')}catch(e){}
+    try{updateHeader()}catch(e){}
+    try{updateGoogleCommonStatusUI()}catch(e){}
+    try{renderMetricMenu&&renderMetricMenu()}catch(e){}
+    try{renderRecentMetricMenu&&renderRecentMetricMenu()}catch(e){}
+  };
+  window.toggleAdvertiserDropdown=function(e){if(e)e.stopPropagation();document.getElementById('advertiserDropdown')?.classList.toggle('open')};
+  window.closeAdvertiserDropdown=function(){document.getElementById('advertiserDropdown')?.classList.remove('open')};
+  window.changeAdvertiser=function(id){if(!id)return;localStorage.setItem(ADV_SELECTED_KEY,id);expandedCampaigns?.clear?.();conversionExpandedCampaigns?.clear?.();dashboardData=null;closeAdvertiserDropdown();renderAdvertiserSelect();renderApiStatus(null,`${selectedName()} 선택됨. 데이터 불러오기를 눌러 조회하세요.`);renderDashboard()};
+  window.selectAdvertiser=function(id){changeAdvertiser(id)};
+  window.showAdvertiserModalError=function(msg){const el=document.getElementById('advertiserModalError');if(!el)return;el.textContent=msg||'';el.classList.toggle('show',!!msg)};
+  window.openAdvertiserModal=function(mode='add'){
+    advertiserModalMode=mode;
+    const cur=selectedAdvertiser();
+    const isDelete=mode==='delete', isRename=mode==='rename';
+    const title=document.getElementById('advertiserModalTitle'), sub=document.getElementById('advertiserModalSub'), sec=document.getElementById('advertiserModalSectionTitle'), desc=document.getElementById('advertiserModalDesc'), input=document.getElementById('advertiserModalName'), warn=document.getElementById('advertiserDeleteWarning'), action=document.getElementById('advertiserModalAction');
+    if(title)title.textContent=mode==='add'?'광고주 추가':isRename?'광고주 수정':'광고주 삭제';
+    if(sub)sub.textContent=mode==='add'?'광고주명을 입력하면 등록 후 API 설정창이 바로 열립니다.':isRename?'광고주명을 수정합니다.':'선택 광고주와 저장된 설정을 삭제합니다.';
+    if(sec)sec.textContent=mode==='add'?'새 광고주 정보':isRename?'광고주명 수정':'삭제 확인';
+    if(desc)desc.textContent=mode==='add'?'광고주명을 입력해 등록하세요. 저장 후 바로 API 설정 팝업이 열립니다.':isRename?'선택한 광고주의 이름만 변경됩니다.':'삭제할 광고주명을 확인하세요.';
+    if(input){input.value=mode==='add'?'':(cur?.name||'');input.disabled=isDelete;setTimeout(()=>{if(!isDelete)input.focus()},80)}
+    if(warn)warn.classList.toggle('show',isDelete);
+    if(action){action.textContent=mode==='delete'?'삭제':'저장';action.classList.toggle('danger',isDelete);action.classList.toggle('primary',true)}
+    showAdvertiserModalError('');renderAdvertiserManageList();document.getElementById('advertiserModal')?.classList.add('show');
+  };
+  window.closeAdvertiserModal=function(){document.getElementById('advertiserModal')?.classList.remove('show')};
+  window.addAdvertiser=function(){openAdvertiserModal('add')};
+  window.renameAdvertiser=function(){openAdvertiserModal('rename')};
+  window.deleteAdvertiser=function(){openAdvertiserModal('delete')};
+  window.saveAdvertiserModal=function(){
+    const nameEl=document.getElementById('advertiserModalName');
+    const name=String(nameEl?.value||'').trim();
+    let list=getAdvertisers(); const cur=selectedAdvertiser();
+    if(advertiserModalMode==='add'){
+      if(!name){showAdvertiserModalError('광고주명을 입력하세요.');nameEl?.focus();return}
+      const adv={id:typeof makeAdvertiserId==='function'?makeAdvertiserId():'adv_'+Date.now().toString(36),name,settings:{naver:{},meta:{},google:{}}};
+      list.push(adv);setAdvertisers(list);localStorage.setItem(ADV_SELECTED_KEY,adv.id);dashboardData=null;closeAdvertiserModal();renderAdvertiserSelect();renderDashboard();setTimeout(openSettings,50);return;
+    }
+    if(!cur){showAdvertiserModalError('선택한 광고주가 없습니다.');return}
+    if(advertiserModalMode==='rename'){
+      if(!name){showAdvertiserModalError('광고주명을 입력하세요.');nameEl?.focus();return}
+      list=list.map(a=>a.id===cur.id?{...a,name}:a);setAdvertisers(list);closeAdvertiserModal();renderAdvertiserSelect();updateHeader();return;
+    }
+    if(advertiserModalMode==='delete'){
+      if(list.length<=1){updateSelectedSettings({naver:{},meta:{},google:{}});closeAdvertiserModal();dashboardData=null;renderAdvertiserSelect();renderDashboard();renderApiStatus(null,'마지막 광고주는 삭제하지 않고 API 설정만 초기화했습니다.');return}
+      const next=list.filter(a=>a.id!==cur.id);setAdvertisers(next);localStorage.setItem(ADV_SELECTED_KEY,next[0]?.id||'');closeAdvertiserModal();dashboardData=null;renderAdvertiserSelect();renderDashboard();renderApiStatus(null,'광고주가 삭제되었습니다.');
+    }
+  };
+  window.renderAdvertiserManageList=function(){
+    const box=document.getElementById('advertiserManageList');if(!box)return;
+    const list=getAdvertisers(), sel=selectedAdvertiserId();
+    const count=document.getElementById('advertiserManageCount'), selected=document.getElementById('advertiserManageSelected');
+    if(count)count.textContent=String(list.length); if(selected)selected.textContent=selectedAdvertiser()?.name||'-';
+    box.innerHTML=list.length?list.map(a=>`<div class="setup-list-item ${a.id===sel?'active':''}"><div class="setup-list-main"><b>${escapeHtml(a.name||'광고주')}</b><span>${advertiserStatusMini(a.settings||{})}</span>${advertiserMediaBoxes(a.settings||{})}</div><div class="setup-list-actions"><button type="button" class="setup-mini-btn" onclick='changeAdvertiser(${JSON.stringify(String(a.id))});renderAdvertiserManageList()'>선택</button><button type="button" class="setup-mini-btn" onclick='changeAdvertiser(${JSON.stringify(String(a.id))});openAdvertiserModal("rename")'>수정</button></div></div>`).join(''):'<div class="setup-empty">등록된 광고주가 없습니다.</div>';
+  };
+  window.selectAdvertiserFromManager=function(id){changeAdvertiser(id);renderAdvertiserManageList()};
+  window.editAdvertiserFromManager=function(id){changeAdvertiser(id);openAdvertiserModal('rename')};
+  window.getCheckedMetaActionTypes=function(){return []};
+  window.getMetaConversionCustomTypes=function(){return ''};
+  window.renderMetaActionTypeChecks=function(){const box=document.getElementById('metaActionTypeChecks');if(box)box.innerHTML=''};
+  window.syncMetaConversionControls=function(source='current'){
+    const s=getSettings(); const sel=document.getElementById('metaConversionBasis');
+    const basis=source==='settings'?(s.meta?.conversionBasis||'purchase'):(sel?.value||s.meta?.conversionBasis||'purchase');
+    if(sel)sel.value=basis;
+    const box=document.getElementById('metaActionTypeBox'), custom=document.getElementById('metaConversionCustomField'), customEl=document.getElementById('metaConversionCustomTypes');
+    if(box)box.style.display='none'; if(custom)custom.style.display='none'; if(customEl)customEl.value='';
+  };
+  window.onMetaConversionBasisChange=function(){dashboardData=null;renderDashboard();renderApiStatus(null,'메타 전환 기준은 API 설정에서 저장 후 적용됩니다.')};
+  window.renderApiStatus=function(data,msg){
+    const enabled=data?.meta?.enabled||getEnabledFromSettings();
+    const errors=data?.errors||[];
+    const html=['naver','meta','google'].map(p=>{const hasErr=errors.some(e=>e.platform===p);const hasData=(data?.allCamps||[]).some(r=>r.platform===p)||(data?.recentDays||[]).some(r=>r.platform===p)||(data?.creatives||[]).some(r=>r.platform===p);const st=hasErr?'err':enabled?.[p]?(hasData||data?'ok':'idle'):'off';return ledHtml(p,st)}).join('');
+    const line=document.getElementById('statusLine'); if(line)line.innerHTML=`<div class="api-leds" id="apiLeds">${html}</div><span class="status-msg">${msg||''}</span>`;
+  };
+  window.openSettings=function(){reloadSettingsInputs();renderAdvertiserSelect();toggleGuide('meta',false);toggleGuide('google',false);openSettingsTab('naver');document.getElementById('settingsModal')?.classList.add('show');setTimeout(()=>{try{updateGoogleCommonStatusUI()}catch(e){}},0)};
+  document.getElementById('apiDebugPanel')?.remove();
+  document.addEventListener('click',()=>closeAdvertiserDropdown());
+  renderAdvertiserSelect();
 })();
 </script>
 
