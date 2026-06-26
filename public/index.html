@@ -1111,5 +1111,163 @@ document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>btn.addEventListen
 })();
 </script>
 
+
+<!-- === PATCH: 광고주 추가/수정은 API 설정창에서 처리, 삭제는 즉시 삭제 === -->
+<style>
+.settings-advertiser-name-card{background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:0 14px 34px rgba(15,23,42,.06);padding:16px;margin-bottom:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
+.settings-advertiser-name-card .field{margin:0}.settings-advertiser-name-card .field label{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#64748b;font-weight:950;margin-bottom:6px}.settings-advertiser-name-card .field input{width:100%;background:#fff;border:1.5px solid #dbe3ef;border-radius:12px;padding:12px 13px;font-size:14px;font-weight:900;outline:none;transition:border-color .15s,box-shadow .15s}.settings-advertiser-name-card .field input:focus{border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.08)}.settings-advertiser-name-card .mini{font-size:11px;color:#667085;line-height:1.5;margin-top:5px}.settings-advertiser-mode-badge{display:inline-flex;align-items:center;border:1px solid #dbeafe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:4px 9px;font-size:10px;font-weight:950;white-space:nowrap}.settings-advertiser-mode-badge.add{border-color:#bbf7d0;background:#ecfdf3;color:#166534}.settings-advertiser-name-error{display:none;color:#dc2626;font-size:12px;font-weight:900;margin-top:7px}.settings-advertiser-name-error.show{display:block}.settings-advertiser-help{font-size:11px;color:#475467;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:10px 12px;line-height:1.5;min-width:180px}.settings-advertiser-help b{display:block;color:#111827;margin-bottom:2px}@media(max-width:760px){.settings-advertiser-name-card{grid-template-columns:1fr}.settings-advertiser-help{min-width:0}}
+</style>
+<script>
+(function(){
+  let settingsAdvertiserMode='edit';
+  const mediaInputIds=['naverCid','naverLic','naverSec','metaBusinessId','metaAccountIds','metaCollaborativeAccountIds','metaToken','metaConversionCustomTypes','googleCid'];
+  function getCurrentAdvertiserName(){
+    try{return (selectedAdvertiser()?.name||'').trim()}catch(e){return ''}
+  }
+  function setSettingsNameError(msg){
+    const el=document.getElementById('settingsAdvertiserNameError');
+    if(!el)return;
+    el.textContent=msg||'';
+    el.classList.toggle('show',!!msg);
+  }
+  function ensureSettingsAdvertiserNameField(){
+    const content=document.querySelector('#settingsModal .setup-content');
+    if(!content || document.getElementById('settingsAdvertiserName'))return;
+    const card=document.createElement('div');
+    card.className='settings-advertiser-name-card';
+    card.innerHTML='<div class="field"><label>광고주명 <span class="settings-advertiser-mode-badge" id="settingsAdvertiserModeBadge">선택 광고주</span></label><input id="settingsAdvertiserName" autocomplete="off" spellcheck="false" placeholder="예: 스탁사인"><div class="mini" id="settingsAdvertiserNameHelp">광고주명과 API 설정을 같은 창에서 저장합니다.</div><div class="settings-advertiser-name-error" id="settingsAdvertiserNameError"></div></div><div class="settings-advertiser-help"><b>저장 방식</b><span id="settingsAdvertiserHelpText">수정은 현재 선택 광고주의 API 설정과 광고주명을 함께 저장합니다.</span></div>';
+    content.insertBefore(card,content.firstChild);
+  }
+  function refreshSettingsAdvertiserNameField(){
+    ensureSettingsAdvertiserNameField();
+    const input=document.getElementById('settingsAdvertiserName');
+    const badge=document.getElementById('settingsAdvertiserModeBadge');
+    const help=document.getElementById('settingsAdvertiserNameHelp');
+    const sideHelp=document.getElementById('settingsAdvertiserHelpText');
+    const isAdd=settingsAdvertiserMode==='add';
+    if(input)input.value=isAdd?'':getCurrentAdvertiserName();
+    if(badge){badge.textContent=isAdd?'새 광고주 등록':'선택 광고주 수정';badge.classList.toggle('add',isAdd)}
+    if(help)help.textContent=isAdd?'상단 광고주명을 입력한 뒤 아래 매체별 API 값을 입력하고 저장하세요.':'선택한 광고주의 이름을 여기서 수정할 수 있고, 아래 API 설정도 함께 저장됩니다.';
+    if(sideHelp)sideHelp.textContent=isAdd?'저장을 누르면 새 광고주가 생성되고 입력한 API 설정이 바로 연결됩니다.':'수정 버튼과 상단 API 설정 버튼은 동일하게 이 창을 열어 현재 광고주 설정을 수정합니다.';
+    setSettingsNameError('');
+    if(input)setTimeout(()=>input.focus(),80);
+  }
+  function clearAdvertiserApiInputs(){
+    mediaInputIds.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+    const basis=document.getElementById('metaConversionBasis');
+    if(basis)basis.value='purchase';
+    try{syncMetaConversionControls('current')}catch(e){}
+    try{updateGoogleCommonStatusUI()}catch(e){}
+  }
+  function updateAdvertiserNameById(id,name){
+    if(!id || !name)return false;
+    const list=typeof getAdvertisers==='function'?getAdvertisers():[];
+    const next=list.map(a=>String(a.id)===String(id)?Object.assign({},a,{name}):a);
+    if(typeof setAdvertisers==='function')setAdvertisers(next);
+    return true;
+  }
+  function createAdvertiserForSettings(name){
+    const list=typeof getAdvertisers==='function'?getAdvertisers():[];
+    const id=typeof makeAdvertiserId==='function'?makeAdvertiserId():'adv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
+    const adv={id,name,settings:{naver:{},meta:{},google:{}}};
+    list.push(adv);
+    if(typeof setAdvertisers==='function')setAdvertisers(list);
+    try{localStorage.setItem(ADV_SELECTED_KEY,id)}catch(e){}
+    return adv;
+  }
+  function deleteCurrentAdvertiser(){
+    const cur=typeof selectedAdvertiser==='function'?selectedAdvertiser():null;
+    let list=typeof getAdvertisers==='function'?getAdvertisers():[];
+    if(!cur){alert('삭제할 광고주가 없습니다.');return;}
+    const name=cur.name||'선택 광고주';
+    if(!confirm(name+' 광고주를 삭제할까요? 저장된 API 설정도 함께 삭제됩니다.'))return;
+    if(list.length<=1){
+      // 기존 데이터 구조가 최소 1개 광고주를 전제로 동작하므로 마지막 항목은 삭제 대신 초기화합니다.
+      if(typeof updateSelectedSettings==='function')updateSelectedSettings({naver:{},meta:{},google:{}});
+      const renamed=list.map(a=>String(a.id)===String(cur.id)?Object.assign({},a,{name:'광고주 1',settings:{naver:{},meta:{},google:{}}}):a);
+      if(typeof setAdvertisers==='function')setAdvertisers(renamed);
+      if(typeof renderAdvertiserSelect==='function')renderAdvertiserSelect();
+      if(typeof renderDashboard==='function'){dashboardData=null;renderDashboard();}
+      if(typeof renderApiStatus==='function')renderApiStatus(null,'마지막 광고주는 기본값으로 초기화했습니다.');
+      return;
+    }
+    const next=list.filter(a=>String(a.id)!==String(cur.id));
+    if(typeof setAdvertisers==='function')setAdvertisers(next);
+    try{localStorage.setItem(ADV_SELECTED_KEY,next[0]?.id||'')}catch(e){}
+    try{dashboardData=null;expandedCampaigns?.clear?.();conversionExpandedCampaigns?.clear?.()}catch(e){}
+    if(typeof renderAdvertiserSelect==='function')renderAdvertiserSelect();
+    if(typeof renderDashboard==='function')renderDashboard();
+    if(typeof renderApiStatus==='function')renderApiStatus(null,'광고주가 삭제되었습니다.');
+  }
+
+  const baseOpenSettings=window.openSettings;
+  window.openSettings=function(options){
+    settingsAdvertiserMode=options&&options.mode==='add'?'add':'edit';
+    if(typeof baseOpenSettings==='function')baseOpenSettings();
+    else document.getElementById('settingsModal')?.classList.add('show');
+    refreshSettingsAdvertiserNameField();
+    if(settingsAdvertiserMode==='add')clearAdvertiserApiInputs();
+  };
+
+  const baseCloseSettings=window.closeSettings;
+  window.closeSettings=function(){
+    settingsAdvertiserMode='edit';
+    setSettingsNameError('');
+    if(typeof baseCloseSettings==='function')baseCloseSettings();
+    else document.getElementById('settingsModal')?.classList.remove('show');
+  };
+
+  const baseSaveSettings=window.saveSettings;
+  window.saveSettings=function(){
+    ensureSettingsAdvertiserNameField();
+    const input=document.getElementById('settingsAdvertiserName');
+    const name=String(input?.value||'').trim();
+    if(!name){setSettingsNameError('광고주명을 입력하세요.');input?.focus();return;}
+    if(settingsAdvertiserMode==='add'){
+      createAdvertiserForSettings(name);
+    }else{
+      const curId=typeof selectedAdvertiserId==='function'?selectedAdvertiserId():'';
+      updateAdvertiserNameById(curId,name);
+    }
+    if(typeof baseSaveSettings==='function')baseSaveSettings();
+    settingsAdvertiserMode='edit';
+  };
+
+  const baseClearSettings=window.clearSettings;
+  window.clearSettings=function(){
+    if(settingsAdvertiserMode==='add'){
+      clearAdvertiserApiInputs();
+      setSettingsNameError('');
+      if(typeof renderApiStatus==='function')renderApiStatus(null,'새 광고주 입력창의 API 값을 초기화했습니다.');
+      return;
+    }
+    if(typeof baseClearSettings==='function')baseClearSettings();
+  };
+
+  window.openAdvertiserModal=function(mode){
+    if(mode==='delete')return deleteCurrentAdvertiser();
+    if(mode==='add')return window.openSettings({mode:'add'});
+    return window.openSettings();
+  };
+  window.addAdvertiser=function(){return window.openSettings({mode:'add'})};
+  window.renameAdvertiser=function(){return window.openSettings()};
+  window.deleteAdvertiser=deleteCurrentAdvertiser;
+  window.editAdvertiserFromManager=function(id){
+    if(id&&typeof changeAdvertiser==='function')changeAdvertiser(id);
+    window.openSettings();
+  };
+  window.closeAdvertiserModal=function(){document.getElementById('advertiserModal')?.classList.remove('show')};
+
+  const baseRenderAdvertiserSelect=window.renderAdvertiserSelect;
+  window.renderAdvertiserSelect=function(){
+    if(typeof baseRenderAdvertiserSelect==='function')baseRenderAdvertiserSelect.apply(this,arguments);
+    if(document.getElementById('settingsModal')?.classList.contains('show') && settingsAdvertiserMode!=='add')refreshSettingsAdvertiserNameField();
+  };
+
+  document.addEventListener('DOMContentLoaded',ensureSettingsAdvertiserNameField);
+  ensureSettingsAdvertiserNameField();
+})();
+</script>
+
 </body>
 </html>
