@@ -977,6 +977,13 @@ function mergePayload(parts){
   out.prevAgg = aggregate(out.allCamps.map(c=>c._prev||{}));
   return out;
 }
+function withoutDebug(obj){
+  const out = {...(obj || {})};
+  delete out.debug;
+  if(out.meta && typeof out.meta === 'object') delete out.meta.debug;
+  if(out.google && typeof out.google === 'object') delete out.google.debug;
+  return out;
+}
 
 module.exports = async function handler(req,res){
   responseHeaders(res);
@@ -1018,9 +1025,10 @@ module.exports = async function handler(req,res){
       if(r.platform==='google') payload.debug.google.errors.push(err);
     }
   }
-  if(!payload.allCamps.length && payload.errors.length) return res.status(502).json({...payload, error:`연결된 API에서 데이터를 가져오지 못했습니다. ${joinErrors(payload.errors)}`});
+  if(!payload.allCamps.length && payload.errors.length) return res.status(502).json(withoutDebug({...payload, error:`연결된 API에서 데이터를 가져오지 못했습니다. ${joinErrors(payload.errors)}`}));
   const metaConvCfg = metaConversionConfig(body);
-  payload.meta = {startDate, endDate, generatedAt:new Date().toISOString(), enabled, metaConversionBasis:metaConvCfg.basis, metaConversionBasisLabel:metaConvCfg.label, metaConversionActionTypes:metaConvCfg.actionTypes, debug:payload.debug?.meta};
-  payload.google = {debug:payload.debug?.google};
+  payload.meta = {startDate, endDate, generatedAt:new Date().toISOString(), enabled, metaConversionBasis:metaConvCfg.basis, metaConversionBasisLabel:metaConvCfg.label, metaConversionActionTypes:metaConvCfg.actionTypes};
+  delete payload.debug;
+  delete payload.google;
   return res.json(payload);
 };
