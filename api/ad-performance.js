@@ -19,6 +19,23 @@ function fmtYMD(d){ return d.toISOString().slice(0,10).replace(/-/g,''); }
 function addDays(d, days){ const x = new Date(d); x.setUTCDate(x.getUTCDate() + days); return x; }
 function prevRange(startDate, endDate){ const s=parseYMD(startDate), e=parseYMD(endDate); const pe=addDays(s,-1); const span=Math.round((e-s)/86400000); const ps=addDays(pe,-span); return [fmtYMD(ps), fmtYMD(pe)]; }
 function chunk(arr, size=200){ const out=[]; for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size)); return out; }
+// 동시 실행 개수를 limit로 제한하면서 Promise.allSettled와 동일한 결과 형태를 반환합니다.
+// MCC 산하 계정이 수십~수백 개일 때 동시 요청 폭주로 인한 서버리스 타임아웃/RESOURCE_EXHAUSTED를 방지합니다.
+async function mapLimit(items, limit, fn){
+  const list = Array.from(items || []);
+  const results = new Array(list.length);
+  let idx = 0;
+  const size = Math.max(1, Math.min(limit, list.length || 1));
+  const workers = new Array(size).fill(0).map(async () => {
+    while(idx < list.length){
+      const cur = idx++;
+      try{ results[cur] = { status:'fulfilled', value: await fn(list[cur], cur) }; }
+      catch(e){ results[cur] = { status:'rejected', reason: e }; }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 function inferSaleType(row){
   if(row.saleType === 'sales' || row.saleType === 'nonsales') return row.saleType;
   const t = `${row.type || ''} ${row.campaignName || row.campNm || row.name || ''}`.toLowerCase();
@@ -725,14 +742,8 @@ function googleApiErrorMessage(status, text){
   const details = Array.isArray(err?.error?.details) ? err.error.details.map(d => d?.errors ? d.errors.map(e => e.message || e.errorCode && JSON.stringify(e.errorCode)).filter(Boolean).join(', ') : '').filter(Boolean).join(' / ') : '';
   return `Google Ads API 오류 (${status}) ${base}${details ? ' / ' + details : ''}`;
 }
-async function googleSearch(accessToken, devtok, mcc, cid, query){
-  const cleanCid = googleCleanCustomerId(cid);
-  const headers = {'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`};
-  if(devtok) headers['developer-token']=devtok;
-  if(mcc) headers['login-customer-id']=googleCleanCustomerId(mcc);
-  const resp = await fetch(`${GOOGLE_ADS_BASE}/customers/${cleanCid}/googleAds:searchStream`, {method:'POST', headers, body:JSON.stringify({query})});
-  const text = await resp.text();
-  if(!resp.ok) throw new Error(googleApiErrorMessage(resp.status, text));
+// searchStream 응답(JSON 배열 또는 NDJSON)을 results 행 배열로 파싱합니다.
+function googleParseRows(text){
   const rows=[];
   try{
     const parsed=JSON.parse(text); const chunks=Array.isArray(parsed)?parsed:[parsed];
@@ -741,6 +752,36 @@ async function googleSearch(accessToken, devtok, mcc, cid, query){
     for(const line of text.trim().split('\n').filter(Boolean)){ try{ const p=JSON.parse(line); const chunks=Array.isArray(p)?p:[p]; for(const c of chunks) if(c.results) rows.push(...c.results); }catch{} }
   }
   return rows;
+}
+// loginCid(=login-customer-id 헤더)를 지정해 단 한 번 호출합니다.
+async function googleSearchOnce(accessToken, devtok, loginCid, cid, query){
+  const cleanCid = googleCleanCustomerId(cid);
+  const headers = {'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`};
+  if(devtok) headers['developer-token']=devtok;
+  const cleanLogin = googleCleanCustomerId(loginCid);
+  if(cleanLogin) headers['login-customer-id']=cleanLogin;
+  const resp = await fetch(`${GOOGLE_ADS_BASE}/customers/${cleanCid}/googleAds:searchStream`, {method:'POST', headers, body:JSON.stringify({query})});
+  const text = await resp.text();
+  if(!resp.ok){ const err=new Error(googleApiErrorMessage(resp.status, text)); err.status=resp.status; throw err; }
+  return googleParseRows(text);
+}
+// MCC(login-customer-id)를 우선 사용하되, 해당 MCC가 관리하지 않는 계정(=OAuth 사용자가
+// 직접 권한을 가진 계정)이면 권한 오류가 나므로 login-customer-id 없이 1회 재시도합니다.
+// 이것이 "MCC는 저장됐는데 직접 연동 계정 CID를 넣으면 조회가 안 되던" 문제의 핵심 해결입니다.
+async function googleSearch(accessToken, devtok, mcc, cid, query){
+  const cleanMcc = googleCleanCustomerId(mcc);
+  const cleanCid = googleCleanCustomerId(cid);
+  try{
+    return await googleSearchOnce(accessToken, devtok, cleanMcc, cid, query);
+  }catch(e){
+    // MCC와 조회 대상 CID가 다를 때만(자기 자신 조회/디스커버리는 제외) 폴백을 시도합니다.
+    const retriable = cleanMcc && cleanMcc !== cleanCid &&
+      /USER_PERMISSION_DENIED|login.?customer|permission|authoriz|authenticat|NOT_FOUND|customer.*not.*found/i.test(e.message || '');
+    if(retriable){
+      return await googleSearchOnce(accessToken, devtok, '', cid, query);
+    }
+    throw e;
+  }
 }
 async function googleDiscoverCustomerIds(accessToken, devtok, managerId){
   const mid = googleCleanCustomerId(managerId);
@@ -842,7 +883,7 @@ async function fetchGoogle(body){
     customerIds = discovered.customerIds;
   }
   if(!customerIds.length) return {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[{platform:'google', message:'조회할 Google Ads Customer ID가 없습니다. MCC만 입력했다면 하위 광고계정 자동 조회 권한을 확인하세요.'}], debug:{google:debug}};
-  let settled = await Promise.allSettled(customerIds.map(id => fetchGoogleCustomer(body, token, id, devtok, mcc)));
+  let settled = await mapLimit(customerIds, 8, id => fetchGoogleCustomer(body, token, id, devtok, mcc));
   const anySuccess = settled.some(r => r.status === 'fulfilled' && ((r.value.allCamps||[]).length || (r.value.recentDays||[]).length));
   const managerLikeFailure = settled.some(r => r.status === 'rejected' && /manager|customer_client|login-customer|Metrics cannot be requested/i.test(r.reason?.message || ''));
   if(!anySuccess && mcc && managerLikeFailure){
@@ -851,7 +892,7 @@ async function fetchGoogle(body){
     const retryIds = discovered.customerIds.filter(id => !customerIds.includes(id));
     if(retryIds.length){
       debug.discoveredCustomerIds = [...new Set([...(debug.discoveredCustomerIds||[]), ...retryIds])];
-      const retrySettled = await Promise.allSettled(retryIds.map(id => fetchGoogleCustomer(body, token, id, devtok, mcc)));
+      const retrySettled = await mapLimit(retryIds, 8, id => fetchGoogleCustomer(body, token, id, devtok, mcc));
       customerIds = [...customerIds, ...retryIds];
       settled = [...settled, ...retrySettled];
     }
