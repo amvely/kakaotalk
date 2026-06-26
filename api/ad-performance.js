@@ -873,9 +873,22 @@ async function fetchGoogle(body){
   const devtok = toStr(cfg.devtok || cfg.developerToken || body.devtok || body.developerToken || body.googleDevtok || process.env.GOOGLE_DEVELOPER_TOKEN);
   const mcc = toStr(cfg.mcc || cfg.loginCustomerId || cfg.mccLoginCustomerId || body.mcc || body.loginCustomerId || body.mccLoginCustomerId || body.googleMcc || body.googleLoginCustomerId || process.env.GOOGLE_MCC_ID || process.env.GOOGLE_LOGIN_CUSTOMER_ID);
   let customerIds = parseGoogleCustomerIds(cfg.customerIds || cfg.customerId || cfg.cids || cfg.cid || body.customerIds || body.customerId || body.cids || body.cid || body.googleCustomerIds || body.googleCids || body.googleCid || process.env.GOOGLE_CUSTOMER_IDS || process.env.GOOGLE_CUSTOMER_ID);
-  if(!mcc || !clientId || !clientSecret || !refreshTok || !devtok) return {skipped:true, reason:'Google Ads API 설정 없음: MCC Login Customer ID, Client ID, Client Secret, Refresh Token, Developer Token을 모두 입력하세요.'};
-  const token = await googleRefreshAccessToken(clientId, clientSecret, refreshTok);
-  const debug = {requestedCustomerIds:customerIds, loginCustomerId:googleCleanCustomerId(mcc), discoveredCustomerIds:[], accounts:[], errors:[]};
+  const debug = {requestedCustomerIds:customerIds, loginCustomerId:googleCleanCustomerId(mcc), discoveredCustomerIds:[], accounts:[], errors:[], config:{hasMcc:!!mcc, hasClientId:!!clientId, hasClientSecret:!!clientSecret, hasRefreshToken:!!refreshTok, hasDeveloperToken:!!devtok}};
+  if(!mcc || !clientId || !clientSecret || !refreshTok || !devtok){
+    const missing=[]; if(!mcc) missing.push('MCC Login Customer ID'); if(!clientId) missing.push('Client ID'); if(!clientSecret) missing.push('Client Secret'); if(!refreshTok) missing.push('Refresh Token'); if(!devtok) missing.push('Developer Token');
+    debug.errors.push({platform:'google', stage:'config', message:`Google Ads API 설정 없음: ${missing.join(', ')}`});
+    return {skipped:true, reason:'Google Ads API 설정 없음: MCC Login Customer ID, Client ID, Client Secret, Refresh Token, Developer Token을 모두 입력하세요.', debug:{google:debug}};
+  }
+  let token='';
+  try{
+    token = await googleRefreshAccessToken(clientId, clientSecret, refreshTok);
+    debug.oauth = {ok:true};
+  }catch(e){
+    const err={platform:'google', stage:'oauth', message:e.message || String(e)};
+    debug.oauth = {ok:false, error:err.message};
+    debug.errors.push(err);
+    return {allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[err], debug:{google:debug}};
+  }
   if(!customerIds.length && mcc){
     const discovered = await googleDiscoverCustomerIds(token, devtok, mcc);
     debug.discovery = discovered.error ? {ok:false, error:discovered.error} : {ok:true, rows:discovered.rows.length};
@@ -912,7 +925,9 @@ async function fetchGoogle(body){
       merged.debug.google.errors.push(err);
     }
   }
-  if(!merged.allCamps.length && merged.errors.length) throw new Error(`Google 전체 광고계정 조회 실패: ${merged.errors.map(e=>`${e.accountId}: ${e.message}`).join(' / ')}`);
+  if(!merged.allCamps.length && merged.errors.length){
+    merged.debug.google.fullFailure = `Google 전체 광고계정 조회 실패: ${merged.errors.map(e=>`${e.accountId}: ${e.message}`).join(' / ')}`;
+  }
   return merged;
 }
 
@@ -920,7 +935,17 @@ function mergePayload(parts){
   const out={allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], skipped:[], debug:{meta:{accounts:[], rows:[], dailyRows:[], errors:[]}, google:{accounts:[], errors:[], requestedCustomerIds:[], discoveredCustomerIds:[]}}};
   for(const p of parts){
     if(!p) continue;
-    if(p.skipped){ out.skipped.push(p.reason); continue; }
+    if(p.skipped){
+      out.skipped.push(p.reason);
+      if(p.debug?.google){
+        out.debug.google.requestedCustomerIds.push(...(p.debug.google.requestedCustomerIds||[]));
+        out.debug.google.discoveredCustomerIds.push(...(p.debug.google.discoveredCustomerIds||[]));
+        out.debug.google.accounts.push(...(p.debug.google.accounts||[]));
+        out.debug.google.errors.push(...(p.debug.google.errors||[]));
+        if(p.debug.google.config) out.debug.google.config = p.debug.google.config;
+      }
+      continue;
+    }
     out.allCamps.push(...(p.allCamps||[]));
     out.allGroups.push(...(p.allGroups||[]));
     out.recentDays.push(...(p.recentDays||[]));
@@ -941,6 +966,9 @@ function mergePayload(parts){
       if(p.debug.google.discovery) out.debug.google.discovery = p.debug.google.discovery;
       if(p.debug.google.discoveryFallback) out.debug.google.discoveryFallback = p.debug.google.discoveryFallback;
       if(p.debug.google.loginCustomerId) out.debug.google.loginCustomerId = p.debug.google.loginCustomerId;
+      if(p.debug.google.config) out.debug.google.config = p.debug.google.config;
+      if(p.debug.google.oauth) out.debug.google.oauth = p.debug.google.oauth;
+      if(p.debug.google.fullFailure) out.debug.google.fullFailure = p.debug.google.fullFailure;
     }
   }
   out.debug.google.requestedCustomerIds = [...new Set(out.debug.google.requestedCustomerIds.filter(Boolean))];
@@ -983,7 +1011,13 @@ module.exports = async function handler(req,res){
   if(enabled.google) tasks.push(fetchGoogle(body).then(v=>({platform:'google', value:v})).catch(e=>({platform:'google', error:e})));
   const results = await Promise.all(tasks);
   const payload = mergePayload(results.map(r=>r.value));
-  for(const r of results){ if(r.error) payload.errors.push({platform:r.platform, message:r.error.message}); }
+  for(const r of results){
+    if(r.error){
+      const err={platform:r.platform, message:r.error.message};
+      payload.errors.push(err);
+      if(r.platform==='google') payload.debug.google.errors.push(err);
+    }
+  }
   if(!payload.allCamps.length && payload.errors.length) return res.status(502).json({...payload, error:`연결된 API에서 데이터를 가져오지 못했습니다. ${joinErrors(payload.errors)}`});
   const metaConvCfg = metaConversionConfig(body);
   payload.meta = {startDate, endDate, generatedAt:new Date().toISOString(), enabled, metaConversionBasis:metaConvCfg.basis, metaConversionBasisLabel:metaConvCfg.label, metaConversionActionTypes:metaConvCfg.actionTypes, debug:payload.debug?.meta};
