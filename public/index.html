@@ -397,6 +397,18 @@
   <aside class="sidebar">
     <div class="brand"><div class="brand-mark">AD</div><div class="brand-text"><strong>매체 통합 대시보드</strong><span>네이버/메타/구글</span></div></div>
 
+    <div class="sidebar-advertiser-card" id="sidebarAdvertiserCard">
+      <div class="side-section-label">ADVERTISER</div>
+      <input class="sidebar-advertiser-search" id="sideAdvertiserSearch" placeholder="광고주 검색" oninput="renderAdvertiserSelect()" />
+      <div class="side-advertiser-list" id="sideAdvertiserList"></div>
+      <div class="side-advertiser-actions">
+        <button type="button" onclick="addAdvertiser()">추가</button>
+        <button type="button" onclick="renameAdvertiser()">수정</button>
+        <button type="button" onclick="deleteAdvertiser()">삭제</button>
+      </div>
+      <p>광고주를 선택한 뒤 API 설정을 저장하세요. Google MCC 공통값은 전체 광고주에 공통 적용됩니다.</p>
+    </div>
+
     <div class="nav-title">REPORT</div>
     <button class="nav-item active" data-tab="dashboard">📊 성과 대시보드</button>
     <button class="nav-item" data-tab="creative">🧪 소재 분석</button>
@@ -456,7 +468,7 @@
 <div class="loading-backdrop" id="loadingOverlay"><div class="loading-card"><div class="loading-spinner"></div><strong>데이터를 불러오는 중입니다</strong><p>선택한 기간의 광고 성과를 불러오고 있습니다.</p></div></div>
 
 
-<div class="modal-backdrop" id="settingsModal"><div class="modal setup-modal uni-modal"><div class="modal-head"><div><h3>API 설정</h3><div class="mini">입력한 API 설정은 이 브라우저의 단일 공통 설정으로 저장됩니다. 매체 탭의 <b>가이드 보기</b>를 누르면 위쪽에 설정 가이드가 펼쳐집니다.</div></div><button class="btn" onclick="closeSettings()">닫기</button></div><div class="modal-body"><div class="setup-content"><div class="v18-tab-card-row"><button type="button" class="v18-tab-card active" data-settings-tab="naver" onclick="openSettingsTab('naver')"><i>🟢</i><span>네이버<small>검색광고 API</small></span></button><button type="button" class="v18-tab-card" data-settings-tab="meta" onclick="openSettingsTab('meta')"><i>🔵</i><span>Meta<small>시스템 사용자 + 전환 기준</small></span></button><button type="button" class="v18-tab-card" data-settings-tab="google" onclick="openSettingsTab('google')"><i>🟡</i><span>Google<small>OAuth + Ads API</small></span></button></div><section class="v18-settings-section active" id="settingsTab_naver"><div class="settings-platform-card naver"><div class="settings-platform-head"><h4>네이버 검색광고 API</h4><span>광고주 계정 기준</span></div><div class="settings-platform-body"><div class="setup-form-grid"><div class="field"><label>Customer ID</label><input id="naverCid" autocomplete="off" spellcheck="false"></div><div class="field"><label>Access License</label><input id="naverLic" autocomplete="off" spellcheck="false"></div><div class="field full"><label>Secret Key</label><input id="naverSec" class="v18-secret" type="text" autocomplete="off" data-lpignore="true" data-1p-ignore="true" spellcheck="false"></div></div></div></div></section><section class="v18-settings-section" id="settingsTab_meta"><button type="button" class="guide-toggle-btn" id="guideBtn_meta" onclick="toggleGuide('meta')"><span>📖 가이드 보기</span><i>▾</i></button><div class="uni-guide" id="guide_meta"><div class="gd-inner">
+<div class="modal-backdrop" id="settingsModal"><div class="modal setup-modal uni-modal"><div class="modal-head"><div><h3>API 설정</h3><div class="mini">입력한 API 설정은 선택한 광고주별로 저장됩니다. Google MCC 공통 설정 5개 값은 전체 광고주에 공통 적용됩니다. 매체 탭의 <b>가이드 보기</b>를 누르면 위쪽에 설정 가이드가 펼쳐집니다.</div></div><button class="btn" onclick="closeSettings()">닫기</button></div><div class="modal-body"><div class="setup-content"><div class="v18-tab-card-row"><button type="button" class="v18-tab-card active" data-settings-tab="naver" onclick="openSettingsTab('naver')"><i>🟢</i><span>네이버<small>검색광고 API</small></span></button><button type="button" class="v18-tab-card" data-settings-tab="meta" onclick="openSettingsTab('meta')"><i>🔵</i><span>Meta<small>시스템 사용자 + 전환 기준</small></span></button><button type="button" class="v18-tab-card" data-settings-tab="google" onclick="openSettingsTab('google')"><i>🟡</i><span>Google<small>OAuth + Ads API</small></span></button></div><section class="v18-settings-section active" id="settingsTab_naver"><div class="settings-platform-card naver"><div class="settings-platform-head"><h4>네이버 검색광고 API</h4><span>광고주 계정 기준</span></div><div class="settings-platform-body"><div class="setup-form-grid"><div class="field"><label>Customer ID</label><input id="naverCid" autocomplete="off" spellcheck="false"></div><div class="field"><label>Access License</label><input id="naverLic" autocomplete="off" spellcheck="false"></div><div class="field full"><label>Secret Key</label><input id="naverSec" class="v18-secret" type="text" autocomplete="off" data-lpignore="true" data-1p-ignore="true" spellcheck="false"></div></div></div></div></section><section class="v18-settings-section" id="settingsTab_meta"><button type="button" class="guide-toggle-btn" id="guideBtn_meta" onclick="toggleGuide('meta')"><span>📖 가이드 보기</span><i>▾</i></button><div class="uni-guide" id="guide_meta"><div class="gd-inner">
 <div class="gd-head"><h4>🔵 Meta API 설정 가이드</h4><p>시스템 사용자(System User) 방식으로 발급된 토큰은 만료 기간이 없습니다.</p></div>
 <div class="gd-tip">💡 <b>시스템 사용자 토큰 방식</b>을 사용합니다. 개인 Facebook 계정과 독립적으로 동작하며, 한 번 발급 후 만료 걱정 없이 계속 사용할 수 있습니다.</div>
 
@@ -502,7 +514,7 @@ act_9876543210"></textarea><div class="mini">일반 광고계정 ID를 줄바꿈
 
 <div class="gd-onum done"><span class="gd-circle">⑥</span><div class="gd-onum-body"><b>아래 항목 입력 후 저장</b> — 이후 조회 대상 변경 시 <b>CID만 입력</b>하면 끝!</div></div>
 </div></div></div>
-<div class="settings-platform-card google"><div class="settings-platform-head"><h4>Google Ads 공통 설정</h4><span>공통</span></div><div class="settings-platform-body"><div class="google-common-status" id="googleCommonStatusBox"><div><b id="googleCommonStatusTitle">Google Ads 공통 설정 필요</b><span id="googleCommonStatusSub">MCC Login Customer ID · Client ID · Client Secret · Refresh Token · Developer Token을 입력하세요.</span></div></div><div class="setup-form-grid"><div class="field"><label>MCC Login Customer ID <span class="api-saved-tag need" id="googleCommonMccBadge">저장 필요</span></label><input autocomplete="off" id="googleCommonMcc" placeholder="123-456-7890" spellcheck="false"><div class="mini">관리자 계정 ID입니다. 모든 Google Ads API 조회의 login-customer-id 헤더에 적용됩니다.</div></div><div class="field"><label>Client ID <span class="api-saved-tag need" id="googleCommonClientIdBadge">저장 필요</span></label><input autocomplete="off" id="googleCommonClientId" placeholder="xxxxxxxx.apps.googleusercontent.com" spellcheck="false"></div><div class="field"><label>Client Secret <span class="api-saved-tag need" id="googleCommonClientSecretBadge">저장 필요</span></label><input autocomplete="off" class="v18-secret" data-1p-ignore="true" data-lpignore="true" id="googleCommonClientSecret" placeholder="변경할 때만 입력" spellcheck="false" type="password"></div><div class="field"><label>Refresh Token <span class="api-saved-tag need" id="googleCommonRefreshTokBadge">저장 필요</span></label><input autocomplete="off" class="v18-secret" data-1p-ignore="true" data-lpignore="true" id="googleCommonRefreshTok" placeholder="변경할 때만 입력" spellcheck="false" type="password"></div><div class="field full"><label>Developer Token <span class="api-saved-tag need" id="googleCommonDevtokBadge">저장 필요</span></label><input autocomplete="off" class="v18-secret" data-1p-ignore="true" data-lpignore="true" id="googleCommonDevtok" placeholder="MCC → 도구 및 설정 → API 센터" spellcheck="false" type="password"><div class="google-common-form-note">비밀값(Client Secret / Refresh Token / Developer Token)은 수정할 때만 입력하세요. 비워두면 기존 저장값을 유지합니다. 5개 공통값이 모두 저장되면 각 라벨에 (저장됨) 태그가 점멸됩니다.</div></div></div></div></div><div class="settings-platform-card google"><div class="settings-platform-head"><h4>Google Customer ID</h4><span>광고주별 1개</span></div><div class="settings-platform-body"><div class="setup-form-grid"><div class="field full"><label>Customer ID / CID <span class="api-saved-tag need" id="googleCidBadge">저장 필요</span></label><input autocomplete="off" id="googleCid" placeholder="예: 123-456-7890" spellcheck="false"><div class="mini">광고주별 조회 대상 CID 1개만 입력합니다. MCC 공통 설정의 login-customer-id 헤더와 함께 조회됩니다.</div></div></div></div></div></section><div class="settings-save-bar"><div class="mini">현재 API 설정은 단일 공통 설정으로 저장됩니다. Google Ads 공통 5개 값과 광고주별 Customer ID / CID 1개를 저장합니다.</div><div class="settings-save-actions"><button class="btn ghost" onclick="clearSettings()">설정 초기화</button><button class="btn primary" onclick="saveSettings()">저장</button></div></div></div></div></div></div>
+<div class="settings-platform-card google"><div class="settings-platform-head"><h4>Google Ads 공통 설정</h4><span>공통</span></div><div class="settings-platform-body"><div class="google-common-status" id="googleCommonStatusBox"><div><b id="googleCommonStatusTitle">Google Ads 공통 설정 필요</b><span id="googleCommonStatusSub">MCC Login Customer ID · Client ID · Client Secret · Refresh Token · Developer Token을 입력하세요.</span></div></div><div class="setup-form-grid"><div class="field"><label>MCC Login Customer ID <span class="api-saved-tag need" id="googleCommonMccBadge">저장 필요</span></label><input autocomplete="off" id="googleCommonMcc" placeholder="123-456-7890" spellcheck="false"><div class="mini">관리자 계정 ID입니다. 모든 Google Ads API 조회의 login-customer-id 헤더에 적용됩니다.</div></div><div class="field"><label>Client ID <span class="api-saved-tag need" id="googleCommonClientIdBadge">저장 필요</span></label><input autocomplete="off" id="googleCommonClientId" placeholder="xxxxxxxx.apps.googleusercontent.com" spellcheck="false"></div><div class="field"><label>Client Secret <span class="api-saved-tag need" id="googleCommonClientSecretBadge">저장 필요</span></label><input autocomplete="off" class="v18-secret" data-1p-ignore="true" data-lpignore="true" id="googleCommonClientSecret" placeholder="변경할 때만 입력" spellcheck="false" type="password"></div><div class="field"><label>Refresh Token <span class="api-saved-tag need" id="googleCommonRefreshTokBadge">저장 필요</span></label><input autocomplete="off" class="v18-secret" data-1p-ignore="true" data-lpignore="true" id="googleCommonRefreshTok" placeholder="변경할 때만 입력" spellcheck="false" type="password"></div><div class="field full"><label>Developer Token <span class="api-saved-tag need" id="googleCommonDevtokBadge">저장 필요</span></label><input autocomplete="off" class="v18-secret" data-1p-ignore="true" data-lpignore="true" id="googleCommonDevtok" placeholder="MCC → 도구 및 설정 → API 센터" spellcheck="false" type="password"><div class="google-common-form-note">비밀값(Client Secret / Refresh Token / Developer Token)은 수정할 때만 입력하세요. 비워두면 기존 저장값을 유지합니다. 5개 공통값이 모두 저장되면 각 라벨에 (저장됨) 태그가 점멸됩니다.</div></div></div></div></div><div class="settings-platform-card google"><div class="settings-platform-head"><h4>Google Customer ID</h4><span>광고주별 1개</span></div><div class="settings-platform-body"><div class="setup-form-grid"><div class="field full"><label>Customer ID / CID <span class="api-saved-tag need" id="googleCidBadge">저장 필요</span></label><input autocomplete="off" id="googleCid" placeholder="예: 123-456-7890" spellcheck="false"><div class="mini">광고주별 조회 대상 CID 1개만 입력합니다. MCC 공통 설정의 login-customer-id 헤더와 함께 조회됩니다.</div></div></div></div></div></section><div class="settings-save-bar"><div class="mini">현재 API 설정은 선택한 광고주에 저장됩니다. Google Ads 공통 5개 값은 전체 공통, Customer ID / CID는 광고주별 1개로 저장합니다.</div><div class="settings-save-actions"><button class="btn ghost" onclick="clearSettings()">설정 초기화</button><button class="btn primary" onclick="saveSettings()">저장</button></div></div></div></div></div></div>
 <script>
 
 const API_ENDPOINT="/api/ad-performance";let selectedPlatform="all",selectedSaleType="sales",dashboardData=null,expandedCampaigns=new Set(),conversionExpandedCampaigns=new Set(),allExpanded=false,diffMode="rate",waterfallTopN=10,campaignSort={key:'revenue',dir:'desc'},creativeSort={key:'cost',dir:'desc'};const defaultMetricVisibility={cost:true,imp:true,click:true,conv:true,revenue:true,purchaseCcnt:true,purchaseConvAmt:true,cart:true,cartRevenue:true,ctr:true,cpc:true,cvr:true,cpa:true,roas:true,aov:true};let metricVisibility={...defaultMetricVisibility},recentMetricVisibility={...defaultMetricVisibility};const colors=['c0','c1','c2','c3','c4','c5'];
@@ -827,6 +839,123 @@ function renderEmptyDashboard(){updateHeader();document.getElementById('kpiCards
 function renderDashboard(){updateHeader();refreshMetricControls();if(!dashboardData){renderEmptyDashboard();renderApiStatus(null,'데이터 불러오기를 눌러 조회하세요.');return}renderApiStatus(dashboardData,dashboardData?undefined:'데이터 불러오기를 눌러 조회하세요.');const{campaigns,groups}=currentRows();renderKpis(campaigns);renderDailyTrendGrid();drawWaterfall(campaigns,groups);renderRecentTable();renderRecentMetricMenu();renderTable(campaigns,groups);renderCreative()}
 async function fetchDashboard(){const s=getSettings();const metaAccountIdList=parseMetaAccountIds(s.meta?.accountIds||s.meta?.accountId);const metaCollabAccountIdList=parseMetaAccountIds(s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds);const metaConversionBasis=getMetaConversionBasis();const metaConversionCustomTypes=getMetaConversionCustomTypes();const googleMerged=mergedGoogleSettingsForRequest(s);const settingsForRequest={...s,meta:{...(s.meta||{}),accountIds:metaAccountIdList.join('\n'),accountIdList:metaAccountIdList,collaborativeAccountIds:metaCollabAccountIdList.join('\n'),conversionBasis:metaConversionBasis,conversionCustomTypes:metaConversionCustomTypes},google:googleMerged};try{renderApiStatus(null,'실제 API 데이터를 불러오는 중입니다.');const response=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startDate:ymdFromISO(document.getElementById('startDate').value),endDate:ymdFromISO(document.getElementById('endDate').value),recentStartDate:recentWindowDates()[0],recentEndDate:recentWindowDates()[6],platform:selectedPlatform,saleType:selectedSaleType,purchaseBasis:document.getElementById('purchaseBasis').checked,metaAccountIds:metaAccountIdList,metaCollaborativeAccountIds:metaCollabAccountIdList,metaConversionBasis,metaConversionCustomTypes,googleCustomerIds:googleMerged.customerIds,googleCid:googleMerged.cid,googleMcc:googleMerged.mcc,...settingsForRequest})});const json=await response.json().catch(()=>({}));if(!response.ok){const platformForError=selectedPlatform==='all'?'google':selectedPlatform;const failed={allCamps:[],allGroups:[],recentDays:[],creatives:[],...json,errors:(json.errors&&json.errors.length)?json.errors:[{platform:platformForError,message:json.error||json.message||'API 호출 실패'}],meta:{...(json.meta||{}),enabled:getEnabledFromSettings()}};renderApiStatus(failed,`API 호출 실패: ${json.error||json.message||response.status}`);return failed}const errText=(json.errors||[]).length?` · 일부 오류: ${(json.errors||[]).map(e=>e.platform?`${platformName(e.platform)}: ${e.message}`:e.message||e).join(' / ')}`:'';renderApiStatus(json,`실제 API 데이터 표시 중 · ${new Date().toLocaleString('ko-KR')}${errText}`);return json}catch(e){console.error(e);const platformForError=selectedPlatform==='all'?'google':selectedPlatform;const failed={allCamps:[],allGroups:[],recentDays:[],creatives:[],errors:[{platform:platformForError,message:e.message}],meta:{enabled:getEnabledFromSettings()}};renderApiStatus(failed,`API 호출 실패: ${e.message}`);return failed}}
 async function loadDashboard(){setLoading(true);try{dashboardData=normalizeApiPayload(await fetchDashboard());renderDashboard()}catch(e){console.error(e);dashboardData=null;renderEmptyDashboard();renderApiStatus({errors:[{platform:'naver',message:e.message},{platform:'meta',message:e.message},{platform:'google',message:e.message}]},'API 호출 실패: '+e.message)}finally{setLoading(false)}}
+
+/* === v25: restore sidebar advertiser list while keeping Google MCC common settings === */
+function normalizeAdvertiserList(list){
+  const out=[];
+  (Array.isArray(list)?list:[]).forEach((a,i)=>{
+    const id=String(a?.id||'adv_'+Date.now()+'_'+i);
+    const name=String(a?.name||a?.title||`광고주 ${i+1}`).trim()||`광고주 ${i+1}`;
+    const settings=a?.settings&&typeof a.settings==='object'?a.settings:{};
+    out.push({id,name,settings});
+  });
+  return out;
+}
+function makeAdvertiserId(){return 'adv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)}
+function defaultAdvertiserFromLegacy(){
+  const legacy=singleStoredSettings();
+  const hasLegacy=legacy&&Object.keys(legacy).length>0;
+  return {id:'single',name:hasLegacy?'기존 광고주':'광고주 1',settings:hasLegacy?legacy:{naver:{},meta:{},google:{}}};
+}
+function getAdvertisers(){
+  ensureGoogleCommonMigrated();
+  let list=normalizeAdvertiserList(safeJson(localStorage.getItem(ADV_KEY),null));
+  if(!list.length){
+    list=[defaultAdvertiserFromLegacy()];
+    localStorage.setItem(ADV_KEY,JSON.stringify(list));
+    if(!localStorage.getItem(ADV_SELECTED_KEY))localStorage.setItem(ADV_SELECTED_KEY,list[0].id);
+  }
+  return list;
+}
+function setAdvertisers(list){localStorage.setItem(ADV_KEY,JSON.stringify(normalizeAdvertiserList(list)))}
+function selectedAdvertiserId(){
+  const list=getAdvertisers();
+  let id=localStorage.getItem(ADV_SELECTED_KEY)||'';
+  if(!list.some(a=>a.id===id)){id=list[0]?.id||'single';localStorage.setItem(ADV_SELECTED_KEY,id)}
+  return id;
+}
+function selectedAdvertiser(){return getAdvertisers().find(a=>a.id===selectedAdvertiserId())||getAdvertisers()[0]||defaultAdvertiserFromLegacy()}
+function getSettings(){return selectedAdvertiser()?.settings||{naver:{},meta:{},google:{}}}
+function updateSelectedSettings(settings){
+  const list=getAdvertisers();
+  const id=selectedAdvertiserId();
+  const idx=list.findIndex(a=>a.id===id);
+  if(idx>=0)list[idx]={...list[idx],settings:settings||{}};
+  else list.push({id,name:'광고주 1',settings:settings||{}});
+  setAdvertisers(list);
+  try{localStorage.setItem(SINGLE_SETTINGS_KEY,JSON.stringify(settings||{}))}catch(e){}
+}
+function advertiserStatusMini(settings={}){
+  const st=advertiserApiStatus(settings);
+  const on=[]; if(st.naver)on.push('N'); if(st.meta)on.push('M'); if(st.google)on.push('G');
+  return on.length?on.join(' · '):'미설정';
+}
+function renderAdvertiserSelect(){
+  const list=getAdvertisers();
+  const selectedId=selectedAdvertiserId();
+  const input=document.getElementById('sideAdvertiserSearch');
+  const q=(input?.value||'').trim().toLowerCase();
+  const filtered=list.filter(a=>!q||String(a.name).toLowerCase().includes(q));
+  const box=document.getElementById('sideAdvertiserList');
+  if(box){
+    box.innerHTML=filtered.length?filtered.map(a=>`<button type="button" class="side-adv-item ${a.id===selectedId?'active':''}" onclick="selectAdvertiser('${escapeHtml(a.id)}')"><span>${escapeHtml(a.name)}</span><span class="meta-count">${advertiserStatusMini(a.settings)}</span></button>`).join(''):`<div class="side-adv-empty">검색 결과가 없습니다.</div>`;
+  }
+  syncMetaConversionControls('settings');
+  updateHeader();
+  updateGoogleCommonStatusUI?.();
+  renderMetricMenu?.();
+  renderRecentMetricMenu?.();
+}
+function selectAdvertiser(id){
+  const list=getAdvertisers();
+  const found=list.find(a=>a.id===id);
+  if(!found)return;
+  localStorage.setItem(ADV_SELECTED_KEY,found.id);
+  dashboardData=null;
+  expandedCampaigns.clear();
+  conversionExpandedCampaigns.clear();
+  renderAdvertiserSelect();
+  renderDashboard();
+  renderApiStatus(null,`${found.name} 선택됨. 데이터 불러오기를 눌러 조회하세요.`);
+}
+function addAdvertiser(){
+  const name=(prompt('추가할 광고주명을 입력하세요.','')||'').trim();
+  if(!name)return;
+  const list=getAdvertisers();
+  const adv={id:makeAdvertiserId(),name,settings:{naver:{},meta:{},google:{}}};
+  list.push(adv);setAdvertisers(list);localStorage.setItem(ADV_SELECTED_KEY,adv.id);
+  dashboardData=null;renderAdvertiserSelect();renderDashboard();openSettings();
+}
+function renameAdvertiser(){
+  const cur=selectedAdvertiser();
+  const name=(prompt('광고주명을 수정하세요.',cur?.name||'')||'').trim();
+  if(!name)return;
+  const list=getAdvertisers().map(a=>a.id===cur.id?{...a,name}:a);setAdvertisers(list);
+  renderAdvertiserSelect();renderApiStatus(null,`광고주명이 ${name}(으)로 변경되었습니다.`);
+}
+function deleteAdvertiser(){
+  const cur=selectedAdvertiser();const list=getAdvertisers();
+  if(list.length<=1){
+    if(confirm('마지막 광고주입니다. 광고주를 삭제하지 않고 API 설정만 초기화할까요?')){updateSelectedSettings({naver:{},meta:{},google:{}});dashboardData=null;renderAdvertiserSelect();renderDashboard();renderApiStatus(null,'선택 광고주의 API 설정을 초기화했습니다.');}
+    return;
+  }
+  if(!confirm(`${cur.name} 광고주를 삭제할까요? 저장된 API 설정도 함께 삭제됩니다.`))return;
+  const next=list.filter(a=>a.id!==cur.id);setAdvertisers(next);localStorage.setItem(ADV_SELECTED_KEY,next[0].id);
+  dashboardData=null;renderAdvertiserSelect();renderDashboard();renderApiStatus(null,'광고주가 삭제되었습니다.');
+}
+function renderAdvertiserManageList(){renderAdvertiserSelect()}
+function cancelAdvertiserInline(){/* sidebar list handles advertiser editing */}
+function closeAdvertiserDropdown(){/* sidebar list uses direct buttons */}
+function toggleAdvertiserDropdown(e){e?.stopPropagation?.()}
+function openAdvertiserModal(){openSettings()}
+function updateHeader(){
+  const title=document.getElementById('dashboardTitle'),sub=document.getElementById('dashboardSubtitle');
+  const start=document.getElementById('startDate')?.value||'',end=document.getElementById('endDate')?.value||'';
+  if(title)title.textContent='광고 성과 통합 대시보드';
+  if(sub){const name=selectedAdvertiser()?.name||'광고주';sub.textContent=start&&end?`${name} · ${start} ~ ${end}`:`${name} · 날짜를 선택해주세요`;}
+}
+function openSettings(){reloadSettingsInputs();renderAdvertiserSelect();toggleGuide('meta',false);toggleGuide('google',false);openSettingsTab('naver');document.getElementById('settingsModal')?.classList.add('show')}
+function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});closeSettings();dashboardData=null;renderAdvertiserSelect();renderDashboard();renderApiStatus(null,'선택 광고주의 API 설정을 초기화했습니다. Google Ads 공통 설정은 유지됩니다.')}
 
 document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.nav-item[data-tab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+btn.dataset.tab).classList.add('active');renderDashboard()}));document.querySelectorAll('.quick-btn').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.quick-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');setDates(btn.dataset.period);renderDashboard()}));document.querySelectorAll('.platform-chip').forEach(btn=>btn.addEventListener('click',()=>{selectedPlatform=btn.dataset.platform;document.querySelectorAll('.platform-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderDashboard()}));document.querySelectorAll('.seg-btn').forEach(btn=>btn.addEventListener('click',()=>{selectedSaleType=btn.dataset.sale;document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderDashboard()}));document.getElementById('purchaseBasis')?.addEventListener('change',renderDashboard);document.addEventListener('click',()=>{closeAdvertiserDropdown();closeMetricMenu()});window.addEventListener('resize',()=>dashboardData&&renderDashboard());renderAdvertiserSelect();setDates('yesterday');renderApiStatus(null,'API 설정 후 데이터 불러오기를 눌러 조회하세요.');renderDashboard();
 
