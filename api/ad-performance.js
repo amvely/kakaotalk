@@ -826,12 +826,12 @@ async function fetchGoogleCustomer(body, token, cid, devtok, mcc){
 }
 async function fetchGoogle(body){
   const cfg = body.google || {};
-  const clientId = toStr(cfg.clientId || body.googleClientId || process.env.GOOGLE_CLIENT_ID);
-  const clientSecret = toStr(cfg.clientSecret || body.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET);
-  const refreshTok = toStr(cfg.refreshTok || body.googleRefreshTok || process.env.GOOGLE_REFRESH_TOKEN);
-  const devtok = toStr(cfg.devtok || body.googleDevtok || process.env.GOOGLE_DEVELOPER_TOKEN);
-  const mcc = toStr(cfg.mcc || cfg.loginCustomerId || body.googleMcc || process.env.GOOGLE_MCC_ID);
-  let customerIds = parseGoogleCustomerIds(cfg.customerIds || cfg.cids || cfg.cid || body.googleCustomerIds || body.googleCids || body.googleCid || process.env.GOOGLE_CUSTOMER_IDS || process.env.GOOGLE_CUSTOMER_ID);
+  const clientId = toStr(cfg.clientId || body.clientId || body.googleClientId || process.env.GOOGLE_CLIENT_ID);
+  const clientSecret = toStr(cfg.clientSecret || body.clientSecret || body.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET);
+  const refreshTok = toStr(cfg.refreshTok || cfg.refreshToken || body.refreshTok || body.refreshToken || body.googleRefreshTok || process.env.GOOGLE_REFRESH_TOKEN);
+  const devtok = toStr(cfg.devtok || cfg.developerToken || body.devtok || body.developerToken || body.googleDevtok || process.env.GOOGLE_DEVELOPER_TOKEN);
+  const mcc = toStr(cfg.mcc || cfg.loginCustomerId || body.mcc || body.loginCustomerId || body.googleMcc || process.env.GOOGLE_MCC_ID);
+  let customerIds = parseGoogleCustomerIds(cfg.customerIds || cfg.customerId || cfg.cids || cfg.cid || body.customerIds || body.customerId || body.cids || body.cid || body.googleCustomerIds || body.googleCids || body.googleCid || process.env.GOOGLE_CUSTOMER_IDS || process.env.GOOGLE_CUSTOMER_ID);
   if(!clientId || !clientSecret || !refreshTok || !devtok || (!customerIds.length && !mcc)) return {skipped:true, reason:'Google Ads API 설정 없음 또는 Developer Token/Customer ID 누락'};
   const token = await googleRefreshAccessToken(clientId, clientSecret, refreshTok);
   const debug = {requestedCustomerIds:customerIds, loginCustomerId:googleCleanCustomerId(mcc), discoveredCustomerIds:[], accounts:[], errors:[]};
@@ -914,13 +914,26 @@ module.exports = async function handler(req,res){
   if(req.method === 'OPTIONS') return res.status(200).end();
   if(req.method !== 'POST') return res.status(405).json({error:'Method not allowed'});
   const body = await parseBody(req);
-  const startDate = isoToYmd(body.startDate), endDate = isoToYmd(body.endDate);
-  if(!/^\d{8}$/.test(startDate) || !/^\d{8}$/.test(endDate)) return res.status(400).json({error:'startDate, endDate는 YYYYMMDD 또는 YYYY-MM-DD 형식이어야 합니다.'});
+  // 125930 Google 보고서의 구버전 호출(/api/google)은 since/until + 최상위 Google 키를 보냈습니다.
+  // 통합 API에서도 그대로 받을 수 있도록 alias를 흡수합니다.
+  if(!body.google && (body.clientId || body.clientSecret || body.refreshTok || body.refreshToken || body.devtok || body.developerToken || body.cid || body.customerId || body.mcc)){
+    body.google = {
+      clientId: body.clientId,
+      clientSecret: body.clientSecret,
+      refreshTok: body.refreshTok || body.refreshToken,
+      devtok: body.devtok || body.developerToken,
+      cid: body.cid || body.customerId || body.customerIds,
+      customerIds: body.customerIds,
+      mcc: body.mcc || body.loginCustomerId,
+    };
+  }
+  const startDate = isoToYmd(body.startDate || body.since), endDate = isoToYmd(body.endDate || body.until);
+  if(!/^\d{8}$/.test(startDate) || !/^\d{8}$/.test(endDate)) return res.status(400).json({error:'startDate/endDate 또는 since/until은 YYYYMMDD 또는 YYYY-MM-DD 형식이어야 합니다.'});
   body.startDate = startDate; body.endDate = endDate;
   const enabled = {
     naver: !!(toStr(body.naver?.cid || process.env.NAVER_CUSTOMER_ID) && toStr(body.naver?.lic || process.env.NAVER_ACCESS_LICENSE) && toStr(body.naver?.sec || process.env.NAVER_SECRET_KEY)),
     meta: !!(toStr(body.meta?.accountIds || body.meta?.accountId || body.meta?.collaborativeAccountIds || body.meta?.collabAccountIds || body.meta?.sharedAccountIds || body.meta?.catalogAccountIds || body.metaBusinessId || body.meta?.businessId || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS || process.env.META_BUSINESS_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
-    google: !!(toStr(body.google?.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.devtok || process.env.GOOGLE_DEVELOPER_TOKEN) && (toStr(body.google?.cid || body.google?.cids || body.google?.customerIds || process.env.GOOGLE_CUSTOMER_ID || process.env.GOOGLE_CUSTOMER_IDS) || toStr(body.google?.mcc || process.env.GOOGLE_MCC_ID)))
+    google: !!(toStr(body.google?.clientId || body.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || body.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || body.google?.refreshToken || body.refreshTok || body.refreshToken || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.devtok || body.google?.developerToken || body.devtok || body.developerToken || process.env.GOOGLE_DEVELOPER_TOKEN) && (toStr(body.google?.cid || body.google?.cids || body.google?.customerId || body.google?.customerIds || body.cid || body.customerId || body.customerIds || process.env.GOOGLE_CUSTOMER_ID || process.env.GOOGLE_CUSTOMER_IDS) || toStr(body.google?.mcc || body.mcc || process.env.GOOGLE_MCC_ID)))
   };
   if(!enabled.naver && !enabled.meta && !enabled.google) return res.status(400).json({error:'API 연결 정보가 없습니다. 화면의 API 설정 또는 Vercel 환경변수에 네이버/메타/구글 자격 정보를 입력하세요.'});
   const tasks = [];
