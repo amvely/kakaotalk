@@ -167,6 +167,85 @@
 #creativeBody .badge{font-weight:700!important;}
 #creativeBody .total-row td{font-weight:600!important;}
 
+
+
+/* === v23: final table weight + total hover visibility fix === */
+/* 최근 7일 데이터: 이전 패치보다 높은 specificity로 본문 볼드 제거 */
+.table-panel table.main-table.recent-table tbody tr:not(.total-row) td,
+.table-panel table.main-table.recent-table tbody tr:not(.total-row) td *{
+  font-weight:400!important;
+}
+.table-panel table.main-table.recent-table tbody tr:not(.total-row) td.rate-mini-cell,
+.table-panel table.main-table.recent-table tbody tr:not(.total-row) td.rate-mini-cell .diff{
+  font-weight:500!important;
+}
+.table-panel table.main-table.recent-table tbody tr.total-row td{
+  font-weight:600!important;
+}
+
+/* 캠페인별 성과: 일반 행 숫자/텍스트 볼드 제거 */
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td,
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td .campaign-name,
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td .group-name,
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td .metric-cell-main,
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td .creative-tag{
+  font-weight:400!important;
+}
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td .badge{
+  font-weight:700!important;
+}
+.table-panel table.main-table tbody#campaignBody tr:not(.total-row) td.rate-mini-cell .diff{
+  font-weight:600!important;
+}
+
+/* 소재별 성과 상세: 일반 행 숫자/텍스트 볼드 제거 */
+.table-panel table.main-table tbody#creativeBody tr:not(.total-row) td,
+.table-panel table.main-table tbody#creativeBody tr:not(.total-row) td .metric-cell-main,
+.table-panel table.main-table tbody#creativeBody tr:not(.total-row) td .creative-tag{
+  font-weight:400!important;
+}
+.table-panel table.main-table tbody#creativeBody tr:not(.total-row) td .badge,
+.table-panel table.main-table tbody#creativeBody tr:not(.total-row) td .creative-type-pill{
+  font-weight:700!important;
+}
+.table-panel table.main-table tbody#creativeBody tr:not(.total-row) td.rate-mini-cell .diff{
+  font-weight:600!important;
+}
+
+/* TOTAL 행: hover 되어도 흰 배경으로 바뀌지 않게 고정 */
+.table-panel table.main-table tbody tr.total-row td,
+.table-panel table.main-table tbody tr.total-row:hover td,
+.table-panel table.main-table tbody#campaignBody tr.total-row td,
+.table-panel table.main-table tbody#campaignBody tr.total-row:hover td,
+.table-panel table.main-table tbody#creativeBody tr.total-row td,
+.table-panel table.main-table tbody#creativeBody tr.total-row:hover td{
+  background:#111827!important;
+  color:#fff!important;
+  font-weight:600!important;
+}
+
+/* 매체별 TOTAL 행은 살짝 구분되는 어두운 배경으로 고정 */
+.table-panel table.main-table tbody#campaignBody tr.platform-total-row td,
+.table-panel table.main-table tbody#campaignBody tr.platform-total-row:hover td{
+  background:#182235!important;
+  color:#f8fafc!important;
+  font-weight:500!important;
+}
+.table-panel table.main-table tbody#campaignBody tr.platform-total-row td.rate-mini-cell,
+.table-panel table.main-table tbody#campaignBody tr.platform-total-row:hover td.rate-mini-cell,
+.table-panel table.main-table tbody#campaignBody tr.platform-total-row td.rate-mini-cell .diff{
+  background:#182235!important;
+}
+
+/* TOTAL 행 안의 증감률 셀도 배경/색상 깨짐 방지 */
+.table-panel table.main-table tbody tr.total-row td.rate-mini-cell,
+.table-panel table.main-table tbody tr.total-row:hover td.rate-mini-cell{
+  background:inherit!important;
+}
+.table-panel table.main-table tbody tr.total-row td.rate-mini-cell .diff.flat{
+  color:#cbd5e1!important;
+}
+
 </style>
 </head>
 <body>
