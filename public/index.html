@@ -369,6 +369,12 @@ function metaCreativeEnabled(){const s=getSettings();const ids=s.meta?.accountId
 function creativeSafeName(c){let name=String(c.adName||c.creativeName||c.name||c.title||'').trim();if(!name||/^[a-f0-9]{18,}$/i.test(name)||/^\d{8,}$/.test(name))name='이름 없는 광고 소재';name=name.replace(/[-_\s]*[a-f0-9]{24,}$/i,'').replace(/[-_\s]*\d{12,}$/,'').trim();return name||'이름 없는 광고 소재'}
 function creativeImage(c){return c.fullSizeImageUrl||c.imageUrl||c.permalinkUrl||c.assetUrl||c.previewUrl||c.thumbnailUrl||''}
 function creativeTag(text,cls=''){return `<span class="creative-tag ${cls}">${escapeHtml(text||'-')}</span>`}
+
+function creativeAccountTag(c){
+  if(!c) return creativeTag('-', 'account');
+  const accountName = c.accountName || c.adAccountName || c.account_name || c.account || c.customerName || c.customer_name || c.accountId || c.account_id || c.customerId || c.customer_id || '-';
+  return creativeTag(accountName, 'account');
+}
 function creativeTypeLabel(c){const t=String(c.creativeType||'image').toLowerCase();return t.includes('video')?'영상':'이미지'}
 function creativeTypePill(c){const t=String(c.creativeType||'image').toLowerCase();const cls=t.includes('video')?'video':t.includes('carousel')?'carousel':'image';return `<span class="creative-type-pill ${cls}">${creativeTypeLabel(c)}</span>`}
 function creativeImgHtml(c,wide=false){const img=creativeImage(c);const name=escapeHtml(creativeSafeName(c));if(img)return `<div class="creative-thumb ${wide?'wide':''}"><img src="${escapeHtml(img)}" alt="${name}" loading="lazy" referrerpolicy="no-referrer"></div>`;return `<div class="creative-thumb ${wide?'wide':''} no-img"><span>이미지 없음</span></div>`}
