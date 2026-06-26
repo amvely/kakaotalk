@@ -789,7 +789,7 @@ async function googleDiscoverCustomerIds(accessToken, devtok, managerId){
   const query = `
     SELECT customer_client.client_customer, customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.status
     FROM customer_client
-    WHERE customer_client.status = 'ENABLED'
+    WHERE customer_client.status = ENABLED
   `.trim();
   try{
     const rows = await googleSearch(accessToken, devtok, mid, mid, query);
@@ -815,17 +815,17 @@ async function fetchGoogleCustomer(body, token, cid, devtok, mcc){
   const campaignQuery = (s,e) => `
     SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.advertising_channel_sub_type, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
     FROM campaign
-    WHERE segments.date BETWEEN '${s}' AND '${e}' AND campaign.status != 'REMOVED'
+    WHERE segments.date BETWEEN '${s}' AND '${e}' AND campaign.status != REMOVED
   `.trim();
   const adgroupQuery = (s,e) => `
     SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.advertising_channel_sub_type, ad_group.id, ad_group.name, ad_group.status, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
     FROM ad_group
-    WHERE segments.date BETWEEN '${s}' AND '${e}' AND campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'
+    WHERE segments.date BETWEEN '${s}' AND '${e}' AND campaign.status != REMOVED AND ad_group.status != REMOVED
   `.trim();
   const dailyQuery = `
     SELECT segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
     FROM campaign
-    WHERE segments.date BETWEEN '${recentStart}' AND '${end}' AND campaign.status != 'REMOVED'
+    WHERE segments.date BETWEEN '${recentStart}' AND '${end}' AND campaign.status != REMOVED
   `.trim();
   const creativeQuery = `
     SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.advertising_channel_sub_type, ad_group.id, ad_group.name, ad_group.status, asset.id, asset.name, asset.type, asset.image_asset.full_size.url, asset.youtube_video_asset.youtube_video_id, asset.text_asset.text, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
@@ -871,9 +871,9 @@ async function fetchGoogle(body){
   const clientSecret = toStr(cfg.clientSecret || body.clientSecret || body.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET);
   const refreshTok = toStr(cfg.refreshTok || cfg.refreshToken || body.refreshTok || body.refreshToken || body.googleRefreshTok || process.env.GOOGLE_REFRESH_TOKEN);
   const devtok = toStr(cfg.devtok || cfg.developerToken || body.devtok || body.developerToken || body.googleDevtok || process.env.GOOGLE_DEVELOPER_TOKEN);
-  const mcc = toStr(cfg.mcc || cfg.loginCustomerId || body.mcc || body.loginCustomerId || body.googleMcc || process.env.GOOGLE_MCC_ID);
+  const mcc = toStr(cfg.mcc || cfg.loginCustomerId || cfg.mccLoginCustomerId || body.mcc || body.loginCustomerId || body.mccLoginCustomerId || body.googleMcc || body.googleLoginCustomerId || process.env.GOOGLE_MCC_ID || process.env.GOOGLE_LOGIN_CUSTOMER_ID);
   let customerIds = parseGoogleCustomerIds(cfg.customerIds || cfg.customerId || cfg.cids || cfg.cid || body.customerIds || body.customerId || body.cids || body.cid || body.googleCustomerIds || body.googleCids || body.googleCid || process.env.GOOGLE_CUSTOMER_IDS || process.env.GOOGLE_CUSTOMER_ID);
-  if(!clientId || !clientSecret || !refreshTok || !devtok || (!customerIds.length && !mcc)) return {skipped:true, reason:'Google Ads API 설정 없음 또는 Developer Token/Customer ID 누락'};
+  if(!mcc || !clientId || !clientSecret || !refreshTok || !devtok) return {skipped:true, reason:'Google Ads API 설정 없음: MCC Login Customer ID, Client ID, Client Secret, Refresh Token, Developer Token을 모두 입력하세요.'};
   const token = await googleRefreshAccessToken(clientId, clientSecret, refreshTok);
   const debug = {requestedCustomerIds:customerIds, loginCustomerId:googleCleanCustomerId(mcc), discoveredCustomerIds:[], accounts:[], errors:[]};
   if(!customerIds.length && mcc){
@@ -957,7 +957,7 @@ module.exports = async function handler(req,res){
   const body = await parseBody(req);
   // 125930 Google 보고서의 구버전 호출(/api/google)은 since/until + 최상위 Google 키를 보냈습니다.
   // 통합 API에서도 그대로 받을 수 있도록 alias를 흡수합니다.
-  if(!body.google && (body.clientId || body.clientSecret || body.refreshTok || body.refreshToken || body.devtok || body.developerToken || body.cid || body.customerId || body.mcc)){
+  if(!body.google && (body.clientId || body.clientSecret || body.refreshTok || body.refreshToken || body.devtok || body.developerToken || body.cid || body.customerId || body.mcc || body.loginCustomerId || body.mccLoginCustomerId)){
     body.google = {
       clientId: body.clientId,
       clientSecret: body.clientSecret,
@@ -965,7 +965,7 @@ module.exports = async function handler(req,res){
       devtok: body.devtok || body.developerToken,
       cid: body.cid || body.customerId || body.customerIds,
       customerIds: body.customerIds,
-      mcc: body.mcc || body.loginCustomerId,
+      mcc: body.mcc || body.loginCustomerId || body.mccLoginCustomerId,
     };
   }
   const startDate = isoToYmd(body.startDate || body.since), endDate = isoToYmd(body.endDate || body.until);
@@ -974,7 +974,7 @@ module.exports = async function handler(req,res){
   const enabled = {
     naver: !!(toStr(body.naver?.cid || process.env.NAVER_CUSTOMER_ID) && toStr(body.naver?.lic || process.env.NAVER_ACCESS_LICENSE) && toStr(body.naver?.sec || process.env.NAVER_SECRET_KEY)),
     meta: !!(toStr(body.meta?.accountIds || body.meta?.accountId || body.meta?.collaborativeAccountIds || body.meta?.collabAccountIds || body.meta?.sharedAccountIds || body.meta?.catalogAccountIds || body.metaBusinessId || body.meta?.businessId || body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds || process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS || process.env.META_BUSINESS_ID) && toStr(body.meta?.token || process.env.META_ACCESS_TOKEN)),
-    google: !!(toStr(body.google?.clientId || body.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || body.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || body.google?.refreshToken || body.refreshTok || body.refreshToken || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.devtok || body.google?.developerToken || body.devtok || body.developerToken || process.env.GOOGLE_DEVELOPER_TOKEN) && (toStr(body.google?.cid || body.google?.cids || body.google?.customerId || body.google?.customerIds || body.cid || body.customerId || body.customerIds || process.env.GOOGLE_CUSTOMER_ID || process.env.GOOGLE_CUSTOMER_IDS) || toStr(body.google?.mcc || body.mcc || process.env.GOOGLE_MCC_ID)))
+    google: !!(toStr(body.google?.mcc || body.google?.loginCustomerId || body.google?.mccLoginCustomerId || body.mcc || body.loginCustomerId || body.mccLoginCustomerId || process.env.GOOGLE_MCC_ID || process.env.GOOGLE_LOGIN_CUSTOMER_ID) && toStr(body.google?.clientId || body.clientId || process.env.GOOGLE_CLIENT_ID) && toStr(body.google?.clientSecret || body.clientSecret || process.env.GOOGLE_CLIENT_SECRET) && toStr(body.google?.refreshTok || body.google?.refreshToken || body.refreshTok || body.refreshToken || process.env.GOOGLE_REFRESH_TOKEN) && toStr(body.google?.devtok || body.google?.developerToken || body.devtok || body.developerToken || process.env.GOOGLE_DEVELOPER_TOKEN))
   };
   if(!enabled.naver && !enabled.meta && !enabled.google) return res.status(400).json({error:'API 연결 정보가 없습니다. 화면의 API 설정 또는 Vercel 환경변수에 네이버/메타/구글 자격 정보를 입력하세요.'});
   const tasks = [];
