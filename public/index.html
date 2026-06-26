@@ -116,15 +116,40 @@
 .table-panel table.main-table .total-row td{background:#111827!important;color:#fff!important;font-weight:950!important}
 .table-panel table.main-table .rate-mini-cell,.table-panel table.main-table .rate-mini-col{font-size:10px!important;font-weight:950!important;color:#98a2b3!important}
 .table-panel table.main-table .campaign-name,.table-panel table.main-table .group-name,.table-panel table.main-table .creative-tag{font-weight:950!important}
+
+/* === v21: sidebar advertiser search + media API badges === */
+.brand{align-items:flex-start!important;margin-bottom:26px!important}
+.brand-text strong{font-size:16px!important;line-height:1.28!important;letter-spacing:-.04em!important;word-break:keep-all!important}
+.brand-text span{display:block;margin-top:3px;color:#94a3b8!important;font-size:11px!important;font-weight:800!important}
+.sidebar-advertiser-card{padding:14px!important;margin-bottom:16px!important}
+.side-section-label{color:#94a3b8!important;font-size:11px!important;letter-spacing:.08em!important;margin-bottom:8px!important}
+.sidebar-advertiser-search{width:100%!important;border:1px solid #334155!important;background:#0b1220!important;color:#fff!important;border-radius:11px!important;padding:9px 11px!important;font-size:12px!important;font-weight:850!important;outline:none!important;margin:0 0 8px!important}
+.sidebar-advertiser-search:focus{border-color:#38bdf8!important;box-shadow:0 0 0 3px rgba(56,189,248,.12)!important}
+.sidebar-advertiser-search::placeholder{color:#64748b!important}
+.side-advertiser-button{min-height:38px!important;padding:9px 11px!important}
+.side-adv-item{padding:9px 10px!important;gap:10px!important}
+.side-adv-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:950;color:inherit}
+.media-boxes{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}
+.media-box{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:950;line-height:1;border:1px solid #334155;background:#1e293b;color:#64748b;box-shadow:none}
+.media-box.on.naver{background:#03c75a;border-color:#03c75a;color:#052e16}
+.media-box.on.meta{background:#1877f2;border-color:#1877f2;color:#fff}
+.media-box.on.google{background:#fbbc04;border-color:#fbbc04;color:#3b2f00}
+.media-box.off{opacity:.45}
+.side-adv-item.active .media-box.off{opacity:.55}
+.side-adv-item .meta-count{display:none!important}
+.setup-list-main .media-boxes{margin-top:4px}
+.setup-list-main .media-box{width:17px;height:17px;font-size:9px}
+
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="brand-mark">AD</div><div class="brand-text"><strong>AdDash</strong><span>Unified Performance</span></div></div>
+    <div class="brand"><div class="brand-mark">AD</div><div class="brand-text"><strong>매체 통합 대시보드</strong><span>네이버/메타/구글</span></div></div>
 
     <div class="sidebar-advertiser-card">
-      <div class="side-section-label">ADVERTISER</div>
+      <div class="side-section-label">광고주</div>
+      <input id="advertiserSearch" class="sidebar-advertiser-search" type="search" placeholder="광고주 검색" autocomplete="off" oninput="renderAdvertiserSelect();document.getElementById('advertiserDropdown')?.classList.add('open')" onfocus="document.getElementById('advertiserDropdown')?.classList.add('open')" onclick="event.stopPropagation()">
       <div class="side-advertiser-dropdown" id="advertiserDropdown">
         <button type="button" class="side-advertiser-button" onclick="toggleAdvertiserDropdown(event)"><span id="advertiserDropdownLabel" class="placeholder">광고주 선택…</span><span>▼</span></button>
         <div class="side-advertiser-menu" id="advertiserList"></div>
@@ -226,11 +251,13 @@ function safeJson(raw,fallback){try{return JSON.parse(raw||'')}catch{return fall
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function makeId(){return 'adv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)}
 function legacySettings(){return safeJson(localStorage.getItem('adDashboardSettings'),{})||{}}
-function getAdvertisers(){let list=safeJson(localStorage.getItem(ADV_KEY),null);if(!Array.isArray(list)||!list.length){const old=legacySettings();list=[{id:'default',name:'기본 광고주',settings:old&&Object.keys(old).length?old:{naver:{},meta:{},google:{}}}];localStorage.setItem(ADV_KEY,JSON.stringify(list));localStorage.removeItem(ADV_SELECTED_KEY)}return list}
+function getAdvertisers(){let list=safeJson(localStorage.getItem(ADV_KEY),null);if(!Array.isArray(list))list=[];const before=list.length;list=list.filter(a=>a&&!(a.id==='default'||a.name==='기본 광고주'));if(before!==list.length){localStorage.setItem(ADV_KEY,JSON.stringify(list));if(localStorage.getItem(ADV_SELECTED_KEY)==='default')localStorage.removeItem(ADV_SELECTED_KEY)}if(!list.length){localStorage.setItem(ADV_KEY,JSON.stringify([]));localStorage.removeItem(ADV_SELECTED_KEY)}return list}
 function setAdvertisers(list){localStorage.setItem(ADV_KEY,JSON.stringify(list))}
 function selectedAdvertiserId(){const list=getAdvertisers();const id=localStorage.getItem(ADV_SELECTED_KEY)||'';return list.some(a=>a.id===id)?id:''}
 function selectedAdvertiser(){const id=selectedAdvertiserId();return getAdvertisers().find(a=>a.id===id)||null}
 function getSettings(){return selectedAdvertiser()?.settings||{}}
+function advertiserApiStatus(settings={}){const s=settings||{};const metaIds=s.meta?.accountIds||s.meta?.accountId||s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds||s.meta?.businessId;const googleIds=s.google?.cid||s.google?.cids||s.google?.customerIds||s.google?.mcc;return{naver:!!(s.naver?.cid&&s.naver?.lic&&s.naver?.sec),meta:!!(metaIds&&s.meta?.token),google:!!(s.google?.clientId&&s.google?.clientSecret&&s.google?.refreshTok&&s.google?.devtok&&googleIds)}}
+function advertiserMediaBoxes(settings={}){const st=advertiserApiStatus(settings);return `<span class="media-boxes" aria-label="API 등록 매체"><span class="media-box ${st.naver?'on naver':'off'}" title="네이버 ${st.naver?'등록':'미등록'}">N</span><span class="media-box ${st.meta?'on meta':'off'}" title="Meta ${st.meta?'등록':'미등록'}">M</span><span class="media-box ${st.google?'on google':'off'}" title="Google ${st.google?'등록':'미등록'}">G</span></span>`}
 function updateSelectedSettings(settings){const list=getAdvertisers();const id=selectedAdvertiserId();const i=list.findIndex(a=>a.id===id);if(i>=0){list[i].settings=settings;setAdvertisers(list);localStorage.setItem('adDashboardSettings',JSON.stringify(settings))}}
 const META_CONVERSION_PRESETS_UI={
   purchase:{label:'구매',types:['offsite_conversion.fb_pixel_purchase']},
@@ -256,7 +283,7 @@ function renderMetaActionTypeChecks(basis, selectedTypes){const box=document.get
 function checkAllMetaActionTypes(on=true){document.querySelectorAll('#metaActionTypeChecks input[type="checkbox"]').forEach(i=>i.checked=!!on)}
 function syncMetaConversionControls(source='current'){const s=getSettings();const sel=document.getElementById('metaConversionBasis');const customEl=document.getElementById('metaConversionCustomTypes');const customField=document.getElementById('metaConversionCustomField');const basis=source==='settings'?(s.meta?.conversionBasis||'purchase'):(sel?.value||s.meta?.conversionBasis||'purchase');const custom=source==='settings'?(s.meta?.conversionCustomTypes||''):(s.meta?.conversionCustomTypes||'');if(sel)sel.value=basis;renderMetaActionTypeChecks(basis,custom);if(customEl){if(source==='settings'||!customEl.dataset.touched){customEl.value='';customEl.dataset.touched='';}customEl.disabled=false;customEl.oninput=()=>{customEl.dataset.touched='1'}}if(customField)customField.style.opacity='1';}
 function onMetaConversionBasisChange(){syncMetaConversionControls();dashboardData=null;renderDashboard();renderApiStatus(null,'메타 전환 기준은 API 설정에서 저장 후 적용됩니다.')}
-function renderAdvertiserSelect(){const listEl=document.getElementById('advertiserList');if(!listEl)return;const list=getAdvertisers(),sel=selectedAdvertiserId();listEl.innerHTML=list.length?list.map(a=>{const meta=(a.settings?.meta?.accountIds||a.settings?.meta?.accountId||'').split(/[\n,]+/).filter(Boolean).length;return `<button type="button" class="side-adv-item ${a.id===sel?'active':''}" onclick="changeAdvertiser('${a.id}')"><span>${a.name||'광고주'}</span><span class="meta-count">Meta ${meta||0}</span></button>`}).join(''):'<div class="side-adv-empty">등록된 광고주가 없습니다.</div>';const label=document.getElementById('advertiserDropdownLabel');const a=selectedAdvertiser();if(label){label.textContent=a?(a.name||'광고주'):'광고주 선택…';label.classList.toggle('placeholder',!a)}const info=document.getElementById('advertiserInfo');if(info)info.textContent='';syncMetaConversionControls('settings');updateHeader();renderMetricMenu();renderRecentMetricMenu()}
+function renderAdvertiserSelect(){const listEl=document.getElementById('advertiserList');if(!listEl)return;const list=getAdvertisers(),sel=selectedAdvertiserId();const q=String(document.getElementById('advertiserSearch')?.value||'').trim().toLowerCase();const filtered=q?list.filter(a=>String(a.name||'').toLowerCase().includes(q)):list;listEl.innerHTML=list.length?(filtered.length?filtered.map(a=>`<button type="button" class="side-adv-item ${a.id===sel?'active':''}" onclick='changeAdvertiser(${JSON.stringify(String(a.id))})'><span class="side-adv-name">${escapeHtml(a.name||'광고주')}</span>${advertiserMediaBoxes(a.settings||{})}</button>`).join(''):'<div class="side-adv-empty">검색 결과가 없습니다.</div>'):'<div class="side-adv-empty">등록된 광고주가 없습니다.<br>아래 추가 버튼으로 광고주를 먼저 등록하세요.</div>';const label=document.getElementById('advertiserDropdownLabel');const a=selectedAdvertiser();if(label){label.textContent=a?(a.name||'광고주'):'광고주 선택…';label.classList.toggle('placeholder',!a)}const info=document.getElementById('advertiserInfo');if(info)info.textContent='';syncMetaConversionControls('settings');updateHeader();renderMetricMenu();renderRecentMetricMenu()}
 function toggleAdvertiserDropdown(e){if(e)e.stopPropagation();document.getElementById('advertiserDropdown')?.classList.toggle('open')}
 function closeAdvertiserDropdown(){document.getElementById('advertiserDropdown')?.classList.remove('open')}
 function changeAdvertiser(id){if(!id)return;localStorage.setItem(ADV_SELECTED_KEY,id);expandedCampaigns.clear();conversionExpandedCampaigns.clear();dashboardData=null;closeAdvertiserDropdown();renderAdvertiserSelect();renderApiStatus(null,'광고주를 선택했습니다. 데이터 불러오기를 눌러 조회하세요.');renderDashboard()}
@@ -281,10 +308,9 @@ function renderAdvertiserManageList(){
   if(!listEl)return;
   listEl.innerHTML=list.length?list.map(a=>{
     const settings=a.settings||{};
-    const naver=!!(settings.naver?.cid&&settings.naver?.lic&&settings.naver?.sec);
-    const meta=!!(settings.meta?.token&&(settings.meta?.accountIds||settings.meta?.accountId||settings.meta?.businessId||settings.meta?.collaborativeAccountIds));
-    const google=!!(settings.google?.clientId&&settings.google?.clientSecret&&settings.google?.refreshTok&&(settings.google?.cid||settings.google?.mcc)&&settings.google?.devtok);
-    return `<div class="setup-list-item ${a.id===sel?'active':''}"><div class="setup-list-main"><b>${escapeHtml(a.name||'광고주')}</b><span>${[naver?'Naver':'',meta?'Meta':'',google?'Google':''].filter(Boolean).join(' · ')||'API 미설정'}</span></div><div class="setup-list-actions"><button type="button" class="setup-mini-btn" onclick="selectAdvertiserFromManager('${String(a.id).replace(/'/g,"\\'")}')">선택</button><button type="button" class="setup-mini-btn" onclick="editAdvertiserFromManager('${String(a.id).replace(/'/g,"\\'")}')">수정</button></div></div>`
+    const st=advertiserApiStatus(settings);
+    const mediaText=[st.naver?'Naver':'',st.meta?'Meta':'',st.google?'Google':''].filter(Boolean).join(' · ')||'API 미설정';
+    return `<div class="setup-list-item ${a.id===sel?'active':''}"><div class="setup-list-main"><b>${escapeHtml(a.name||'광고주')}</b><span>${mediaText}</span>${advertiserMediaBoxes(settings)}</div><div class="setup-list-actions"><button type="button" class="setup-mini-btn" onclick='selectAdvertiserFromManager(${JSON.stringify(String(a.id))})'>선택</button><button type="button" class="setup-mini-btn" onclick='editAdvertiserFromManager(${JSON.stringify(String(a.id))})'>수정</button></div></div>`
   }).join(''):'<div class="setup-empty">등록된 광고주가 없습니다.</div>';
 }
 function selectAdvertiserFromManager(id){localStorage.setItem(ADV_SELECTED_KEY,id);dashboardData=null;expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderAdvertiserSelect();renderAdvertiserManageList();renderDashboard();}
@@ -325,7 +351,7 @@ function importAdvertisersFromFile(input){
 
 function openApiGuide(e){if(e)e.preventDefault();document.getElementById('apiGuideModal')?.classList.add('show');openGuideTab('naver')}function closeApiGuide(){document.getElementById('apiGuideModal')?.classList.remove('show')}function openGuideTab(key){document.querySelectorAll('.v18-tab-card[data-guide]').forEach(b=>b.classList.toggle('active',b.dataset.guide===key));document.querySelectorAll('.v18-guide-section').forEach(p=>p.classList.toggle('active',p.id==='apiGuide_'+key))}function openSettingsTab(key){document.querySelectorAll('.v18-tab-card[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===key));document.querySelectorAll('.v18-settings-section').forEach(p=>p.classList.toggle('active',p.id==='settingsTab_'+key))}
 function updateHeader(){const title=document.getElementById('dashboardTitle'),sub=document.getElementById('dashboardSubtitle');const a=selectedAdvertiser();const start=document.getElementById('startDate')?.value||'',end=document.getElementById('endDate')?.value||'';if(title)title.textContent=a?`${a.name||'광고주'} 광고 성과 통합 대시보드`:'광고주를 선택해주세요';if(sub)sub.textContent=start&&end?`${start} ~ ${end}`:'날짜를 선택해주세요'}
-function ledHtml(p,state){const label=platformName(p);const text=state==='ok'?'연결됨':state==='err'?'연결실패':state==='off'?'미설정':'대기';return `<span class="led-chip ${state==='ok'?'ok':state==='err'?'err':'idle'}"><i></i>${label} ${text}</span>`}function getEnabledFromSettings(){const s=getSettings();const metaIds=s.meta?.accountIds||s.meta?.accountId||s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds||s.meta?.businessId;return{naver:!!(s.naver?.cid&&s.naver?.lic&&s.naver?.sec),meta:!!(metaIds&&s.meta?.token),google:!!(s.google?.clientId&&s.google?.clientSecret&&s.google?.refreshTok&&s.google?.cid)}}function renderApiStatus(data,msg){const enabled=data?.meta?.enabled||getEnabledFromSettings();const errors=data?.errors||[];const html=['naver','meta','google'].map(p=>{const hasErr=errors.some(e=>e.platform===p);const hasData=(data?.allCamps||[]).some(r=>r.platform===p)||(data?.recentDays||[]).some(r=>r.platform===p)||(data?.creatives||[]).some(r=>r.platform===p);const st=hasErr?'err':enabled?.[p]?(hasData||data?'ok':'idle'):'off';return ledHtml(p,st)}).join('');const line=document.getElementById('statusLine');if(line)line.innerHTML=`<div class="api-leds" id="apiLeds">${html}</div><span class="status-msg">${msg||''}</span>`}function setStatus(type,text,data){if(type==='err')renderApiStatus(data||{errors:[{platform:'naver'},{platform:'meta'},{platform:'google'}]},text);else renderApiStatus(data,text)}function setLoading(on){document.getElementById('loadingOverlay')?.classList.toggle('show',!!on)}
+function ledHtml(p,state){const label=platformName(p);const text=state==='ok'?'연결됨':state==='err'?'연결실패':state==='off'?'미설정':'대기';return `<span class="led-chip ${state==='ok'?'ok':state==='err'?'err':'idle'}"><i></i>${label} ${text}</span>`}function getEnabledFromSettings(){return advertiserApiStatus(getSettings())}function renderApiStatus(data,msg){const enabled=data?.meta?.enabled||getEnabledFromSettings();const errors=data?.errors||[];const html=['naver','meta','google'].map(p=>{const hasErr=errors.some(e=>e.platform===p);const hasData=(data?.allCamps||[]).some(r=>r.platform===p)||(data?.recentDays||[]).some(r=>r.platform===p)||(data?.creatives||[]).some(r=>r.platform===p);const st=hasErr?'err':enabled?.[p]?(hasData||data?'ok':'idle'):'off';return ledHtml(p,st)}).join('');const line=document.getElementById('statusLine');if(line)line.innerHTML=`<div class="api-leds" id="apiLeds">${html}</div><span class="status-msg">${msg||''}</span>`}function setStatus(type,text,data){if(type==='err')renderApiStatus(data||{errors:[{platform:'naver'},{platform:'meta'},{platform:'google'}]},text);else renderApiStatus(data,text)}function setLoading(on){document.getElementById('loadingOverlay')?.classList.toggle('show',!!on)}
 function recentWindowDates(){const endRaw=ymdFromISO(document.getElementById('endDate')?.value)||ymd(new Date());const endD=new Date(isoFromYmd(endRaw)+'T00:00:00');const dates=[];for(let i=6;i>=0;i--){const d=new Date(endD);d.setDate(endD.getDate()-i);dates.push(ymd(d))}return dates}
 function recentDateKey(r){const raw=r?.dt||r?.dateRaw||r?.segmentsDate||r?.date||'';const y=ymdFromISO(raw);return y&&y.length===8?y:''}
 function recentDateLabel(d){return `${d.slice(4,6)}/${d.slice(6,8)}`}
