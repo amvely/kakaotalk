@@ -140,6 +140,33 @@
 .setup-list-main .media-boxes{margin-top:4px}
 .setup-list-main .media-box{width:17px;height:17px;font-size:9px}
 
+
+
+/* === v22: table font weight normalization === */
+/* 최근 7일 데이터: 본문 숫자/날짜 볼드 제거 */
+.recent-table tbody td{font-weight:400!important;}
+.recent-table tbody td .diff,
+.recent-table tbody td .mini-diff{font-weight:500!important;}
+.recent-table .total-row td,
+.recent-table .avg-row td{font-weight:500!important;}
+
+/* 캠페인별 성과: 캠페인명/광고그룹명/지표 숫자 볼드 제거 */
+#campaignBody td,
+#campaignBody .campaign-name,
+#campaignBody .group-name,
+#campaignBody .metric-cell-main,
+#campaignBody .creative-tag{font-weight:400!important;}
+#campaignBody .badge{font-weight:700!important;}
+#campaignBody .total-row td,
+#campaignBody .platform-total-row td{font-weight:600!important;}
+
+/* 소재별 성과 상세도 본문 지표 숫자 과한 볼드 제거 */
+#creativeBody td,
+#creativeBody .metric-cell-main{font-weight:400!important;}
+#creativeBody .creative-tag,
+#creativeBody .badge{font-weight:700!important;}
+#creativeBody .total-row td{font-weight:600!important;}
+
 </style>
 </head>
 <body>
