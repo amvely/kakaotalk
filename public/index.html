@@ -827,7 +827,7 @@ function renderEmptyDashboard(){updateHeader();document.getElementById('kpiCards
 function renderDashboard(){updateHeader();refreshMetricControls();if(!dashboardData){renderEmptyDashboard();renderApiStatus(null, selectedAdvertiserId()?'데이터 불러오기를 눌러 조회하세요.':'API 설정 후 데이터 불러오기를 눌러주세요.');return;}renderApiStatus(dashboardData,dashboardData?undefined:'데이터 불러오기를 눌러 조회하세요.');const{campaigns,groups}=currentRows();renderKpis(campaigns);renderDailyTrendGrid();drawWaterfall(campaigns,groups);renderRecentTable();renderRecentMetricMenu();renderTable(campaigns,groups);renderCreative()}
 async function loadDashboard(){if(!selectedAdvertiserId()){renderDashboard();renderApiStatus(null,'API 설정 후 데이터 불러오기를 눌러주세요.');return;}setLoading(true);try{dashboardData=normalizeApiPayload(await fetchDashboard());renderDashboard()}catch(e){console.error(e);dashboardData=null;renderEmptyDashboard();renderApiStatus({errors:[{platform:'naver',message:e.message},{platform:'meta',message:e.message},{platform:'google',message:e.message}]},'API 호출 실패: '+e.message)}finally{setLoading(false)}}function setDates(period){const now=new Date(),end=new Date(now);end.setDate(now.getDate()-1);let start=new Date(end);if(period==='yesterday')start=new Date(end);if(period==='last7')start.setDate(end.getDate()-6);if(period==='lastWeek'){const current=new Date(now);const day=(current.getDay()+6)%7;const thisMonday=new Date(current);thisMonday.setDate(current.getDate()-day);start=new Date(thisMonday);start.setDate(thisMonday.getDate()-7);end.setTime(new Date(thisMonday.getFullYear(),thisMonday.getMonth(),thisMonday.getDate()-1).getTime())}if(period==='thisMonth')start=new Date(now.getFullYear(),now.getMonth(),1);if(period==='lastMonth'){start=new Date(now.getFullYear(),now.getMonth()-1,1);end.setTime(new Date(now.getFullYear(),now.getMonth(),0).getTime())}document.getElementById('startDate').value=isoFromYmd(ymd(start));document.getElementById('endDate').value=isoFromYmd(ymd(end));updateHeader()}function toggleAllGroups(){const{campaigns}=currentRows();allExpanded=!allExpanded;expandedCampaigns=allExpanded?new Set(campaigns.map(c=>c.id||`${c.platform}:${c.campaignId}`)):new Set();document.querySelector('.table-actions .btn[onclick*="toggleAllGroups"]')&&(document.querySelector('.table-actions .btn[onclick*="toggleAllGroups"]').textContent=allExpanded?'광고그룹 전체 접기':'광고그룹 전체 펼치기');renderDashboard()}function selectPlatform(p){selectedPlatform=p;document.querySelectorAll('.platform-chip').forEach(b=>b.classList.toggle('active',b.dataset.platform===p));renderDashboard()}
 // 단일 API 설정 기준으로 모든 입력칸 값을 다시 채운다.
-function reloadSettingsInputs(){ensureGoogleCommonMigrated();const s=getSettings();['naverCid','naverLic','naverSec','metaBusinessId','metaAccountIds','metaCollaborativeAccountIds','metaToken','metaConversionBasis','metaConversionCustomTypes','googleCid','googleCommonMcc','googleCommonClientId','googleCommonClientSecret','googleCommonRefreshTok','googleCommonDevtok'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});document.getElementById('naverCid').value=s.naver?.cid||'';document.getElementById('naverLic').value=s.naver?.lic||'';document.getElementById('naverSec').value=s.naver?.sec||'';document.getElementById('metaBusinessId').value=s.meta?.businessId||'';document.getElementById('metaAccountIds').value=s.meta?.accountIds||s.meta?.accountId||'';document.getElementById('metaCollaborativeAccountIds').value=s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds||'';document.getElementById('metaToken').value=s.meta?.token||'';document.getElementById('metaConversionBasis').value=s.meta?.conversionBasis||'purchase';document.getElementById('metaConversionCustomTypes').value='';syncMetaConversionControls('settings');const gc=loadGoogleCommonSettings();document.getElementById('googleCommonMcc').value=gc.mcc||'';document.getElementById('googleCommonClientId').value=gc.clientId||'';document.getElementById('googleCid').value=(parseGoogleCustomerIds(s.google?.cid||s.google?.cids||s.google?.customerIds||s.google?.customerId)[0]||'');updateGoogleCommonStatusUI()}
+function reloadSettingsInputs(){ensureGoogleCommonMigrated();const s=getSettings();['naverCid','naverLic','naverSec','metaBusinessId','metaAccountIds','metaCollaborativeAccountIds','metaToken','metaConversionBasis','metaConversionCustomTypes','googleCid','googleCommonMcc','googleCommonClientId','googleCommonClientSecret','googleCommonRefreshTok','googleCommonDevtok'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});document.getElementById('naverCid').value=s.naver?.cid||'';document.getElementById('naverLic').value=s.naver?.lic||'';document.getElementById('naverSec').value=s.naver?.sec||'';document.getElementById('metaBusinessId').value=s.meta?.businessId||'';document.getElementById('metaAccountIds').value=s.meta?.accountIds||s.meta?.accountId||'';document.getElementById('metaCollaborativeAccountIds').value=s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds||'';document.getElementById('metaToken').value=s.meta?.token||'';document.getElementById('metaConversionBasis').value=s.meta?.conversionBasis||'purchase';const metaCustomTypesEl=document.getElementById('metaConversionCustomTypes');if(metaCustomTypesEl)metaCustomTypesEl.value='';syncMetaConversionControls('settings');const gc=loadGoogleCommonSettings();document.getElementById('googleCommonMcc').value=gc.mcc||'';document.getElementById('googleCommonClientId').value=gc.clientId||'';document.getElementById('googleCid').value=(parseGoogleCustomerIds(s.google?.cid||s.google?.cids||s.google?.customerIds||s.google?.customerId)[0]||'');updateGoogleCommonStatusUI()}
 // 통합 API 설정 모달 열기: 입력값 채우기 + 가이드 초기화 + 네이버 탭 + 표시.
 function openSettings(){reloadSettingsInputs();renderAdvertiserManageList();cancelAdvertiserInline();toggleGuide('meta',false);toggleGuide('google',false);openSettingsTab('naver');document.getElementById('settingsModal').classList.add('show')}
 function closeSettings(){document.getElementById('settingsModal').classList.remove('show')}
@@ -1269,5 +1269,40 @@ document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>btn.addEventListen
 })();
 </script>
 
+
+<!-- === HOTFIX: optional meta custom field guard for API settings buttons === -->
+<script>
+(function(){
+  const safeSetValue=function(id,value){const el=document.getElementById(id);if(el)el.value=value||'';};
+  const oldReload=window.reloadSettingsInputs;
+  window.reloadSettingsInputs=function(){
+    try{
+      if(typeof oldReload==='function')return oldReload.apply(this,arguments);
+    }catch(e){
+      const isOptionalMetaCustom=String(e&&e.message||'').includes('metaConversionCustomTypes') || String(e&&e.message||'').includes('null');
+      if(!isOptionalMetaCustom)throw e;
+      try{
+        ensureGoogleCommonMigrated&&ensureGoogleCommonMigrated();
+        const s=typeof getSettings==='function'?getSettings():{};
+        ['naverCid','naverLic','naverSec','metaBusinessId','metaAccountIds','metaCollaborativeAccountIds','metaToken','metaConversionBasis','googleCid','googleCommonMcc','googleCommonClientId','googleCommonClientSecret','googleCommonRefreshTok','googleCommonDevtok'].forEach(id=>safeSetValue(id,''));
+        safeSetValue('naverCid',s.naver?.cid||'');
+        safeSetValue('naverLic',s.naver?.lic||'');
+        safeSetValue('naverSec',s.naver?.sec||'');
+        safeSetValue('metaBusinessId',s.meta?.businessId||'');
+        safeSetValue('metaAccountIds',s.meta?.accountIds||s.meta?.accountId||'');
+        safeSetValue('metaCollaborativeAccountIds',s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds||'');
+        safeSetValue('metaToken',s.meta?.token||'');
+        safeSetValue('metaConversionBasis',s.meta?.conversionBasis||'purchase');
+        const gc=typeof loadGoogleCommonSettings==='function'?loadGoogleCommonSettings():{};
+        safeSetValue('googleCommonMcc',gc.mcc||'');
+        safeSetValue('googleCommonClientId',gc.clientId||'');
+        safeSetValue('googleCid',typeof parseGoogleCustomerIds==='function'?(parseGoogleCustomerIds(s.google?.cid||s.google?.cids||s.google?.customerIds||s.google?.customerId)[0]||''):(s.google?.cid||''));
+        try{syncMetaConversionControls&&syncMetaConversionControls('settings')}catch(_e){}
+        try{updateGoogleCommonStatusUI&&updateGoogleCommonStatusUI()}catch(_e){}
+      }catch(fallbackErr){console.error(fallbackErr)}
+    }
+  };
+})();
+</script>
 </body>
 </html>
