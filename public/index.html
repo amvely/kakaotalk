@@ -1167,7 +1167,10 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
   window.currentRows=function(){
     const basis=r=>applyPurchaseBasis(r);
     const platformOk=r=>selectedPlatform==='all'||r.platform===selectedPlatform;
-    const rowOk=r=>platformOk(r)&&saleTypeMatches(r)&&rowHasAnyPeriodMetric(r);
+    // 판매/비판매 토글은 데이터 필터가 아니라 지표 기준/표시 항목 전환입니다.
+    // 캠페인명이 자동 분류되지 않는 매체/계정에서 토글 시 전체 데이터가 0으로 사라지는 문제를 막기 위해
+    // 행 필터는 매체 + 성과 존재 여부만 적용합니다.
+    const rowOk=r=>platformOk(r)&&rowHasAnyPeriodMetric(r);
     const camps=(dashboardData?.allCamps||[]).map(basis).filter(rowOk);
     const groups=(dashboardData?.allGroups||[]).map(basis).filter(rowOk);
     const creatives=(dashboardData?.creatives||[]).map(basis).filter(rowOk);
@@ -1178,7 +1181,7 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
     const target=recentWindowDates(), targetSet=new Set(target);
     return (dashboardData?.recentDays||[])
       .map(applyPurchaseBasis)
-      .filter(r=>(selectedPlatform==='all'||r.platform===selectedPlatform)&&saleTypeMatches(r))
+      .filter(r=>(selectedPlatform==='all'||r.platform===selectedPlatform))
       .map(r=>{const dt=recentDateKey(r);return calcRow({...r,dt:dt||r.dt,date:dt?recentDateLabel(dt):r.date});})
       .filter(r=>targetSet.has(r.dt));
   };
