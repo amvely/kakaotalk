@@ -436,6 +436,18 @@
 .metric-share-seg[data-tooltip-value]{cursor:default}
 
 
+
+
+/* === v8: schedule API tags, report sidebar cleanup, instant tooltips === */
+.nav-meta-badge{margin-left:auto;display:inline-flex;align-items:center;border:1px solid rgba(96,165,250,.35);background:#1d4ed8;color:#dbeafe;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:950;line-height:1;white-space:nowrap;letter-spacing:-.01em}
+.report-schedule-api-tags{display:flex!important;gap:5px!important;align-items:center!important;flex-wrap:wrap!important;margin-top:6px!important}
+.report-schedule-api-tag{display:inline-flex;align-items:center;border:1px solid #e4e7ec;background:#f8fafc;color:#667085;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:950;line-height:1;cursor:default;text-transform:lowercase}
+.report-schedule-api-tag.ok.naver{background:#ecfdf3;border-color:#bbf7d0;color:#166534}.report-schedule-api-tag.ok.meta{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.report-schedule-api-tag.ok.google{background:#fefce8;border-color:#fde68a;color:#92400e}
+.report-schedule-api-tag.missing{background:#f8fafc;border-color:#e4e7ec;color:#98a2b3}.report-schedule-api-tag.err{background:#fff1f2;border-color:#fecdd3;color:#be123c}
+.instant-ui-tooltip{position:fixed;z-index:1000000;display:none;pointer-events:none;background:#111827;color:#fff;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:900;line-height:1.25;box-shadow:0 12px 28px rgba(15,23,42,.24);white-space:nowrap;transform:translate(12px,12px);max-width:360px;white-space:normal}
+body.report-export-mode #sidebarAdvertiserCard{display:none!important}
+body.report-export-mode .sidebar .side-advertiser-menu,body.report-export-mode .side-advertiser-dropdown,body.report-export-mode .side-advertiser-io,body.report-export-mode .side-advertiser-actions{display:none!important}
+
 /* === v7: scheduled multi-advertiser report modal === */
 .btn.report-schedule-action-btn{background:linear-gradient(135deg,#059669,#14b8a6);color:#fff!important;border-color:#10b981!important;box-shadow:0 8px 18px rgba(16,185,129,.18)}
 .btn.report-schedule-action-btn:hover{filter:brightness(1.04);transform:translateY(-1px)}
@@ -463,6 +475,14 @@ body.report-export-mode .filter-card{display:block!important}
 
 body.report-export-mode .actions:empty{display:none!important}
 body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule-action-btn,body.report-export-mode .report-action-btn,body.report-export-mode .data-load-btn{display:none!important}
+
+/* === v8b: keep schedule media tags compact below advertiser name === */
+.report-schedule-row .report-schedule-api-tag{display:inline-flex!important;align-items:center!important;margin-top:0!important;border-radius:999px!important;padding:4px 8px!important;font-size:10px!important;font-weight:950!important;line-height:1!important;text-transform:lowercase!important}
+.report-schedule-row .report-schedule-api-tag.ok.naver{background:#ecfdf3!important;border-color:#bbf7d0!important;color:#166534!important}
+.report-schedule-row .report-schedule-api-tag.ok.meta{background:#eff6ff!important;border-color:#bfdbfe!important;color:#1d4ed8!important}
+.report-schedule-row .report-schedule-api-tag.ok.google{background:#fefce8!important;border-color:#fde68a!important;color:#92400e!important}
+.report-schedule-row .report-schedule-api-tag.missing{background:#f8fafc!important;border-color:#e4e7ec!important;color:#98a2b3!important}
+
 </style>
 </head>
 <body>
@@ -489,7 +509,7 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 </div>
 <div class="nav-title">REPORT</div>
 <button class="nav-item active" data-tab="dashboard">📊 성과 대시보드</button>
-<button class="nav-item" data-tab="creative">🧪 소재 분석</button>
+<button class="nav-item" data-tab="creative"><span>🧪 소재 분석</span><span class="nav-meta-badge">Meta 전용</span></button>
 <div class="nav-title">CHANNEL</div>
 <button class="nav-item" onclick="selectPlatform('naver')">🟢 네이버</button>
 <button class="nav-item" onclick="selectPlatform('meta')">🔵 메타</button>
@@ -737,7 +757,7 @@ function openGuideTab(key){openSettingsTab(key)}
 function toggleGuide(platform,force){const guide=document.getElementById('guide_'+platform);const btn=document.getElementById('guideBtn_'+platform);if(!guide)return;const open=(force===true)?true:(force===false?false:!guide.classList.contains('open'));guide.classList.toggle('open',open);if(btn){btn.classList.toggle('open',open);const label=btn.querySelector('span');if(label)label.textContent=open?'📖 가이드 닫기':'📖 가이드 보기'}}
 // 매체 탭 전환. 탭을 바꾸면 다른 매체 가이드는 자동으로 접어 화면을 깔끔하게 유지한다.
 function openSettingsTab(key){document.querySelectorAll('.v18-tab-card[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===key));document.querySelectorAll('.v18-settings-section').forEach(p=>p.classList.toggle('active',p.id==='settingsTab_'+key));['meta','google'].forEach(p=>{if(p!==key)toggleGuide(p,false)});if(key==='google')updateGoogleCommonStatusUI()}
-function ledHtml(p,state){const label=platformName(p);const text=state==='ok'?'연결됨':state==='err'?'연결실패':state==='off'?'미설정':'대기';return `<span class="led-chip ${state==='ok'?'ok':state==='err'?'err':'idle'}"><i></i>${label} ${text}</span>`}
+function ledHtml(p,state,reason){const label=platformName(p);const text=state==='ok'?'연결됨':state==='err'?'연결실패':state==='off'?'미설정':'대기';const tip=reason?` data-instant-tip="${escapeHtml(reason)}"`:``;return `<span class="led-chip ${state==='ok'?'ok':state==='err'?'err':'idle'}"${tip}><i></i>${label} ${text}</span>`}
 
 function setStatus(type,text,data){if(type==='err')renderApiStatus(data||{errors:[{platform:'naver'},{platform:'meta'},{platform:'google'}]},text);else renderApiStatus(data,text)}function setLoading(on){document.getElementById('loadingOverlay')?.classList.toggle('show',!!on)}
 function recentWindowDates(){const endRaw=ymdFromISO(document.getElementById('endDate')?.value)||ymd(new Date());const endD=new Date(isoFromYmd(endRaw)+'T00:00:00');const dates=[];for(let i=6;i>=0;i--){const d=new Date(endD);d.setDate(endD.getDate()-i);dates.push(ymd(d))}return dates}
@@ -1098,7 +1118,7 @@ async function downloadReportHtml(){
     const clone=document.documentElement.cloneNode(true);
     const cloneBody=clone.querySelector('body');
     if(cloneBody)cloneBody.classList.add('report-export-mode');
-    clone.querySelectorAll('.modal-backdrop,.loading-backdrop,#advertiserImportFile,#metricShareTooltip,.chart-tooltip').forEach(el=>el.remove());
+    clone.querySelectorAll('.modal-backdrop,.loading-backdrop,#advertiserImportFile,#metricShareTooltip,#instantUiTooltip,.chart-tooltip').forEach(el=>el.remove());
     clone.querySelectorAll('input[type="password"], textarea[id*="Token"], textarea[id*="token"], textarea[id*="Tok"], input[id*="Token"], input[id*="token"], input[id*="Secret"], input[id*="Sec"], input[id*="Lic"], input[id*="Mcc"], input[id*="Cid"], input[id*="Devtok"], input[id*="Refresh"]').forEach(el=>{try{el.value='';el.setAttribute('value','')}catch(e){}});
     const payloadScript=document.createElement('script');
     payloadScript.textContent='window.__AD_REPORT_EXPORT__='+JSON.stringify(payload).replace(/<\//g,'<\\/')+';';
@@ -1110,6 +1130,8 @@ async function downloadReportHtml(){
       body.report-export-mode .report-schedule-action-btn,
       body.report-export-mode .report-action-btn,
       body.report-export-mode .data-load-btn{display:none!important;}
+      body.report-export-mode #sidebarAdvertiserCard{display:none!important;}
+      body.report-export-mode .side-advertiser-menu,body.report-export-mode .side-advertiser-dropdown,body.report-export-mode .side-advertiser-io,body.report-export-mode .side-advertiser-actions{display:none!important;}
       body.report-export-mode .filter-card{display:block!important;}
       body.report-export-mode .panel-tools,body.report-export-mode .table-actions,body.report-export-mode .metric-share-tools{display:flex!important;}
       body.report-export-mode .report-export-meta{display:flex!important;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border:1px solid #e4e7ec;border-radius:14px;background:#fff;color:#344054;font-size:12px;font-weight:900;box-shadow:0 18px 45px rgba(16,24,40,.05)}
@@ -1140,6 +1162,22 @@ async function downloadReportHtml(){
 /* === v7: scheduled multi-advertiser HTML report generation === */
 function reportScheduleSetStatus(html){const el=document.getElementById('reportScheduleStatus');if(el)el.innerHTML=html||''}
 function reportScheduleSetProgress(done,total){const el=document.getElementById('reportScheduleProgress');if(el)el.style.width=(total?Math.max(0,Math.min(100,done/total*100)):0).toFixed(1)+'%'}
+function reportScheduleApiStatusDetail(settings={}){
+  const s=settings||{};
+  const st=typeof advertiserApiStatus==='function'?advertiserApiStatus(s):{naver:false,meta:false,google:false};
+  const googleCid=typeof googleCidOfAdvertiser==='function'?googleCidOfAdvertiser(s):(String(s.google?.cid||s.google?.customerId||'').replace(/[^0-9]/g,''));
+  const googleCommonOk=typeof googleCommonReady==='function'?googleCommonReady():false;
+  const metaIds=s.meta?.accountIds||s.meta?.accountId||s.meta?.collaborativeAccountIds||s.meta?.collabAccountIds||s.meta?.sharedAccountIds||s.meta?.catalogAccountIds||s.meta?.businessId;
+  return {
+    naver:{ok:!!st.naver,label:'naver',reason:st.naver?'Naver API 설정 완료':'Naver CID / Access License / Secret Key를 확인하세요.'},
+    meta:{ok:!!st.meta,label:'meta',reason:st.meta?'Meta API 설정 완료':(!s.meta?.token?'Meta Access Token이 없습니다.':(!metaIds?'Meta 광고계정 ID 또는 Business ID가 없습니다.':'Meta API 설정을 확인하세요.'))},
+    google:{ok:!!st.google,label:'google',reason:st.google?'Google Ads 설정 완료':(!googleCid?'광고주별 Google Customer ID / CID가 없습니다.':(!googleCommonOk?'Google Ads 공통 설정 5개 값이 부족합니다.':'Google Ads 설정을 확인하세요.'))}
+  };
+}
+function reportScheduleApiTags(settings={}){
+  const d=reportScheduleApiStatusDetail(settings);
+  return `<div class="report-schedule-api-tags">${['naver','meta','google'].map(k=>`<span class="report-schedule-api-tag ${d[k].ok?'ok':'missing'} ${k}" data-instant-tip="${escapeHtml(d[k].reason)}">${d[k].label}</span>`).join('')}</div>`;
+}
 function reportScheduleApiSummary(settings={}){try{return advertiserStatusMini(settings||{})}catch(e){return 'API 설정 확인 필요'}}
 function renderReportScheduleAdvertisers(){
   const list=(typeof getAdvertisers==='function'?getAdvertisers():[])||[];
@@ -1150,7 +1188,7 @@ function renderReportScheduleAdvertisers(){
   box.innerHTML=list.map(a=>{
     const id=String(a.id||'');
     const checked=id===selectedId?'checked':'';
-    return `<label class="report-schedule-row"><input type="checkbox" class="report-schedule-check" value="${escapeHtml(id)}" ${checked}/><div><b>${escapeHtml(a.name||'광고주')}</b><span>${escapeHtml(reportScheduleApiSummary(a.settings||{}))}</span></div><select class="report-schedule-sale" data-adv-id="${escapeHtml(id)}"><option value="sales">판매</option><option value="nonsales">비판매</option></select></label>`;
+    return `<label class="report-schedule-row"><input type="checkbox" class="report-schedule-check" value="${escapeHtml(id)}" ${checked}/><div><b>${escapeHtml(a.name||'광고주')}</b>${reportScheduleApiTags(a.settings||{})}</div><select class="report-schedule-sale" data-adv-id="${escapeHtml(id)}"><option value="sales">판매</option><option value="nonsales">비판매</option></select></label>`;
   }).join('');
 }
 function openReportScheduleModal(){
@@ -1416,7 +1454,7 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
   window.renderApiStatus=function(data,msg){
     const enabled=data?.meta?.enabled||getEnabledFromSettings();
     const errors=data?.errors||[];
-    const html=['naver','meta','google'].map(p=>{const hasErr=errors.some(e=>e.platform===p);const hasData=(data?.allCamps||[]).some(r=>r.platform===p)||(data?.recentDays||[]).some(r=>r.platform===p)||(data?.creatives||[]).some(r=>r.platform===p);const st=hasErr?'err':enabled?.[p]?(hasData||data?'ok':'idle'):'off';return ledHtml(p,st)}).join('');
+    const html=['naver','meta','google'].map(p=>{const err=errors.find(e=>e.platform===p);const hasErr=!!err;const hasData=(data?.allCamps||[]).some(r=>r.platform===p)||(data?.recentDays||[]).some(r=>r.platform===p)||(data?.creatives||[]).some(r=>r.platform===p);const st=hasErr?'err':enabled?.[p]?(hasData||data?'ok':'idle'):'off';const reason=hasErr?(err.message||err.error||'API 연결실패'):(st==='off'?'API 설정이 부족합니다.':(st==='idle'?'데이터 조회 전입니다.':''));return ledHtml(p,st,reason)}).join('');
     const line=document.getElementById('statusLine'); if(line)line.innerHTML=`<div class="api-leds" id="apiLeds">${html}</div><span class="status-msg">${msg||''}</span>`;
   };
   window.__openSettingsCore=function(){reloadSettingsInputs();renderAdvertiserSelect();toggleGuide('meta',false);toggleGuide('google',false);openSettingsTab('naver');document.getElementById('settingsModal')?.classList.add('show');setTimeout(()=>{try{updateGoogleCommonStatusUI()}catch(e){}},0)};
@@ -1888,6 +1926,47 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
   document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.nav-item[data-tab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+btn.dataset.tab).classList.add('active');renderDashboard()}));document.querySelectorAll('.quick-btn').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.quick-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');setDates(btn.dataset.period);renderDashboard()}));document.querySelectorAll('.platform-chip').forEach(btn=>btn.addEventListener('click',()=>{selectedPlatform=btn.dataset.platform;document.querySelectorAll('.platform-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderDashboard()}));document.querySelectorAll('.seg-btn').forEach(btn=>btn.addEventListener('click',()=>{selectedSaleType=btn.dataset.sale;document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderDashboard()}));document.getElementById('purchaseBasis')?.addEventListener('change',renderDashboard);document.addEventListener('click',()=>{closeAdvertiserDropdown();closeMetricMenu()});window.addEventListener('resize',()=>dashboardData&&renderDashboard());if(window.__AD_REPORT_EXPORT__&&applyReportExportPayload(window.__AD_REPORT_EXPORT__)){return;}renderAdvertiserSelect();setDates('yesterday');renderApiStatus(null,'API 설정 후 데이터 불러오기를 눌러 조회하세요.');renderDashboard();
 })();
 
+
+
+
+/* === v8: instant tooltip for API tags and failure reasons === */
+(function(){
+  function ensureTip(){
+    let el=document.getElementById('instantUiTooltip');
+    if(!el){el=document.createElement('div');el.id='instantUiTooltip';el.className='instant-ui-tooltip';document.body.appendChild(el)}
+    return el;
+  }
+  function moveTip(e){
+    const el=document.getElementById('instantUiTooltip');
+    if(!el||el.style.display==='none')return;
+    const pad=14;
+    let x=e.clientX+14,y=e.clientY+14;
+    const r=el.getBoundingClientRect();
+    if(x+r.width+pad>window.innerWidth)x=e.clientX-r.width-14;
+    if(y+r.height+pad>window.innerHeight)y=e.clientY-r.height-14;
+    el.style.left=Math.max(8,x)+'px';
+    el.style.top=Math.max(8,y)+'px';
+  }
+  document.addEventListener('mouseover',function(e){
+    const target=e.target.closest('[data-instant-tip]');
+    if(!target)return;
+    const text=target.getAttribute('data-instant-tip')||'';
+    if(!text)return;
+    const el=ensureTip();
+    el.textContent=text;
+    el.style.display='block';
+    moveTip(e);
+  });
+  document.addEventListener('mousemove',function(e){moveTip(e)});
+  document.addEventListener('mouseout',function(e){
+    const target=e.target.closest('[data-instant-tip]');
+    if(!target)return;
+    const to=e.relatedTarget;
+    if(to&&target.contains(to))return;
+    const el=document.getElementById('instantUiTooltip');
+    if(el)el.style.display='none';
+  });
+})();
 
 /* === v4: close visible popups with ESC === */
 function closeTopPopupOnEsc(){
