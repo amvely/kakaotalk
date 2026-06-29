@@ -400,6 +400,36 @@
 .side-adv-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:950;color:inherit}.media-boxes{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}.media-box{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:950;line-height:1;border:1px solid #334155;background:#1e293b;color:#64748b}.media-box.on.naver{background:#03c75a;border-color:#03c75a;color:#052e16}.media-box.on.meta{background:#1877f2;border-color:#1877f2;color:#fff}.media-box.on.google{background:#fbbc04;border-color:#fbbc04;color:#422006}.side-adv-empty{font-size:11px;color:#94a3b8;background:#0f172a;border:1px dashed #334155;border-radius:11px;padding:10px;text-align:center}
 #metaActionTypeBox,#metaConversionCustomField{display:none!important}
 
+
+/* === v5: visible advertiser import/export, ESC modal close, metric share 100% panel === */
+.side-advertiser-io{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.side-advertiser-io button{border:1px solid #334155;background:#0f172a;color:#cbd5e1;border-radius:9px;padding:7px 4px;font-size:11px;font-weight:900;cursor:pointer}
+.side-advertiser-io button:hover{border-color:#38bdf8;color:#fff;background:#172033}
+.metric-share-panel{margin-bottom:16px;background:#fff!important;color:var(--text)!important;border-color:var(--border)!important;box-shadow:var(--shadow)!important}
+.metric-share-panel .panel-head{background:#fff!important;border-bottom:1px solid var(--border)!important;color:var(--text)!important}
+.metric-share-panel .panel-head h2{color:var(--text)!important}
+.metric-share-tools{gap:8px;justify-content:flex-end}
+.metric-share-body{padding:18px;background:#fff}
+.metric-share-legend{display:flex;gap:10px 14px;align-items:center;justify-content:center;flex-wrap:wrap;margin-bottom:14px;font-size:11px;font-weight:950;color:#344054}
+.metric-share-legend-item{display:inline-flex;gap:6px;align-items:center;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:1px solid transparent;border-radius:999px;padding:4px 7px;transition:opacity .15s,transform .15s,border-color .15s,background .15s}
+.metric-share-legend-item:hover{background:#f8fafc;border-color:#e4e7ec}
+.metric-share-legend-item.active{background:#f8fafc;border-color:#98a2b3;transform:translateY(-1px)}
+.metric-share-legend-item.dim{opacity:.32}
+.metric-share-color{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+.metric-share-row{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;margin:22px 0}
+.metric-share-label{font-size:13px;font-weight:950;color:#344054;text-align:left}
+.metric-share-track{height:34px;display:flex;overflow:hidden;border-radius:7px;background:#f1f5f9;border:1px solid #e4e7ec}
+.metric-share-seg{height:100%;display:flex;align-items:center;justify-content:center;min-width:0;color:#fff;font-size:11px;font-weight:950;text-shadow:0 1px 2px rgba(0,0,0,.28);position:relative;transition:opacity .15s,filter .15s}
+.metric-share-seg.dim{opacity:.18;filter:saturate(.65)}
+.metric-share-seg.active{box-shadow:inset 0 0 0 2px rgba(17,24,39,.45);z-index:1}
+.metric-share-seg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.metric-share-axis{display:grid;grid-template-columns:repeat(11,1fr);margin:8px 0 0 84px;color:#667085;font-size:11px;font-weight:950}
+.metric-share-axis span{text-align:center;transform:translateX(-50%)}
+.metric-share-axis span:first-child{text-align:left;transform:none}.metric-share-axis span:last-child{text-align:right;transform:none}
+.metric-share-empty{padding:28px;text-align:center;color:#667085;background:#f8fafc;border:1px dashed var(--border);border-radius:12px}
+.metric-share-note{text-align:right;color:#667085;font-size:11px;font-weight:900;margin-top:10px}
+@media(max-width:780px){.metric-share-row{grid-template-columns:1fr;gap:7px}.metric-share-axis{margin-left:0}.metric-share-track{height:38px}.metric-share-tools{width:100%;justify-content:flex-start}.metric-share-tools select{min-width:100%}}
+
 </style>
 </head>
 <body>
@@ -417,6 +447,10 @@
 <button onclick="openAdvertiserModal('add')" type="button">추가</button>
 <button onclick="openAdvertiserModal('rename')" type="button">수정</button>
 <button onclick="openAdvertiserModal('delete')" type="button">삭제</button>
+</div>
+<div class="side-advertiser-io">
+<button onclick="exportAdvertisersJson()" type="button">내보내기</button>
+<button onclick="openAdvertisersImport()" type="button">불러오기</button>
 </div>
 <p id="advertiserInfo" style="display:none"></p>
 </div>
@@ -461,6 +495,7 @@
 </div>
 </section>
 <section class="panel" id="waterfallPanel" style="margin-bottom:16px"><div class="panel-head"><div><h2>워터폴 차트</h2><small>이전기간 → 캠페인별 증감 기여도 → 조회기간</small></div><div class="panel-tools"><span class="wf-filter-label">캠페인 유형</span><select class="tiny-select wide" id="waterfallSaleType" onchange="renderDashboard()"><option value="all">전체 캠페인 유형</option></select><span class="wf-filter-label">캠페인</span><select class="tiny-select wide" id="waterfallCampaign" onchange="renderDashboard()"><option value="all">전체 캠페인</option></select><select class="tiny-select" id="waterfallMetric" onchange="syncMetricAndRender(this.value)"><option value="cost">광고비</option><option value="imp">노출수</option><option value="click">클릭수</option><option value="conv">전환수</option><option value="revenue">매출액</option></select><select class="tiny-select" id="waterfallLevel" onchange="renderDashboard()"><option value="campaign">캠페인별</option><option value="platform">매체별</option></select><span class="wf-control-note">표시</span><div class="wf-stepper"><button onclick="adjustWaterfallTopN(-1)" type="button">−</button><b id="waterfallTopNLabel">10개</b><button onclick="adjustWaterfallTopN(1)" type="button">＋</button><input id="waterfallTopN" type="hidden" value="10"/></div></div></div><div class="wf-summary" id="wfSummary"></div><div class="chart-box tall"><canvas id="waterfallChart"></canvas></div></section>
+<section class="panel metric-share-panel" id="metricSharePanel"><div class="panel-head"><div><h2>항목별 성과 비중 분석 (100%)</h2></div><div class="panel-tools metric-share-tools"><select class="tiny-select wide" id="metricSharePlatform" onchange="onMetricShareFilterChange('platform')"><option value="all">전체 매체</option><option value="naver">네이버</option><option value="meta">메타</option><option value="google">구글</option></select><select class="tiny-select wide" id="metricShareType" onchange="onMetricShareFilterChange('type')"><option value="all">전체 캠페인 유형</option></select><select class="tiny-select wide" id="metricShareCampaign" onchange="onMetricShareFilterChange('campaign')"><option value="all">전체 캠페인</option></select></div></div><div class="metric-share-body" id="metricShareBody"></div></section>
 <section class="panel table-panel recent-panel"><div class="table-top"><div><h2>최근 7일 데이터</h2><p>종료일 기준 최근 7일의 네이버·메타·구글 합산 데이터입니다. 하단 TOTAL은 최근 7일 합계입니다.</p></div><div class="table-actions"><div class="metric-picker"><button class="btn" onclick="toggleRecentMetricMenu(event)" type="button">지표 설정</button><div class="metric-menu" id="recentMetricMenu"></div></div></div></div><div class="table-wrap recent-wrap"><table class="main-table recent-table"><thead id="recentHead"></thead><tbody id="recentBody"></tbody></table></div></section>
 <section class="panel table-panel"><div class="table-top"><div><h2>캠페인별 성과</h2><p>캠페인을 클릭하면 광고그룹 성과가 펼쳐집니다. 하단 TOTAL은 현재 필터 기준 합계입니다.</p></div><div class="table-actions"><div class="metric-picker"><button class="btn" onclick="toggleMetricMenu(event)" type="button">지표 설정</button><div class="metric-menu" id="metricMenu"></div></div><button class="btn" onclick="toggleAllGroups()">광고그룹 전체 펼치기</button></div></div><div class="campaign-filter-bar"><select class="control" id="campFilterPlatform"><option value="all">전체 매체</option><option value="naver">네이버</option><option value="meta">메타</option><option value="google">구글</option></select><select class="control" id="campFilterType"><option value="all">전체 캠페인 유형</option></select><select class="control" id="textFilterTarget"><option value="campaign">캠페인</option><option value="adgroup">광고그룹</option></select><select class="control" id="textFilterMode"><option value="contains">포함</option><option value="exact">일치</option><option value="exclude">제외</option></select><input class="control filter-text" id="textFilterValue" placeholder="검색어"/><select class="control" id="numFilterMetric"><option value="cost">광고비</option><option value="imp">노출수</option><option value="click">클릭수</option><option value="conv">전환수</option><option value="revenue">매출액</option></select><select class="control" id="numFilterOp"><option value="gte">이상</option><option value="lte">이하</option><option value="gt">초과</option><option value="lt">미만</option><option value="eq">같음</option></select><input class="control num-input" id="numFilterValue" placeholder="숫자" type="number"/><button class="btn filter-apply-btn" onclick="renderDashboard()">필터 적용</button><button class="btn ghost" onclick="clearCampaignFilters()">필터 초기화</button></div><div class="table-wrap"><table class="main-table"><thead><tr><th>매체</th><th>캠페인 / 광고그룹</th><th>유형</th><th>광고비</th><th>노출수</th><th>클릭수</th><th>전환수</th><th>매출액</th><th class="rate-col rate-mini-col">증감</th><th>CTR</th><th>CPC</th><th>CVR</th><th>CPA</th><th>ROAS</th><th>객단가</th></tr></thead><tbody id="campaignBody"></tbody></table></div></section>
 </section>
@@ -513,6 +548,36 @@ act_9876543210" spellcheck="false"></textarea><div class="mini">일반 광고계
 <style>
 .settings-advertiser-name-card{background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:0 14px 34px rgba(15,23,42,.06);padding:16px;margin-bottom:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
 .settings-advertiser-name-card .field{margin:0}.settings-advertiser-name-card .field label{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#64748b;font-weight:950;margin-bottom:6px}.settings-advertiser-name-card .field input{width:100%;background:#fff;border:1.5px solid #dbe3ef;border-radius:12px;padding:12px 13px;font-size:14px;font-weight:900;outline:none;transition:border-color .15s,box-shadow .15s}.settings-advertiser-name-card .field input:focus{border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.08)}.settings-advertiser-name-card .mini{font-size:11px;color:#667085;line-height:1.5;margin-top:5px}.settings-advertiser-mode-badge{display:inline-flex;align-items:center;border:1px solid #dbeafe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:4px 9px;font-size:10px;font-weight:950;white-space:nowrap}.settings-advertiser-mode-badge.add{border-color:#bbf7d0;background:#ecfdf3;color:#166534}.settings-advertiser-name-error{display:none;color:#dc2626;font-size:12px;font-weight:900;margin-top:7px}.settings-advertiser-name-error.show{display:block}.settings-advertiser-help{font-size:11px;color:#475467;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:10px 12px;line-height:1.5;min-width:180px}.settings-advertiser-help b{display:block;color:#111827;margin-bottom:2px}@media(max-width:760px){.settings-advertiser-name-card{grid-template-columns:1fr}.settings-advertiser-help{min-width:0}}
+
+/* === v5: visible advertiser import/export, ESC modal close, metric share 100% panel === */
+.side-advertiser-io{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.side-advertiser-io button{border:1px solid #334155;background:#0f172a;color:#cbd5e1;border-radius:9px;padding:7px 4px;font-size:11px;font-weight:900;cursor:pointer}
+.side-advertiser-io button:hover{border-color:#38bdf8;color:#fff;background:#172033}
+.metric-share-panel{margin-bottom:16px;background:#fff!important;color:var(--text)!important;border-color:var(--border)!important;box-shadow:var(--shadow)!important}
+.metric-share-panel .panel-head{background:#fff!important;border-bottom:1px solid var(--border)!important;color:var(--text)!important}
+.metric-share-panel .panel-head h2{color:var(--text)!important}
+.metric-share-tools{gap:8px;justify-content:flex-end}
+.metric-share-body{padding:18px;background:#fff}
+.metric-share-legend{display:flex;gap:10px 14px;align-items:center;justify-content:center;flex-wrap:wrap;margin-bottom:14px;font-size:11px;font-weight:950;color:#344054}
+.metric-share-legend-item{display:inline-flex;gap:6px;align-items:center;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:1px solid transparent;border-radius:999px;padding:4px 7px;transition:opacity .15s,transform .15s,border-color .15s,background .15s}
+.metric-share-legend-item:hover{background:#f8fafc;border-color:#e4e7ec}
+.metric-share-legend-item.active{background:#f8fafc;border-color:#98a2b3;transform:translateY(-1px)}
+.metric-share-legend-item.dim{opacity:.32}
+.metric-share-color{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+.metric-share-row{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;margin:22px 0}
+.metric-share-label{font-size:13px;font-weight:950;color:#344054;text-align:left}
+.metric-share-track{height:34px;display:flex;overflow:hidden;border-radius:7px;background:#f1f5f9;border:1px solid #e4e7ec}
+.metric-share-seg{height:100%;display:flex;align-items:center;justify-content:center;min-width:0;color:#fff;font-size:11px;font-weight:950;text-shadow:0 1px 2px rgba(0,0,0,.28);position:relative;transition:opacity .15s,filter .15s}
+.metric-share-seg.dim{opacity:.18;filter:saturate(.65)}
+.metric-share-seg.active{box-shadow:inset 0 0 0 2px rgba(17,24,39,.45);z-index:1}
+.metric-share-seg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.metric-share-axis{display:grid;grid-template-columns:repeat(11,1fr);margin:8px 0 0 84px;color:#667085;font-size:11px;font-weight:950}
+.metric-share-axis span{text-align:center;transform:translateX(-50%)}
+.metric-share-axis span:first-child{text-align:left;transform:none}.metric-share-axis span:last-child{text-align:right;transform:none}
+.metric-share-empty{padding:28px;text-align:center;color:#667085;background:#f8fafc;border:1px dashed var(--border);border-radius:12px}
+.metric-share-note{text-align:right;color:#667085;font-size:11px;font-weight:900;margin-top:10px}
+@media(max-width:780px){.metric-share-row{grid-template-columns:1fr;gap:7px}.metric-share-axis{margin-left:0}.metric-share-track{height:38px}.metric-share-tools{width:100%;justify-content:flex-start}.metric-share-tools select{min-width:100%}}
+
 </style>
 
 <!-- === HOTFIX: optional meta custom field guard for API settings buttons === -->
@@ -522,7 +587,7 @@ act_9876543210" spellcheck="false"></textarea><div class="mini">일반 광고계
 <script>
 
 /* === Core utilities, storage, and rendering primitives === */
-const API_ENDPOINT="/api/ad-performance";let selectedPlatform="all",selectedSaleType="sales",dashboardData=null,expandedCampaigns=new Set(),conversionExpandedCampaigns=new Set(),allExpanded=false,diffMode="rate",waterfallTopN=10,campaignSort={key:'revenue',dir:'desc'},creativeSort={key:'cost',dir:'desc'};const defaultMetricVisibility={cost:true,imp:true,click:true,conv:true,revenue:true,purchaseCcnt:true,purchaseConvAmt:true,cart:true,cartRevenue:true,ctr:true,cpc:true,cvr:true,cpa:true,roas:true,aov:true};let metricVisibility={...defaultMetricVisibility},recentMetricVisibility={...defaultMetricVisibility};const colors=['c0','c1','c2','c3','c4','c5'];
+const API_ENDPOINT="/api/ad-performance";let selectedPlatform="all",selectedSaleType="sales",dashboardData=null,expandedCampaigns=new Set(),conversionExpandedCampaigns=new Set(),allExpanded=false,diffMode="rate",waterfallTopN=10,metricShareHighlightedKey=null,campaignSort={key:'revenue',dir:'desc'},creativeSort={key:'cost',dir:'desc'};const defaultMetricVisibility={cost:true,imp:true,click:true,conv:true,revenue:true,purchaseCcnt:true,purchaseConvAmt:true,cart:true,cartRevenue:true,ctr:true,cpc:true,cvr:true,cpa:true,roas:true,aov:true};let metricVisibility={...defaultMetricVisibility},recentMetricVisibility={...defaultMetricVisibility};const colors=['c0','c1','c2','c3','c4','c5'];
 function n(v){const x=Number(v);return Number.isFinite(x)?x:0}function fmtWon(v){return '₩'+Math.round(n(v)).toLocaleString('ko-KR')}function fmtNum(v){return Math.round(n(v)).toLocaleString('ko-KR')}function fmtPct(v,d=1){return n(v).toFixed(d)+'%'}function ymd(date){return `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`}function isoFromYmd(s){s=String(s).replace(/-/g,'');return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`}function ymdFromISO(s){return String(s||'').replace(/-/g,'').slice(0,8)}
 function platformName(p){return({naver:'네이버',meta:'메타',google:'구글'})[p]||p||'기타'}function isOff(row){const v=String(row?.status||row?.effectiveStatus||row?.campaignStatus||row?.configuredStatus||row?.servingStatus||'').toUpperCase();return ['OFF','PAUSED','REMOVED','DISABLED','ENDED','ARCHIVED'].some(x=>v.includes(x))||row?.enabled===false||row?.isActive===false}function badge(p,off=false){return `<span class="badge ${p} ${off?'off':''}"><span class="dot ${p}"></span>${platformName(p)}</span>`}function metaConversionLabel(){const basis=getMetaConversionBasis();const el=document.getElementById('metaConversionBasis');const txt=el?.selectedOptions?.[0]?.textContent||({purchase:'구매',lead:'리드',add_to_cart:'장바구니',link_click:'링크 클릭',landing_page_view:'랜딩페이지 조회',custom:'커스텀'})[basis]||'구매';return basis==='custom'?'커스텀':txt}function metricLabel(k){const selectedLabel=metaConversionLabel();return({cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',purchaseCcnt:`${selectedLabel}전환`,revenue:'매출액',purchaseConvAmt:`${selectedLabel}전환값`,cart:'장바구니',cartRevenue:'장바구니 전환값',roas:'ROAS',ctr:'CTR',cvr:'CVR',cpc:'CPC',cpa:'CPA',aov:'객단가'})[k]||k}function metricFmt(k,v){return ['cost','revenue','purchaseConvAmt','cartRevenue','cpc','cpa','aov'].includes(k)?fmtWon(v):k==='roas'?fmtPct(v,0):['ctr','cvr'].includes(k)?fmtPct(v,2):fmtNum(v)}
 function showNaverCartValue(){return selectedPlatform==='naver'}function activeMetricKeys(){const base=selectedSaleType==='nonsales'?['cost','imp','click','conv']:['cost','imp','click','conv','revenue'];return showNaverCartValue()&&selectedSaleType!=='nonsales'?base.concat(['cart']):base}function hasRevenueMetric(){return activeMetricKeys().includes('revenue')}function refreshMetricControls(){const keys=activeMetricKeys();['contribMetric','waterfallMetric'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const keep=keys.includes(el.value)?el.value:keys[0];el.innerHTML=keys.map(k=>`<option value="${k}">${metricLabel(k)}</option>`).join('');el.value=keep})}
@@ -765,8 +830,95 @@ const SINGLE_SETTINGS_KEY='adDashboardSettings';
 function singleStoredSettings(){return safeJson(localStorage.getItem(SINGLE_SETTINGS_KEY),{})||{}}
 
 
-function renderEmptyDashboard(){updateHeader();document.getElementById('kpiCards').innerHTML='<div class="blank-state" style="grid-column:1/-1"><strong>데이터 불러오기 전입니다.</strong>API 설정을 저장한 뒤 데이터 불러오기를 눌러주세요.</div>';document.getElementById('summaryBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:#98a2b3">조회 전입니다.</td></tr>';document.getElementById('dailyTrendGrid').innerHTML='<div class="blank-state" style="grid-column:1/-1"><strong>일간 추이차트</strong>API 데이터를 불러오면 표시됩니다.</div>';document.getElementById('wfSummary').innerHTML='<div class="wf-card" style="grid-column:1/-1"><div class="wf-label">대기</div><div class="wf-val">데이터 불러오기 전</div></div>';const c=document.getElementById('waterfallChart');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);document.getElementById('recentHead').innerHTML='';document.getElementById('recentBody').innerHTML='<tr><td style="text-align:center;color:#98a2b3">조회 전입니다.</td></tr>';document.getElementById('campaignBody').innerHTML='<tr><td colspan="18" style="text-align:center;color:#98a2b3">API 설정 후 데이터 불러오기를 눌러주세요.</td></tr>';document.getElementById('creativeKpis').innerHTML='';document.getElementById('creativeGrid').innerHTML='';document.getElementById('creativeBody').innerHTML='';document.getElementById('conversionCards')&&(document.getElementById('conversionCards').innerHTML='');document.getElementById('funnelBox')&&(document.getElementById('funnelBox').innerHTML='');document.getElementById('conversionShare')&&(document.getElementById('conversionShare').innerHTML='');document.getElementById('conversionBody')&&(document.getElementById('conversionBody').innerHTML='')}
-function renderDashboard(){updateHeader();refreshMetricControls();if(!dashboardData){renderEmptyDashboard();renderApiStatus(null,'데이터 불러오기를 눌러 조회하세요.');return}renderApiStatus(dashboardData,dashboardData?undefined:'데이터 불러오기를 눌러 조회하세요.');const{campaigns,groups}=currentRows();renderKpis(campaigns);renderDailyTrendGrid();drawWaterfall(campaigns,groups);renderRecentTable();renderRecentMetricMenu();renderTable(campaigns,groups);renderCreative()}
+
+function metricShareKeys(){return selectedSaleType==='nonsales'?['cost','imp','click','conv']:['cost','imp','click','conv','revenue']}
+function metricShareName(row){return String(row?.adgroupName||row?.adsetName||row?.groupName||row?.name||row?.campaignName||row?.id||'항목').trim()||'항목'}
+function metricSharePalette(i){const colors=['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#eab308','#64748b'];return colors[i%colors.length]}
+function metricShareRowKey(row,idx=0){return String(row?.id||row?.rawId||row?.adgroupId||row?.groupId||row?.adsetId||row?.campaignId||row?.campaignName||row?.adgroupName||row?.name||idx)}
+function metricShareOptionValue(row){return String(row?.id||`${row?.platform||''}:${row?.campaignId||row?.rawId||row?.campaignName||row?.name||''}`)}
+function platformOrderValue(p){return p==='naver'?1:p==='meta'?2:p==='google'?3:9}
+function metricShareChildLabel(platform){return platform==='meta'?'세트':platform==='naver'?'광고그룹':platform==='google'?'광고그룹':'하위 항목'}
+function onMetricShareFilterChange(scope){
+  if(scope==='platform'){
+    const typeEl=document.getElementById('metricShareType'),campEl=document.getElementById('metricShareCampaign');
+    if(typeEl)typeEl.value='all'; if(campEl)campEl.value='all'; metricShareHighlightedKey=null;
+  }else if(scope==='type'){
+    const campEl=document.getElementById('metricShareCampaign'); if(campEl)campEl.value='all'; metricShareHighlightedKey=null;
+  }else if(scope==='campaign')metricShareHighlightedKey=null;
+  renderDashboard();
+}
+function toggleMetricShareHighlight(key){metricShareHighlightedKey=metricShareHighlightedKey===key?null:key;renderDashboard()}
+function refreshMetricShareFilters(camps=[]){
+  const platformEl=document.getElementById('metricSharePlatform'),typeEl=document.getElementById('metricShareType'),campEl=document.getElementById('metricShareCampaign');
+  if(!platformEl||!typeEl||!campEl)return {platform:'all',type:'all',campaign:'all'};
+  const keepPlatform=platformEl.value||'all',keepType=typeEl.value||'all',keepCamp=campEl.value||'all';
+  const presentPlatforms=[...new Set((camps||[]).map(c=>c.platform).filter(Boolean))].sort((a,b)=>platformOrderValue(a)-platformOrderValue(b));
+  const platformOptions=['all',...presentPlatforms.filter(p=>['naver','meta','google'].includes(p))];
+  const platformLabels={all:'전체 매체',naver:'네이버',meta:'메타',google:'구글'};
+  platformEl.innerHTML=platformOptions.map(p=>`<option value="${p}">${platformLabels[p]||p}</option>`).join('');
+  platformEl.value=platformOptions.includes(keepPlatform)?keepPlatform:'all';
+  const byPlatform=(camps||[]).filter(c=>platformEl.value==='all'||c.platform===platformEl.value);
+  const types=[...new Set(byPlatform.map(campaignTypeOf).filter(Boolean))].sort();
+  typeEl.innerHTML='<option value="all">전체 캠페인 유형</option>'+types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  typeEl.value=types.includes(keepType)?keepType:'all';
+  const byType=byPlatform.filter(c=>typeEl.value==='all'||campaignTypeOf(c)===typeEl.value);
+  const seen=new Set();
+  const campaignOptions=[];
+  byType.forEach(c=>{const value=metricShareOptionValue(c);if(!value||seen.has(value))return;seen.add(value);campaignOptions.push({value,label:c.campaignName||c.name||value,platform:c.platform})});
+  campEl.innerHTML='<option value="all">전체 캠페인</option>'+campaignOptions.map(c=>`<option value="${escapeHtml(c.value)}">${escapeHtml(c.label)}</option>`).join('');
+  campEl.value=campaignOptions.some(c=>c.value===keepCamp)?keepCamp:'all';
+  return {platform:platformEl.value,type:typeEl.value,campaign:campEl.value};
+}
+function metricShareSelectedSource(camps=[],groups=[]){
+  const filters=refreshMetricShareFilters(camps);
+  let filtered=(camps||[]).filter(c=>(filters.platform==='all'||c.platform===filters.platform)&&(filters.type==='all'||campaignTypeOf(c)===filters.type));
+  let levelLabel='캠페인';
+  if(filters.campaign!=='all'){
+    const selected=filtered.find(c=>metricShareOptionValue(c)===filters.campaign);
+    const ck=selected?(selected.id||`${selected.platform}:${selected.campaignId}`):filters.campaign;
+    const cid=selected?.campaignId;
+    const childRows=(groups||[]).filter(g=>(g.campaignKey===ck)||(selected&&g.platform===selected.platform&&String(g.campaignId)===String(cid))).filter(rowHasAnyPeriodMetric);
+    levelLabel=metricShareChildLabel(selected?.platform||filters.platform);
+    return {rows:childRows,levelLabel,selectedCampaign:selected};
+  }
+  return {rows:filtered,levelLabel,selectedCampaign:null};
+}
+function renderMetricSharePanel(camps,groups=[]){
+  const body=document.getElementById('metricShareBody'); if(!body)return;
+  const keys=metricShareKeys();
+  const source=metricShareSelectedSource(camps||[],groups||[]);
+  const rows=(source.rows||[]).filter(r=>keys.some(k=>n(r[k])>0));
+  if(!rows.length){
+    const msg=source.selectedCampaign?`선택한 캠페인의 ${metricShareChildLabel(source.selectedCampaign.platform)} 성과 데이터가 없습니다.`:'표시할 성과 비중 데이터가 없습니다.';
+    body.innerHTML=`<div class="metric-share-empty"><strong>${msg}</strong><br>데이터를 불러오거나 기간/매체/캠페인 필터를 확인하세요.</div>`;return;
+  }
+  const rankMetric=keys.includes('cost')?'cost':keys[0];
+  const ranked=[...rows].sort((a,b)=>n(b[rankMetric])-n(a[rankMetric]));
+  const top=ranked.slice(0,12);
+  const other=ranked.slice(12);
+  const items=top.map((r,i)=>({key:metricShareRowKey(r,i),name:metricShareName(r),platform:r.platform,color:metricSharePalette(i),row:r}));
+  if(other.length){
+    const agg=calcMetric(other.reduce((acc,r)=>{['cost','imp','click','conv','revenue'].forEach(k=>acc[k]=n(acc[k])+n(r[k]));return acc},{cost:0,imp:0,click:0,conv:0,revenue:0}));
+    items.push({key:'__other__',name:'기타',platform:'',color:metricSharePalette(items.length),row:agg});
+  }
+  if(metricShareHighlightedKey&&!items.some(it=>it.key===metricShareHighlightedKey))metricShareHighlightedKey=null;
+  const legend=items.map(it=>{
+    const active=metricShareHighlightedKey===it.key,dim=metricShareHighlightedKey&&metricShareHighlightedKey!==it.key;
+    return `<span class="metric-share-legend-item ${active?'active':''} ${dim?'dim':''}" data-key="${escapeHtml(it.key)}" title="${escapeHtml(it.name)}"><i class="metric-share-color" style="background:${it.color}"></i>${escapeHtml(it.name)}</span>`;
+  }).join('');
+  const rowHtml=keys.map(k=>{
+    const total=items.reduce((sum,it)=>sum+n(it.row[k]),0);
+    if(!total)return `<div class="metric-share-row"><div class="metric-share-label">${metricLabel(k)}</div><div class="metric-share-track"><div class="metric-share-seg" style="width:100%;background:#94a3b8"><span>0%</span></div></div></div>`;
+    const segs=items.map(it=>{const pct=n(it.row[k])/total*100;if(pct<=0)return '';const label=pct>=3?`${Math.round(pct)}%`:'';const active=metricShareHighlightedKey===it.key,dim=metricShareHighlightedKey&&metricShareHighlightedKey!==it.key;return `<div class="metric-share-seg ${active?'active':''} ${dim?'dim':''}" title="${escapeHtml(it.name)} · ${metricLabel(k)} ${metricFmt(k,it.row[k])} · ${pct.toFixed(1)}%" style="width:${pct}%;background:${it.color}"><span>${label}</span></div>`}).join('');
+    return `<div class="metric-share-row"><div class="metric-share-label">${metricLabel(k)}</div><div class="metric-share-track">${segs}</div></div>`;
+  }).join('');
+  const axis='<div class="metric-share-axis"><span>0%</span><span>10%</span><span>20%</span><span>30%</span><span>40%</span><span>50%</span><span>60%</span><span>70%</span><span>80%</span><span>90%</span><span>100%</span></div>';
+  body.innerHTML=`<div class="metric-share-legend">${legend}</div>${rowHtml}${axis}<div class="metric-share-note">* 상위 12개 ${source.levelLabel} 기준이며 나머지는 기타로 합산됩니다.</div>`;
+  body.querySelectorAll('.metric-share-legend-item').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();toggleMetricShareHighlight(el.dataset.key)}));
+}
+
+function renderEmptyDashboard(){updateHeader();document.getElementById('kpiCards').innerHTML='<div class="blank-state" style="grid-column:1/-1"><strong>데이터 불러오기 전입니다.</strong>API 설정을 저장한 뒤 데이터 불러오기를 눌러주세요.</div>';document.getElementById('summaryBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:#98a2b3">조회 전입니다.</td></tr>';document.getElementById('dailyTrendGrid').innerHTML='<div class="blank-state" style="grid-column:1/-1"><strong>일간 추이차트</strong>API 데이터를 불러오면 표시됩니다.</div>';document.getElementById('wfSummary').innerHTML='<div class="wf-card" style="grid-column:1/-1"><div class="wf-label">대기</div><div class="wf-val">데이터 불러오기 전</div></div>';document.getElementById('metricShareBody')&&(document.getElementById('metricShareBody').innerHTML='<div class="metric-share-empty">데이터 불러오기 전입니다.</div>');const c=document.getElementById('waterfallChart');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);document.getElementById('recentHead').innerHTML='';document.getElementById('recentBody').innerHTML='<tr><td style="text-align:center;color:#98a2b3">조회 전입니다.</td></tr>';document.getElementById('campaignBody').innerHTML='<tr><td colspan="18" style="text-align:center;color:#98a2b3">API 설정 후 데이터 불러오기를 눌러주세요.</td></tr>';document.getElementById('creativeKpis').innerHTML='';document.getElementById('creativeGrid').innerHTML='';document.getElementById('creativeBody').innerHTML='';document.getElementById('conversionCards')&&(document.getElementById('conversionCards').innerHTML='');document.getElementById('funnelBox')&&(document.getElementById('funnelBox').innerHTML='');document.getElementById('conversionShare')&&(document.getElementById('conversionShare').innerHTML='');document.getElementById('conversionBody')&&(document.getElementById('conversionBody').innerHTML='')}
+function renderDashboard(){updateHeader();refreshMetricControls();if(!dashboardData){renderEmptyDashboard();renderApiStatus(null,'데이터 불러오기를 눌러 조회하세요.');return}renderApiStatus(dashboardData,dashboardData?undefined:'데이터 불러오기를 눌러 조회하세요.');const{campaigns,groups}=currentRows();renderKpis(campaigns);renderDailyTrendGrid();drawWaterfall(campaigns,groups);renderMetricSharePanel(campaigns,groups);renderRecentTable();renderRecentMetricMenu();renderTable(campaigns,groups);renderCreative()}
 async function loadDashboard(){setLoading(true);try{dashboardData=normalizeApiPayload(await fetchDashboard());renderDashboard()}catch(e){console.error(e);dashboardData=null;renderEmptyDashboard();renderApiStatus({errors:[{platform:'naver',message:e.message},{platform:'meta',message:e.message},{platform:'google',message:e.message}]},'API 호출 실패: '+e.message)}finally{setLoading(false)}}
 
 /* === v25: restore sidebar advertiser list while keeping Google MCC common settings === */
@@ -1192,7 +1344,9 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
     }catch(e){alert('내보내기에 실패했습니다: '+(e?.message||e));}
   };
   window.openAdvertisersImport=function(){
-    document.getElementById('advertiserImportFile')?.click();
+    let input=document.getElementById('advertiserImportFile');
+    if(!input){input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.id='advertiserImportFile';input.style.display='none';input.onchange=function(){importAdvertisersJson(this.files&&this.files[0]);this.value=''};document.body.appendChild(input);}
+    input.click();
   };
   window.importAdvertisersJson=function(file){
     if(!file)return;
@@ -1413,6 +1567,26 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
   window.__AD_DASHBOARD_BOOTSTRAPPED__=true;
   document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.nav-item[data-tab]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+btn.dataset.tab).classList.add('active');renderDashboard()}));document.querySelectorAll('.quick-btn').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.quick-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');setDates(btn.dataset.period);renderDashboard()}));document.querySelectorAll('.platform-chip').forEach(btn=>btn.addEventListener('click',()=>{selectedPlatform=btn.dataset.platform;document.querySelectorAll('.platform-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderDashboard()}));document.querySelectorAll('.seg-btn').forEach(btn=>btn.addEventListener('click',()=>{selectedSaleType=btn.dataset.sale;document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');expandedCampaigns.clear();conversionExpandedCampaigns.clear();renderDashboard()}));document.getElementById('purchaseBasis')?.addEventListener('change',renderDashboard);document.addEventListener('click',()=>{closeAdvertiserDropdown();closeMetricMenu()});window.addEventListener('resize',()=>dashboardData&&renderDashboard());renderAdvertiserSelect();setDates('yesterday');renderApiStatus(null,'API 설정 후 데이터 불러오기를 눌러 조회하세요.');renderDashboard();
 })();
+
+
+/* === v4: close visible popups with ESC === */
+function closeTopPopupOnEsc(){
+  closeMetricMenu?.();
+  closeAdvertiserDropdown?.();
+  const settings=document.getElementById('settingsModal');
+  const advertiser=document.getElementById('advertiserModal');
+  if(settings?.classList.contains('show')){closeSettings?.();return true;}
+  if(advertiser?.classList.contains('show')){closeAdvertiserModal?.();return true;}
+  return false;
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'||e.key==='Esc'){
+    if(closeTopPopupOnEsc()){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+});
 
 </script></body>
 </html>
