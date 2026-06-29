@@ -472,6 +472,7 @@ body.report-export-mode .sidebar .side-advertiser-menu,body.report-export-mode .
 body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule-action-btn,body.report-export-mode .report-action-btn,body.report-export-mode .data-load-btn{display:none!important}
 body.report-export-mode .filter-card,body.report-export-mode .panel-tools,body.report-export-mode .table-actions,body.report-export-mode .metric-share-tools{display:flex!important}
 body.report-export-mode .filter-card{display:block!important}
+body.report-export-mode .quick-row{display:none!important}
 
 body.report-export-mode .actions:empty{display:none!important}
 body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule-action-btn,body.report-export-mode .report-action-btn,body.report-export-mode .data-load-btn{display:none!important}
@@ -1118,7 +1119,7 @@ async function downloadReportHtml(){
     const clone=document.documentElement.cloneNode(true);
     const cloneBody=clone.querySelector('body');
     if(cloneBody)cloneBody.classList.add('report-export-mode');
-    clone.querySelectorAll('.modal-backdrop,.loading-backdrop,#advertiserImportFile,#metricShareTooltip,#instantUiTooltip,.chart-tooltip').forEach(el=>el.remove());
+    clone.querySelectorAll('.modal-backdrop,.loading-backdrop,#sidebarAdvertiserCard,#advertiserImportFile,#metricShareTooltip,#instantUiTooltip,.chart-tooltip').forEach(el=>el.remove());
     clone.querySelectorAll('input[type="password"], textarea[id*="Token"], textarea[id*="token"], textarea[id*="Tok"], input[id*="Token"], input[id*="token"], input[id*="Secret"], input[id*="Sec"], input[id*="Lic"], input[id*="Mcc"], input[id*="Cid"], input[id*="Devtok"], input[id*="Refresh"]').forEach(el=>{try{el.value='';el.setAttribute('value','')}catch(e){}});
     const payloadScript=document.createElement('script');
     payloadScript.textContent='window.__AD_REPORT_EXPORT__='+JSON.stringify(payload).replace(/<\//g,'<\\/')+';';
@@ -1133,6 +1134,7 @@ async function downloadReportHtml(){
       body.report-export-mode #sidebarAdvertiserCard{display:none!important;}
       body.report-export-mode .side-advertiser-menu,body.report-export-mode .side-advertiser-dropdown,body.report-export-mode .side-advertiser-io,body.report-export-mode .side-advertiser-actions{display:none!important;}
       body.report-export-mode .filter-card{display:block!important;}
+      body.report-export-mode .quick-row{display:none!important;}
       body.report-export-mode .panel-tools,body.report-export-mode .table-actions,body.report-export-mode .metric-share-tools{display:flex!important;}
       body.report-export-mode .report-export-meta{display:flex!important;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border:1px solid #e4e7ec;border-radius:14px;background:#fff;color:#344054;font-size:12px;font-weight:900;box-shadow:0 18px 45px rgba(16,24,40,.05)}
       body.report-export-mode .report-export-meta span{background:#f8fafc;border:1px solid #e4e7ec;border-radius:999px;padding:6px 10px;}
