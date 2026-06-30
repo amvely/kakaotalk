@@ -484,14 +484,7 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 .report-schedule-row .report-schedule-api-tag.ok.google{background:#fefce8!important;border-color:#fde68a!important;color:#92400e!important}
 .report-schedule-row .report-schedule-api-tag.missing{background:#f8fafc!important;border-color:#e4e7ec!important;color:#98a2b3!important}
 
-.st-debug{margin:0 0 16px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:12px 14px;font-size:12px;font-weight:850;line-height:1.55}.st-debug b{display:block;margin-bottom:4px;color:#9a3412}.st-debug code{background:#ffedd5;border-radius:6px;padding:1px 5px}
 </style>
-
-<style>
-.nav-naver-badge{margin-left:auto;display:inline-flex;align-items:center;border:1px solid rgba(3,199,90,.35);background:#064e3b;color:#bbf7d0;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:950;line-height:1;white-space:nowrap;letter-spacing:-.01em}
-.searchterm-kpis{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-bottom:16px}.searchterm-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-bottom:16px}.st-scatter-tools{display:grid;grid-template-columns:repeat(6,minmax(112px,1fr));gap:10px;padding:14px 18px;background:#fbfcff;border-bottom:1px solid var(--border)}.st-field label{display:block;font-size:11px;color:#667085;font-weight:950;margin-bottom:6px}.st-field input,.st-field select{width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:12px;font-weight:850;background:#fff}.st-chart-wrap{padding:18px}.st-scatter-box{height:342px;border:1px solid var(--border);border-radius:18px;background:#fff;position:relative;overflow:hidden}.st-scatter-box canvas{width:100%;height:100%;display:block}.st-rank-body{padding:14px 18px 18px}.st-rank-list{display:grid;gap:8px;margin-top:12px}.st-rank-row{display:grid;grid-template-columns:30px minmax(0,1fr) 92px;gap:10px;align-items:center}.st-rank-num{width:26px;height:26px;border-radius:9px;background:#f2f4f7;color:#344054;display:grid;place-items:center;font-size:11px;font-weight:950}.st-rank-main{min-width:0}.st-rank-name{font-size:12px;font-weight:950;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.st-rank-bar-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden;margin-top:6px}.st-rank-bar{height:100%;background:var(--green);border-radius:999px}.st-rank-val{text-align:right;font-size:12px;font-weight:950}.st-filter-bar{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;padding:12px 18px;background:#fbfcff;border-bottom:1px solid var(--border)}.st-cond-row{display:grid;grid-template-columns:1.05fr .75fr .8fr;gap:8px}.st-diff-toggle.active{background:#111827;color:#fff;border-color:#111827}.st-diff-col,.st-diff-cell{width:66px;min-width:62px;text-align:center!important;color:#98a2b3!important;font-size:10px!important;background:#fbfcff!important}.st-diff-cell .diff{font-size:10px;font-weight:950}.st-judgement{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:950}.st-judgement.good{background:#dcfce7;color:#166534}.st-judgement.bad{background:#fee2e2;color:#991b1b}.st-judgement.watch{background:#fef3c7;color:#92400e}.st-judgement.neutral{background:#f2f4f7;color:#475467}.st-tooltip{position:fixed;z-index:999999;background:#111827;color:#fff;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:900;pointer-events:none;display:none;box-shadow:0 12px 28px rgba(15,23,42,.25);white-space:nowrap}.st-tooltip small{display:block;color:#cbd5e1;font-size:10px;margin-top:3px}.st-empty{padding:26px;color:#667085;text-align:center}.searchterm-table th:nth-child(1),.searchterm-table th:nth-child(2),.searchterm-table th:nth-child(3),.searchterm-table td:nth-child(1),.searchterm-table td:nth-child(2),.searchterm-table td:nth-child(3){text-align:left!important}@media(max-width:1240px){.searchterm-grid{grid-template-columns:1fr}.st-scatter-tools{grid-template-columns:repeat(3,1fr)}.searchterm-kpis{grid-template-columns:repeat(2,1fr)}.st-filter-bar{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.searchterm-kpis,.st-scatter-tools,.st-filter-bar{grid-template-columns:1fr}}
-</style>
-
 </head>
 <body>
 <div class="app">
@@ -518,7 +511,6 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <div class="nav-title">REPORT</div>
 <button class="nav-item active" data-tab="dashboard">📊 성과 대시보드</button>
 <button class="nav-item" data-tab="creative"><span>🧪 소재 분석</span><span class="nav-meta-badge">Meta 전용</span></button>
-<button class="nav-item" data-tab="searchterm"><span>🔎 검색어 분석</span><span class="nav-naver-badge">NAVER</span></button>
 <div class="nav-title">CHANNEL</div>
 <button class="nav-item" onclick="selectPlatform('naver')">🟢 네이버</button>
 <button class="nav-item" onclick="selectPlatform('meta')">🔵 메타</button>
@@ -567,48 +559,6 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <div class="creative-carousel-shell"><button aria-label="이전 소재" class="creative-carousel-nav prev" onclick="scrollCreativeCarousel(-1)" type="button">‹</button><section class="creative-grid creative-grid-top4" id="creativeGrid"></section><button aria-label="다음 소재" class="creative-carousel-nav next" onclick="scrollCreativeCarousel(1)" type="button">›</button></div>
 <section class="panel table-panel"><div class="table-top"><div><h2>소재별 성과 상세</h2><p>Meta 광고 소재 기준으로 캠페인/세트/이미지 유형과 성과 지표를 확인합니다.</p></div><div class="creative-tools"><div class="metric-picker"><button class="btn" onclick="toggleCreativeMetricMenu(event)" type="button">지표 설정</button><div class="metric-menu creativeMetricMenu" id="creativeMetricMenu"></div></div></div></div><div class="table-wrap"><table class="main-table"><thead><tr><th>광고계정</th><th>캠페인</th><th>세트</th><th>이미지</th><th>유형</th><th>소재명</th><th>광고비</th><th>노출수</th><th>클릭수</th><th>전환수</th><th>매출액</th><th>CTR</th><th>CPC</th><th>CVR</th><th>CPA</th><th>ROAS</th><th>객단가</th></tr></thead><tbody id="creativeBody"></tbody></table></div></section>
 </section>
-
-<section class="tab-panel" id="tab-searchterm">
-<section class="searchterm-kpis" id="searchTermKpis"></section>
-<div class="st-debug" id="searchTermDebug" style="display:none"></div>
-<section class="searchterm-grid">
-  <section class="panel">
-    <div class="panel-head"><div><h2>검색어 효율 분포</h2><small>하단 테이블 필터와 별개로 광고비·클릭·전환 조건만 적용됩니다.</small></div><span class="badge naver"><span class="dot naver"></span>NAVER</span></div>
-    <div class="st-scatter-tools">
-      <div class="st-field"><label>X축</label><select id="stXMetric" onchange="renderSearchTerms()"></select></div>
-      <div class="st-field"><label>Y축</label><select id="stYMetric" onchange="renderSearchTerms()"></select></div>
-      <div class="st-field"><label>점 크기</label><select id="stSizeMetric" onchange="renderSearchTerms()"></select></div>
-      <div class="st-field"><label>광고비 이상</label><input id="stMinCost" type="number" value="0" oninput="renderSearchTerms()"></div>
-      <div class="st-field"><label>클릭수 이상</label><input id="stMinClick" type="number" value="0" oninput="renderSearchTerms()"></div>
-      <div class="st-field"><label>전환수 이상</label><input id="stMinConv" type="number" value="0" oninput="renderSearchTerms()"></div>
-    </div>
-    <div class="st-chart-wrap"><div class="st-scatter-box"><canvas id="stScatterCanvas"></canvas></div></div>
-  </section>
-  <section class="panel">
-    <div class="panel-head"><div><h2>검색어 TOP10</h2><small>검색어 전체 데이터 기준 랭킹입니다.</small></div></div>
-    <div class="st-rank-body">
-      <div class="panel-tools"><select class="tiny-select wide" id="stRankMetric" onchange="renderSearchTerms()"></select><select class="tiny-select wide" id="stRankCondition" onchange="renderSearchTerms()"><option value="top">TOP 10</option><option value="bottom">BOTTOM 10</option><option value="noConvTop">무전환 TOP 10</option><option value="convTop">전환 있음 TOP 10</option></select></div>
-      <div class="st-rank-list" id="stRankList"></div>
-    </div>
-  </section>
-</section>
-<section class="panel table-panel">
-  <div class="table-top"><div><h2>검색어별 성과</h2><p>노출수 0 초과 검색어만 표시합니다. 하단 TOTAL은 현재 필터 기준 합계입니다.</p></div><div class="table-actions"><div class="metric-picker"><button class="btn" onclick="toggleSearchTermMetricMenu(event)" type="button">지표 설정</button><div class="metric-menu" id="searchTermMetricMenu"></div></div><button class="btn st-diff-toggle" id="stDiffToggle" onclick="toggleSearchTermDiff()" type="button"><span class="diff-toggle-dot"></span>증감률 OFF</button></div></div>
-  <div class="st-filter-bar">
-    <select class="control" id="stCampaignFilter" onchange="onSearchTermCampaignChange()"><option value="">전체 캠페인</option></select>
-    <select class="control" id="stAdgroupFilter" onchange="renderSearchTerms()"><option value="">전체 광고그룹</option></select>
-    <input class="control" id="stIncludeText" placeholder="검색어 포함" oninput="renderSearchTerms()">
-    <input class="control" id="stExcludeText" placeholder="검색어 제외" oninput="renderSearchTerms()">
-    <select class="control" id="stSortBy" onchange="renderSearchTerms()"></select>
-    <div class="st-cond-row"><select class="control" id="stCondMetric1" onchange="renderSearchTerms()"><option value="">조건1 지표</option></select><select class="control" id="stCondOp1" onchange="renderSearchTerms()"><option value=">=">이상</option><option value="<=">이하</option><option value=">">초과</option><option value="<">미만</option><option value="=">같음</option></select><input class="control" id="stCondVal1" type="number" placeholder="값" oninput="renderSearchTerms()"></div>
-    <div class="st-cond-row"><select class="control" id="stCondMetric2" onchange="renderSearchTerms()"><option value="">조건2 지표</option></select><select class="control" id="stCondOp2" onchange="renderSearchTerms()"><option value=">=">이상</option><option value="<=">이하</option><option value=">">초과</option><option value="<">미만</option><option value="=">같음</option></select><input class="control" id="stCondVal2" type="number" placeholder="값" oninput="renderSearchTerms()"></div>
-    <button class="btn ghost" onclick="resetSearchTermFilters()" type="button">필터 초기화</button>
-  </div>
-  <div class="table-wrap"><table class="main-table searchterm-table"><thead id="searchTermHead"></thead><tbody id="searchTermBody"></tbody></table></div>
-</section>
-<div class="st-tooltip" id="searchTermTooltip"></div>
-</section>
-
 </main>
 </div>
 <div class="metric-share-tooltip" id="metricShareTooltip"></div>
@@ -1948,7 +1898,7 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
     const settingsForRequest={...s,meta:{...(s.meta||{}),accountIds:metaAccountIdList.join('\n'),accountIdList:metaAccountIdList,collaborativeAccountIds:metaCollabAccountIdList.join('\n'),conversionBasis:metaConversionBasis,conversionCustomTypes:metaConversionCustomTypes},google:googleForRequest};
     try{
       renderApiStatus(null,'실제 API 데이터를 불러오는 중입니다.');
-      const body={startDate:ymdFromISO(document.getElementById('startDate').value),endDate:ymdFromISO(document.getElementById('endDate').value),recentStartDate:recentWindowDates()[0],recentEndDate:recentWindowDates()[6],platform:selectedPlatform,saleType:selectedSaleType,purchaseBasis:document.getElementById('purchaseBasis').checked,includeSearchTerms:true,metaAccountIds:metaAccountIdList,metaCollaborativeAccountIds:metaCollabAccountIdList,metaConversionBasis,metaConversionCustomTypes,...(googleCid?{googleCustomerIds:googleForRequest.customerIds,googleCid:googleForRequest.cid,googleMcc:googleForRequest.mcc}:{}),...settingsForRequest};
+      const body={startDate:ymdFromISO(document.getElementById('startDate').value),endDate:ymdFromISO(document.getElementById('endDate').value),recentStartDate:recentWindowDates()[0],recentEndDate:recentWindowDates()[6],platform:selectedPlatform,saleType:selectedSaleType,purchaseBasis:document.getElementById('purchaseBasis').checked,metaAccountIds:metaAccountIdList,metaCollaborativeAccountIds:metaCollabAccountIdList,metaConversionBasis,metaConversionCustomTypes,...(googleCid?{googleCustomerIds:googleForRequest.customerIds,googleCid:googleForRequest.cid,googleMcc:googleForRequest.mcc}:{}),...settingsForRequest};
       const response=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       const json=await response.json().catch(()=>({}));
       if(!response.ok){
@@ -2041,62 +1991,5 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-</script>
-<script>
-(function SearchTermAnalysisModule(){
-  if(window.__SEARCH_TERM_ANALYSIS__) return;
-  window.__SEARCH_TERM_ANALYSIS__=true;
-  const stMetricKeys=['cost','imp','click','ctr','cpc','conv','cvr','cpa','revenue','roas','aov'];
-  const stDefaultVisible={cost:true,imp:true,click:true,ctr:true,cpc:true,conv:true,cvr:true,cpa:true,revenue:true,roas:true,aov:true};
-  let stVisible={...stDefaultVisible};
-  let stShowDiff=false;
-  let stSortDir='desc';
-  function stMetricLabel(k){return ({cost:'광고비',imp:'노출수',click:'클릭수',ctr:'CTR',cpc:'CPC',conv:'전환수',cvr:'CVR',cpa:'CPA',revenue:'매출액',roas:'ROAS',aov:'객단가'})[k]||k}
-  function stFmt(k,v){return ['cost','revenue','cpc','cpa','aov'].includes(k)?fmtWon(v):['ctr','cvr'].includes(k)?fmtPct(v,2):k==='roas'?fmtPct(v,0):fmtNum(v)}
-  function stRows(){return (dashboardData?.searchTerms||[]).map(r=>calcMetric({...r,term:r.searchTerm||r.term||r.keywordName||'',campaignName:r.campaignName||'-',adgroupName:r.adgroupName||'-',_prev:r._prev||{}})).filter(r=>n(r.imp)>0&&r.term)}
-  function stAggregate(list){const t={cost:0,imp:0,click:0,conv:0,revenue:0},p={cost:0,imp:0,click:0,conv:0,revenue:0};(list||[]).forEach(r=>{t.cost+=n(r.cost);t.imp+=n(r.imp);t.click+=n(r.click);t.conv+=n(r.conv);t.revenue+=n(r.revenue);const pr=calcMetric(r._prev||{});p.cost+=n(pr.cost);p.imp+=n(pr.imp);p.click+=n(pr.click);p.conv+=n(pr.conv);p.revenue+=n(pr.revenue)});const row=calcMetric(t);row._prev=calcMetric(p);return row}
-  function stEnsureControls(rows){
-    const opts=stMetricKeys.map(k=>`<option value="${k}">${stMetricLabel(k)}</option>`).join('');
-    [['stXMetric','cost'],['stYMetric','roas'],['stSizeMetric','click'],['stRankMetric','cost'],['stSortBy','cost'],['stCondMetric1',''],['stCondMetric2','']].forEach(([id,def])=>{const el=document.getElementById(id);if(!el)return;const keep=el.value||def;const prefix=id.startsWith('stCond')?'<option value="">조건 지표</option>':'';if(!el.dataset.ready){el.innerHTML=prefix+opts;el.dataset.ready='1'}el.value=[...el.options].some(o=>o.value===keep)?keep:def;});
-    const camp=document.getElementById('stCampaignFilter');
-    if(camp){const keep=camp.value;const camps=[...new Set(rows.map(r=>r.campaignName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));camp.innerHTML='<option value="">전체 캠페인</option>'+camps.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');camp.value=camps.includes(keep)?keep:'';}
-    updateSearchTermAdgroups(false);
-  }
-  function updateSearchTermAdgroups(render=true){
-    const rows=stRows();const c=document.getElementById('stCampaignFilter')?.value||'';const ag=document.getElementById('stAdgroupFilter');if(!ag)return;const keep=ag.value;const groups=[...new Set(rows.filter(r=>!c||r.campaignName===c).map(r=>r.adgroupName).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));ag.innerHTML='<option value="">전체 광고그룹</option>'+groups.map(g=>`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');ag.value=groups.includes(keep)?keep:'';if(render) renderSearchTerms();
-  }
-  function stCompare(v,op,t){if(op==='>=')return v>=t;if(op==='<=')return v<=t;if(op==='>')return v>t;if(op==='<')return v<t;if(op==='=')return Math.abs(v-t)<0.00001;return true}
-  function stPassCond(r,i){const m=document.getElementById('stCondMetric'+i)?.value;if(!m)return true;const val=document.getElementById('stCondVal'+i)?.value;if(val==='')return true;return stCompare(n(r[m]),document.getElementById('stCondOp'+i)?.value||'>=',n(val))}
-  function stTableRows(){const rows=stRows();const c=document.getElementById('stCampaignFilter')?.value||'',ag=document.getElementById('stAdgroupFilter')?.value||'',inc=String(document.getElementById('stIncludeText')?.value||'').trim().toLowerCase(),exc=String(document.getElementById('stExcludeText')?.value||'').trim().toLowerCase();const sortBy=document.getElementById('stSortBy')?.value||'cost';return rows.filter(r=>(!c||r.campaignName===c)&&(!ag||r.adgroupName===ag)&&(!inc||String(r.term).toLowerCase().includes(inc))&&(!exc||!String(r.term).toLowerCase().includes(exc))&&stPassCond(r,1)&&stPassCond(r,2)).sort((a,b)=>stSortDir==='desc'?n(b[sortBy])-n(a[sortBy]):n(a[sortBy])-n(b[sortBy]));}
-  function renderSearchTermDebug(rows){
-    const box=document.getElementById('searchTermDebug');
-    if(!box)return;
-    const errs=dashboardData?.searchTermErrors||[];
-    if(rows.length || !errs.length){box.style.display='none';box.innerHTML='';return;}
-    const first=errs.slice(0,4).map(e=>`<div><code>${escapeHtml(e.reportTp||e.stage||'stat-report')}</code> ${escapeHtml(e.statDt||'')} · ${escapeHtml(String(e.message||e.error||e).slice(0,240))}</div>`).join('');
-    box.style.display='block';
-    box.innerHTML=`<b>검색어 보고서 데이터가 비어 있습니다.</b>${first}<div style="margin-top:6px">대용량 보고서가 아직 준비 중이거나 해당 광고주/기간에 지원되는 검색어 보고서가 없을 수 있습니다. 기간을 어제로 두고 다시 조회해보세요.</div>`;
-  }
-  function renderSearchTermKpis(rows){const t=stAggregate(rows),noConv=rows.filter(r=>n(r.conv)===0).reduce((s,r)=>s+n(r.cost),0),convCnt=rows.filter(r=>n(r.conv)>0).length,good=rows.filter(r=>n(r.roas)>=300&&n(r.conv)>0).length;const box=document.getElementById('searchTermKpis');if(!box)return;box.innerHTML=[[ 'green','총 검색어 수',fmtNum(rows.length),'노출수 0 초과 기준'],['blue','전환 검색어 수',fmtNum(convCnt),`고효율 ${fmtNum(good)}개`],['red','무전환 광고비',fmtWon(noConv),'전환수 0인 검색어 비용'],['purple','전체 ROAS',fmtPct(t.roas,0),`${fmtWon(t.revenue)} / ${fmtWon(t.cost)}`]].map(c=>`<div class="card ${c[0]}"><div class="label">${c[1]}</div><div class="value">${c[2]}</div><div class="sub">${c[3]}</div></div>`).join('')}
-  function stChartRows(){const rows=stRows();const minCost=n(document.getElementById('stMinCost')?.value),minClick=n(document.getElementById('stMinClick')?.value),minConv=n(document.getElementById('stMinConv')?.value);return rows.filter(r=>n(r.cost)>=minCost&&n(r.click)>=minClick&&n(r.conv)>=minConv)}
-  function renderSearchTermScatter(){const canvas=document.getElementById('stScatterCanvas');if(!canvas)return;const box=canvas.parentElement;const dpr=window.devicePixelRatio||1;const w=box.clientWidth||760,h=box.clientHeight||342;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);const data=stChartRows(),xk=document.getElementById('stXMetric')?.value||'cost',yk=document.getElementById('stYMetric')?.value||'roas',sk=document.getElementById('stSizeMetric')?.value||'click';const m={l:58,r:26,t:28,b:44},iw=w-m.l-m.r,ih=h-m.t-m.b;ctx.strokeStyle='#eef2f7';ctx.lineWidth=1;for(let i=0;i<=4;i++){const x=m.l+iw*i/4,y=m.t+ih*i/4;ctx.beginPath();ctx.moveTo(x,m.t);ctx.lineTo(x,m.t+ih);ctx.stroke();ctx.beginPath();ctx.moveTo(m.l,y);ctx.lineTo(m.l+iw,y);ctx.stroke()}ctx.strokeStyle='#d0d5dd';ctx.beginPath();ctx.moveTo(m.l,m.t);ctx.lineTo(m.l,m.t+ih);ctx.lineTo(m.l+iw,m.t+ih);ctx.stroke();ctx.fillStyle='#667085';ctx.font='11px Pretendard, sans-serif';ctx.textAlign='center';ctx.fillText(stMetricLabel(xk),m.l+iw/2,h-12);ctx.save();ctx.translate(16,m.t+ih/2);ctx.rotate(-Math.PI/2);ctx.fillText(stMetricLabel(yk),0,0);ctx.restore();ctx.fillStyle='#98a2b3';ctx.font='bold 11px Pretendard, sans-serif';ctx.textAlign='left';ctx.fillText('저비용 고효율',m.l+14,m.t+18);ctx.textAlign='right';ctx.fillText('고비용 고효율',m.l+iw-14,m.t+18);ctx.fillText('비용 점검',m.l+iw-14,m.t+ih-12);ctx.textAlign='left';ctx.fillText('영향 적음',m.l+14,m.t+ih-12);const maxX=Math.max(...data.map(r=>n(r[xk])),1),maxY=Math.max(...data.map(r=>n(r[yk])),1),maxS=Math.max(...data.map(r=>n(r[sk])),1);const pts=[];data.forEach(r=>{const x=m.l+n(r[xk])/maxX*iw,y=m.t+ih-n(r[yk])/maxY*ih,rad=4+Math.sqrt(n(r[sk])/maxS)*12;pts.push({x,y,rad,row:r});ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle=n(r.conv)>0?'rgba(3,199,90,.72)':'rgba(239,68,68,.56)';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();});if(!data.length){ctx.fillStyle='#667085';ctx.textAlign='center';ctx.font='bold 13px Pretendard, sans-serif';ctx.fillText('표시할 검색어 데이터가 없습니다.',w/2,h/2)}canvas.__points=pts;canvas.onmousemove=e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;const hit=[...(canvas.__points||[])].reverse().find(p=>Math.hypot(p.x-x,p.y-y)<=p.rad+3);const tt=document.getElementById('searchTermTooltip');if(hit){const r=hit.row;tt.innerHTML=`${escapeHtml(r.term)}<small>${escapeHtml(r.campaignName)} / ${escapeHtml(r.adgroupName)}<br>광고비 ${fmtWon(r.cost)} · ROAS ${fmtPct(r.roas,0)} · 전환 ${fmtNum(r.conv)}</small>`;tt.style.left=(e.clientX+12)+'px';tt.style.top=(e.clientY+12)+'px';tt.style.display='block'}else tt.style.display='none'};canvas.onmouseleave=()=>{const tt=document.getElementById('searchTermTooltip');if(tt)tt.style.display='none'};}
-  function renderSearchTermRank(){const box=document.getElementById('stRankList');if(!box)return;const k=document.getElementById('stRankMetric')?.value||'cost',cond=document.getElementById('stRankCondition')?.value||'top';let data=[...stRows()];if(cond==='noConvTop')data=data.filter(r=>n(r.conv)===0);if(cond==='convTop')data=data.filter(r=>n(r.conv)>0);const asc=cond==='bottom';data.sort((a,b)=>asc?n(a[k])-n(b[k]):n(b[k])-n(a[k]));data=data.slice(0,10);const max=Math.max(...data.map(r=>n(r[k])),1);box.innerHTML=data.map((r,i)=>`<div class="st-rank-row"><div class="st-rank-num">${i+1}</div><div class="st-rank-main"><div class="st-rank-name" title="${escapeHtml(r.term)}">${escapeHtml(r.term)}</div><div class="st-rank-bar-track"><div class="st-rank-bar" style="width:${Math.max(4,n(r[k])/max*100)}%"></div></div></div><div class="st-rank-val">${stFmt(k,r[k])}</div></div>`).join('')||'<div class="st-empty">표시할 TOP10 데이터가 없습니다.</div>'}
-  function renderSearchTermMetricMenu(){const box=document.getElementById('searchTermMetricMenu');if(!box)return;const allOn=stMetricKeys.every(k=>stVisible[k]!==false);box.innerHTML=`<div class="metric-menu-head"><b>검색어 지표</b><button type="button" onclick="setAllSearchTermMetrics(${!allOn})">${allOn?'전체 해제':'전체 선택'}</button></div>`+stMetricKeys.map(k=>`<label class="metric-check"><input type="checkbox" ${stVisible[k]!==false?'checked':''} onchange="setSearchTermMetricVisibility('${k}',this.checked)">${stMetricLabel(k)}</label>`).join('')+`<div class="metric-hidden-note">검색어별 성과 표에 표시할 지표를 선택합니다.</div>`}
-  function stDiffHtml(cur,prev){cur=n(cur);prev=n(prev);if(prev===0&&cur===0)return '<span class="diff flat">0%</span>';if(prev===0)return '<span class="diff new">신규</span>';const d=(cur-prev)/prev*100,cls=d>0?'up':d<0?'down':'flat',sign=d>0?'+':'';return `<span class="diff ${cls}">${sign}${d.toFixed(Math.abs(d)>=100?0:1)}%</span>`}
-  function stJudgement(r){if(n(r.conv)===0&&n(r.cost)>=30000)return '<span class="st-judgement bad">제외 검토</span>';if(n(r.roas)>=300&&n(r.conv)>0)return '<span class="st-judgement good">고효율</span>';if(n(r.conv)===0)return '<span class="st-judgement watch">관찰</span>';return '<span class="st-judgement neutral">보통</span>'}
-  function renderSearchTermTable(){const head=document.getElementById('searchTermHead'),body=document.getElementById('searchTermBody');if(!head||!body)return;const keys=stMetricKeys.filter(k=>stVisible[k]!==false);const headMetrics=keys.map(k=>`<th data-st-sort="${k}">${stMetricLabel(k)}</th>${stShowDiff?'<th class="st-diff-col">증감률</th>':''}`).join('');head.innerHTML=`<tr><th>캠페인</th><th>광고그룹</th><th>검색어</th>${headMetrics}<th>판단</th></tr>`;const metricCells=r=>keys.map(k=>`<td>${stFmt(k,r[k])}</td>${stShowDiff?`<td class="st-diff-cell">${stDiffHtml(r[k],calcMetric(r._prev||{})[k])}</td>`:''}`).join('');const data=stTableRows();const rowsHtml=data.map(r=>`<tr><td>${escapeHtml(r.campaignName)}</td><td>${escapeHtml(r.adgroupName)}</td><td><b>${escapeHtml(r.term)}</b></td>${metricCells(r)}<td>${stJudgement(r)}</td></tr>`).join('');const t=stAggregate(data);const total=`<tr class="total-row"><td>TOTAL</td><td colspan="2">검색어 합계</td>${metricCells(t)}<td>-</td></tr>`;body.innerHTML=rowsHtml+total || '<tr><td colspan="16" style="text-align:center;color:#98a2b3">표시할 검색어가 없습니다.</td></tr>';head.querySelectorAll('[data-st-sort]').forEach(th=>th.addEventListener('click',()=>{const sort=document.getElementById('stSortBy');if(sort.value===th.dataset.stSort)stSortDir=stSortDir==='desc'?'asc':'desc';else{sort.value=th.dataset.stSort;stSortDir='desc'}renderSearchTerms()}));}
-  window.renderSearchTerms=function(){const tab=document.getElementById('tab-searchterm');if(!tab)return;const active=tab.classList.contains('active');if(active){document.getElementById('dashboardTitle').textContent='검색어 분석';document.getElementById('dashboardSubtitle').textContent='네이버 대용량 다운로드 보고서를 기반으로 검색어별 성과를 분석합니다.';}const rows=stRows();stEnsureControls(rows);renderSearchTermKpis(rows);renderSearchTermDebug(rows);renderSearchTermScatter();renderSearchTermRank();renderSearchTermMetricMenu();renderSearchTermTable();}
-  window.onSearchTermCampaignChange=function(){updateSearchTermAdgroups(true)};
-  window.toggleSearchTermMetricMenu=function(e){if(e)e.stopPropagation();document.getElementById('searchTermMetricMenu')?.classList.toggle('show');renderSearchTermMetricMenu()};
-  window.setSearchTermMetricVisibility=function(k,on){stVisible[k]=!!on;renderSearchTermMetricMenu();renderSearchTermTable()};
-  window.setAllSearchTermMetrics=function(on){stMetricKeys.forEach(k=>stVisible[k]=!!on);renderSearchTermMetricMenu();renderSearchTermTable()};
-  window.toggleSearchTermDiff=function(){stShowDiff=!stShowDiff;const b=document.getElementById('stDiffToggle');if(b){b.classList.toggle('active',stShowDiff);b.innerHTML=`<span class="diff-toggle-dot"></span>증감률 ${stShowDiff?'ON':'OFF'}`;}renderSearchTermTable()};
-  window.resetSearchTermFilters=function(){['stCampaignFilter','stAdgroupFilter','stIncludeText','stExcludeText','stCondMetric1','stCondMetric2','stCondVal1','stCondVal2'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});const sort=document.getElementById('stSortBy');if(sort)sort.value='cost';stSortDir='desc';updateSearchTermAdgroups(false);renderSearchTerms()};
-  const baseRender=window.renderDashboard;
-  if(typeof baseRender==='function') window.renderDashboard=function(){const ret=baseRender.apply(this,arguments);try{renderSearchTerms()}catch(e){console.warn(e)}return ret};
-  document.addEventListener('click',e=>{if(!e.target.closest?.('#searchTermMetricMenu')&&!e.target.closest?.('[onclick*="toggleSearchTermMetricMenu"]'))document.getElementById('searchTermMetricMenu')?.classList.remove('show')});
-})();
-</script>
-
-</body>
+</script></body>
 </html>
