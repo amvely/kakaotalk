@@ -190,23 +190,70 @@ function valueByPath(obj, keys){
   }
   return '';
 }
+function naverReportDateCandidates(statDt){
+  const ymd = isoToYmd(statDt);
+  const iso = ymdToISO(ymd);
+  return [...new Set([ymd, iso])].filter(Boolean);
+}
+function naverReportTypeCandidates(reportTp){
+  const raw = String(reportTp || '').trim();
+  const up = raw.toUpperCase();
+  return [...new Set([up, raw])].filter(Boolean);
+}
+function reportJobIdFromResponse(data, resp){
+  const fromBody = valueByPath(data, [
+    'reportJobId','id','jobId','resourceId','data.reportJobId','data.id','result.reportJobId'
+  ]);
+  if(fromBody) return String(fromBody);
+  const loc = resp?.headers?.get?.('location') || resp?.headers?.get?.('Location') || '';
+  if(loc){
+    const last = String(loc).split('/').filter(Boolean).pop();
+    if(last) return last;
+  }
+  return '';
+}
+async function naverJsonReqWithMeta(cid, lic, sec, method, pathWithQuery, body){
+  const m = String(method).toUpperCase();
+  const pathOnly = pathWithQuery.split('?')[0];
+  const timestamp = Date.now().toString();
+  const sig = makeNaverSignature(sec, timestamp, m, pathOnly);
+  const resp = await fetch(NAVER_BASE + pathWithQuery, {
+    method:m,
+    headers:{
+      'Content-Type':'application/json; charset=UTF-8',
+      'X-Timestamp':timestamp,
+      'X-API-KEY':lic,
+      'X-Customer':cid,
+      'X-Signature':sig
+    },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const txt = await resp.text();
+  let data; try { data = txt ? JSON.parse(txt) : {}; } catch { data = txt; }
+  if(!resp.ok) throw new Error(`Naver ${pathOnly} 오류 (${resp.status}) ${typeof data === 'string' ? data : JSON.stringify(data).slice(0,700)}`);
+  return {data, resp, text:txt};
+}
 async function naverCreateStatReport(cid, lic, sec, reportTp, statDt){
-  const bodies = [
-    {reportTp, statDt},
-    {reportTp, statDt:ymdToISO(statDt)}
-  ];
+  const tries=[];
+  for(const tp of naverReportTypeCandidates(reportTp)){
+    for(const dt of naverReportDateCandidates(statDt)){
+      // 공식 예시/이슈들에서 JSON body와 query params가 혼재되어 있어 둘 다 순차 시도합니다.
+      tries.push({mode:'json', path:'/stat-reports', body:{reportTp:tp, statDt:dt}});
+      tries.push({mode:'query', path:`/stat-reports?reportTp=${encodeURIComponent(tp)}&statDt=${encodeURIComponent(dt)}`, body:undefined});
+    }
+  }
   let lastErr;
-  for(const body of bodies){
+  for(const t of tries){
     try{
-      const data = await naverJsonReq(cid,lic,sec,'POST','/stat-reports',body);
-      const reportJobId = valueByPath(data, ['reportJobId','id','jobId','resourceId','data.reportJobId','data.id']);
-      if(!reportJobId) throw new Error(`Naver StatReport 생성 응답에서 reportJobId를 찾지 못했습니다: ${JSON.stringify(data).slice(0,300)}`);
+      const {data, resp} = await naverJsonReqWithMeta(cid,lic,sec,'POST',t.path,t.body);
+      const reportJobId = reportJobIdFromResponse(data, resp);
+      if(!reportJobId) throw new Error(`Naver StatReport 생성 응답에서 reportJobId를 찾지 못했습니다: ${JSON.stringify(data).slice(0,500)}`);
       return {reportJobId, raw:data};
     }catch(e){ lastErr = e; }
   }
   throw lastErr;
 }
-async function naverWaitStatReport(cid, lic, sec, reportJobId, maxPolls=26){
+async function naverWaitStatReport(cid, lic, sec, reportJobId, maxPolls=18){
   let last;
   for(let i=0;i<maxPolls;i++){
     const data = await naverReq(cid,lic,sec,'GET',`/stat-reports/${encodeURIComponent(reportJobId)}`);
@@ -214,18 +261,42 @@ async function naverWaitStatReport(cid, lic, sec, reportJobId, maxPolls=26){
     const status = String(valueByPath(data, ['status','jobStatus','reportJobStatus','stat','data.status','data.jobStatus']) || '').toUpperCase();
     const downloadUrl = valueByPath(data, ['downloadUrl','downloadURL','url','fileUrl','data.downloadUrl','data.downloadURL','data.url']);
     if(downloadUrl && (!status || /BUILT|DONE|COMPLETED|SUCCESS|FINISH|READY/.test(status))) return {downloadUrl, raw:data};
-    if(/FAIL|ERROR|CANCEL|DELETE/.test(status)) throw new Error(`Naver StatReport 생성 실패(${status}): ${JSON.stringify(data).slice(0,300)}`);
-    await sleep(i < 4 ? 1200 : 2500);
+    if(/FAIL|ERROR|CANCEL|DELETE/.test(status)) throw new Error(`Naver StatReport 생성 실패(${status}): ${JSON.stringify(data).slice(0,500)}`);
+    await sleep(i < 3 ? 1200 : 2500);
   }
-  throw new Error(`Naver StatReport 생성 대기 시간 초과: ${reportJobId} / ${JSON.stringify(last||{}).slice(0,300)}`);
+  throw new Error(`Naver StatReport 생성 대기 시간 초과: ${reportJobId} / ${JSON.stringify(last||{}).slice(0,500)}`);
 }
-async function naverDownloadStatReport(downloadUrl){
-  const url = String(downloadUrl || '');
-  if(!url) return '';
-  const resp = await fetch(url);
+async function naverRawReq(cid, lic, sec, method, pathWithQuery){
+  const m = String(method).toUpperCase();
+  const pathOnly = pathWithQuery.split('?')[0];
+  const timestamp = Date.now().toString();
+  const sig = makeNaverSignature(sec, timestamp, m, pathOnly);
+  const resp = await fetch(NAVER_BASE + pathWithQuery, { method:m, headers:{ 'X-Timestamp':timestamp, 'X-API-KEY':lic, 'X-Customer':cid, 'X-Signature':sig }});
   const txt = await resp.text();
-  if(!resp.ok) throw new Error(`Naver StatReport 다운로드 오류 (${resp.status}) ${txt.slice(0,300)}`);
+  if(!resp.ok) throw new Error(`Naver ${pathOnly} 다운로드 오류 (${resp.status}) ${txt.slice(0,500)}`);
   return txt;
+}
+async function naverDownloadStatReport(downloadUrl, cid, lic, sec){
+  const raw = String(downloadUrl || '').trim();
+  if(!raw) return '';
+  const url = raw.startsWith('http') ? raw : (raw.startsWith('/') ? NAVER_BASE + raw : NAVER_BASE + '/' + raw);
+  try{
+    const resp = await fetch(url);
+    const txt = await resp.text();
+    if(resp.ok) return txt;
+    // downloadUrl이 API 내부 경로인 경우 서명 GET으로 재시도합니다.
+    if(url.startsWith(NAVER_BASE)){
+      const u = new URL(url);
+      return await naverRawReq(cid, lic, sec, 'GET', u.pathname + u.search);
+    }
+    throw new Error(`Naver StatReport 다운로드 오류 (${resp.status}) ${txt.slice(0,500)}`);
+  }catch(e){
+    if(url.startsWith(NAVER_BASE)){
+      const u = new URL(url);
+      return await naverRawReq(cid, lic, sec, 'GET', u.pathname + u.search);
+    }
+    throw e;
+  }
 }
 function splitDelimitedLine(line, delim){
   const out=[]; let cur='', quote=false;
@@ -287,12 +358,12 @@ const H = {
   adgroupName:['adgroupName','groupNm','adgroup','ad group','광고그룹명','광고그룹'],
   keywordId:['keywordId','nccKeywordId','keywordNo','키워드ID','키워드 아이디'],
   keywordName:['keyword','keywordName','registeredKeyword','등록키워드','키워드명','키워드'],
-  searchTerm:['searchTerm','searchQuery','searchKeyword','query','keywordText','shoppingKeyword','검색어','유입검색어','검색키워드','확장검색어','검색 질의어'],
-  imp:['impressions','impression','impCnt','imp','노출수','노출'],
-  click:['clicks','click','clkCnt','clk','클릭수','클릭'],
-  cost:['cost','salesAmt','spend','adCost','광고비','비용','총비용','평균비용'],
-  conv:['conversions','conversionCount','conversionCnt','ccnt','conv','전환수','전환건수','구매전환수','구매수'],
-  revenue:['conversionValue','salesByConversion','convAmt','revenue','sales','purchaseConvAmt','매출액','전환매출','전환매출액','전환가치','구매전환매출'],
+  searchTerm:['searchTerm','searchQuery','searchKeyword','query','keywordText','shoppingKeyword','matchedKeyword','expandedKeyword','Search keyword','Search term','검색어','유입검색어','검색키워드','확장검색어','확장 키워드','검색 질의어'],
+  imp:['impressions','impression','impCnt','imp','Impression count','노출수','노출'],
+  click:['clicks','click','clkCnt','clk','Click count','클릭수','클릭'],
+  cost:['cost','salesAmt','spend','adCost','Cost','광고비','비용','총비용','평균비용'],
+  conv:['conversions','conversionCount','conversionCnt','ccnt','conv','Conversion count','전환수','전환건수','구매전환수','구매수'],
+  revenue:['conversionValue','salesByConversion','Sales by conversion','convAmt','revenue','sales','purchaseConvAmt','매출액','전환매출','전환매출액','전환가치','구매전환매출'],
   purchaseCcnt:['purchaseCcnt','purchaseConversionCount','구매전환수','구매수'],
   purchaseConvAmt:['purchaseConvAmt','purchaseConversionValue','구매전환매출','구매전환매출액']
 };
@@ -345,7 +416,7 @@ function aggregateSearchTerms(rows){
 async function naverFetchOneStatReport(cid, lic, sec, reportTp, statDt){
   const {reportJobId} = await naverCreateStatReport(cid,lic,sec,reportTp,statDt);
   const {downloadUrl} = await naverWaitStatReport(cid,lic,sec,reportJobId);
-  const text = await naverDownloadStatReport(downloadUrl);
+  const text = await naverDownloadStatReport(downloadUrl, cid, lic, sec);
   // 생성된 임시 리포트는 보관 부담을 줄이기 위해 삭제를 시도하되 실패해도 조회 결과에는 영향 주지 않습니다.
   naverReq(cid,lic,sec,'DELETE',`/stat-reports/${encodeURIComponent(reportJobId)}`).catch(()=>{});
   return parseDelimitedReport(text).map(row=>normalizeSearchTermStatRow(row,reportTp,statDt)).filter(Boolean);
@@ -428,6 +499,12 @@ async function fetchNaver(body){
       const st = await naverFetchSearchTerms(cid, lic, sec, body);
       searchTerms = st.searchTerms || [];
       searchTermErrors = st.errors || [];
+      const groupNameById = {}; allGroups.forEach(g=>{ if(g.adgroupId) groupNameById[g.adgroupId]=g.adgroupName; });
+      searchTerms = searchTerms.map(r=>({
+        ...r,
+        campaignName: r.campaignName && r.campaignName !== '-' ? r.campaignName : (campNameById[r.campaignId] || r.campaignName || '-'),
+        adgroupName: r.adgroupName && r.adgroupName !== '-' ? r.adgroupName : (groupNameById[r.adgroupId] || r.adgroupName || '-')
+      }));
     }catch(e){
       searchTermErrors = [{platform:'naver', stage:'search-terms', message:e.message || String(e)}];
     }
