@@ -148,6 +148,239 @@ async function naverFetchDaily(cid, lic, sec, ids, start, end){
   }
   return rows;
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVER StatReport 기반 검색어 분석 데이터
+// - 화면에서 네이버 API가 등록된 광고주를 조회할 때 includeSearchTerms=true로 함께 요청합니다.
+// - StatReport는 보통 1일 단위로 생성되므로 조회 기간을 날짜별로 순회합니다.
+// - 쇼핑검색 검색어 상세/전환 상세 + 파워링크 확장검색어 보고서를 가능한 범위에서 수집하고,
+//   캠페인/광고그룹/검색어 기준으로 집계합니다.
+async function naverJsonReq(cid, lic, sec, method, pathWithQuery, body){
+  const m = String(method).toUpperCase();
+  const pathOnly = pathWithQuery.split('?')[0];
+  const timestamp = Date.now().toString();
+  const sig = makeNaverSignature(sec, timestamp, m, pathOnly);
+  const resp = await fetch(NAVER_BASE + pathWithQuery, {
+    method:m,
+    headers:{
+      'Content-Type':'application/json; charset=UTF-8',
+      'X-Timestamp':timestamp,
+      'X-API-KEY':lic,
+      'X-Customer':cid,
+      'X-Signature':sig
+    },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const txt = await resp.text();
+  let data; try { data = txt ? JSON.parse(txt) : {}; } catch { data = txt; }
+  if(!resp.ok) throw new Error(`Naver ${pathOnly} 오류 (${resp.status}) ${typeof data === 'string' ? data : JSON.stringify(data).slice(0,500)}`);
+  return data;
+}
+function naverDateList(start, end, maxDays=45){
+  const out=[]; let d=parseYMD(start), e=parseYMD(end);
+  while(d<=e && out.length<maxDays){ out.push(fmtYMD(d)); d=addDays(d,1); }
+  return out;
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function valueByPath(obj, keys){
+  for(const k of keys){
+    const v = k.split('.').reduce((a,p)=>a&&a[p], obj);
+    if(v !== undefined && v !== null && v !== '') return v;
+  }
+  return '';
+}
+async function naverCreateStatReport(cid, lic, sec, reportTp, statDt){
+  const bodies = [
+    {reportTp, statDt},
+    {reportTp, statDt:ymdToISO(statDt)}
+  ];
+  let lastErr;
+  for(const body of bodies){
+    try{
+      const data = await naverJsonReq(cid,lic,sec,'POST','/stat-reports',body);
+      const reportJobId = valueByPath(data, ['reportJobId','id','jobId','resourceId','data.reportJobId','data.id']);
+      if(!reportJobId) throw new Error(`Naver StatReport 생성 응답에서 reportJobId를 찾지 못했습니다: ${JSON.stringify(data).slice(0,300)}`);
+      return {reportJobId, raw:data};
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
+async function naverWaitStatReport(cid, lic, sec, reportJobId, maxPolls=26){
+  let last;
+  for(let i=0;i<maxPolls;i++){
+    const data = await naverReq(cid,lic,sec,'GET',`/stat-reports/${encodeURIComponent(reportJobId)}`);
+    last = data;
+    const status = String(valueByPath(data, ['status','jobStatus','reportJobStatus','stat','data.status','data.jobStatus']) || '').toUpperCase();
+    const downloadUrl = valueByPath(data, ['downloadUrl','downloadURL','url','fileUrl','data.downloadUrl','data.downloadURL','data.url']);
+    if(downloadUrl && (!status || /BUILT|DONE|COMPLETED|SUCCESS|FINISH|READY/.test(status))) return {downloadUrl, raw:data};
+    if(/FAIL|ERROR|CANCEL|DELETE/.test(status)) throw new Error(`Naver StatReport 생성 실패(${status}): ${JSON.stringify(data).slice(0,300)}`);
+    await sleep(i < 4 ? 1200 : 2500);
+  }
+  throw new Error(`Naver StatReport 생성 대기 시간 초과: ${reportJobId} / ${JSON.stringify(last||{}).slice(0,300)}`);
+}
+async function naverDownloadStatReport(downloadUrl){
+  const url = String(downloadUrl || '');
+  if(!url) return '';
+  const resp = await fetch(url);
+  const txt = await resp.text();
+  if(!resp.ok) throw new Error(`Naver StatReport 다운로드 오류 (${resp.status}) ${txt.slice(0,300)}`);
+  return txt;
+}
+function splitDelimitedLine(line, delim){
+  const out=[]; let cur='', quote=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){
+      if(quote && line[i+1]==='"'){ cur+='"'; i++; }
+      else quote=!quote;
+    }else if(ch===delim && !quote){ out.push(cur); cur=''; }
+    else cur+=ch;
+  }
+  out.push(cur);
+  return out.map(v=>v.replace(/^"|"$/g,'').trim());
+}
+function parseDelimitedReport(text){
+  const clean = String(text || '').replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const lines = clean.split('\n').filter(l=>l.trim() !== '');
+  if(!lines.length) return [];
+  let headerIdx = 0;
+  // 일부 리포트는 앞쪽에 설명 줄이 붙을 수 있어 검색어/캠페인/노출 같은 헤더가 있는 줄을 찾습니다.
+  for(let i=0;i<Math.min(lines.length,8);i++){
+    const l = lines[i].toLowerCase();
+    if(/검색어|search|campaign|캠페인|노출|impression/.test(l)){ headerIdx=i; break; }
+  }
+  const sample = lines[headerIdx] || '';
+  const delim = (sample.match(/\t/g)||[]).length >= (sample.match(/,/g)||[]).length ? '\t' : ',';
+  const headers = splitDelimitedLine(sample,delim).map(h=>String(h||'').replace(/^\uFEFF/,'').trim());
+  const rows=[];
+  for(const line of lines.slice(headerIdx+1)){
+    const vals = splitDelimitedLine(line,delim);
+    if(!vals.length || vals.every(v=>!v)) continue;
+    const row={}; headers.forEach((h,i)=>row[h]=vals[i] ?? ''); rows.push(row);
+  }
+  return rows;
+}
+function normHeader(k){ return String(k||'').toLowerCase().replace(/^\uFEFF/,'').replace(/[\s_\-./\\()[\]{}%:,·+|]/g,''); }
+function normMap(row){ const m={}; for(const [k,v] of Object.entries(row||{})) m[normHeader(k)] = v; return m; }
+function pick(row, aliases){
+  const m = row.__norm || (row.__norm = normMap(row));
+  const keys = Object.keys(m);
+  for(const a of aliases){ const nk=normHeader(a); if(m[nk] !== undefined && m[nk] !== '') return m[nk]; }
+  for(const a of aliases){ const nk=normHeader(a); const hit = keys.find(k => k.includes(nk) || nk.includes(k)); if(hit && m[hit] !== '') return m[hit]; }
+  return '';
+}
+function numCell(v){
+  let s = String(v ?? '').trim();
+  if(!s) return 0;
+  const neg = /^\(.*\)$/.test(s);
+  s = s.replace(/[,%원₩\s]/g,'').replace(/[()]/g,'');
+  const x = Number(s);
+  return Number.isFinite(x) ? (neg ? -x : x) : 0;
+}
+const NAVER_SEARCH_REPORT_TYPES = ['SHOPPINGKEYWORD_DETAIL','SHOPPINGKEYWORD_CONVERSION_DETAIL','EXPKEYWORD'];
+const H = {
+  date:['date','statDate','statDt','period','일자','날짜'],
+  campaignId:['campaignId','nccCampaignId','campId','campaignNo','캠페인ID','캠페인 아이디'],
+  campaignName:['campaignName','campNm','campaign','캠페인명','캠페인'],
+  adgroupId:['adgroupId','nccAdgroupId','groupId','adGroupNo','광고그룹ID','광고그룹 아이디'],
+  adgroupName:['adgroupName','groupNm','adgroup','ad group','광고그룹명','광고그룹'],
+  keywordId:['keywordId','nccKeywordId','keywordNo','키워드ID','키워드 아이디'],
+  keywordName:['keyword','keywordName','registeredKeyword','등록키워드','키워드명','키워드'],
+  searchTerm:['searchTerm','searchQuery','searchKeyword','query','keywordText','shoppingKeyword','검색어','유입검색어','검색키워드','확장검색어','검색 질의어'],
+  imp:['impressions','impression','impCnt','imp','노출수','노출'],
+  click:['clicks','click','clkCnt','clk','클릭수','클릭'],
+  cost:['cost','salesAmt','spend','adCost','광고비','비용','총비용','평균비용'],
+  conv:['conversions','conversionCount','conversionCnt','ccnt','conv','전환수','전환건수','구매전환수','구매수'],
+  revenue:['conversionValue','salesByConversion','convAmt','revenue','sales','purchaseConvAmt','매출액','전환매출','전환매출액','전환가치','구매전환매출'],
+  purchaseCcnt:['purchaseCcnt','purchaseConversionCount','구매전환수','구매수'],
+  purchaseConvAmt:['purchaseConvAmt','purchaseConversionValue','구매전환매출','구매전환매출액']
+};
+function normalizeSearchTermStatRow(raw, reportTp, statDate){
+  const isConv = /CONVERSION/i.test(reportTp);
+  const searchTerm = toStr(pick(raw,H.searchTerm) || pick(raw,H.keywordName));
+  const campaignId = toStr(pick(raw,H.campaignId));
+  const adgroupId = toStr(pick(raw,H.adgroupId));
+  const keywordId = toStr(pick(raw,H.keywordId));
+  const campaignName = toStr(pick(raw,H.campaignName)) || campaignId || '-';
+  const adgroupName = toStr(pick(raw,H.adgroupName)) || adgroupId || '-';
+  if(!searchTerm) return null;
+  const type = String(reportTp).startsWith('SHOPPING') ? '쇼핑검색' : '파워링크';
+  const base = {
+    platform:'naver', source:'naver', reportTp, statDate:statDate || isoToYmd(pick(raw,H.date)),
+    campaignId, campaignName, adgroupId, adgroupName, keywordId,
+    keywordName:toStr(pick(raw,H.keywordName)), searchTerm, term:searchTerm, type, saleType:'sales',
+    cost:0, imp:0, click:0, conv:0, revenue:0, purchaseCcnt:0, purchaseConvAmt:0
+  };
+  if(isConv){
+    base.conv = numCell(pick(raw,H.conv));
+    base.revenue = numCell(pick(raw,H.revenue));
+    base.purchaseCcnt = numCell(pick(raw,H.purchaseCcnt)) || base.conv;
+    base.purchaseConvAmt = numCell(pick(raw,H.purchaseConvAmt)) || base.revenue;
+  }else{
+    base.imp = numCell(pick(raw,H.imp));
+    base.click = numCell(pick(raw,H.click));
+    base.cost = numCell(pick(raw,H.cost));
+    // 일부 상세 리포트에 전환 지표가 같이 있는 경우를 대비합니다.
+    base.conv = numCell(pick(raw,H.conv));
+    base.revenue = numCell(pick(raw,H.revenue));
+  }
+  return base;
+}
+function searchTermKey(r){
+  return [r.campaignId || r.campaignName, r.adgroupId || r.adgroupName, r.searchTerm || r.term].map(v=>String(v||'').trim()).join('||');
+}
+function aggregateSearchTerms(rows){
+  const map={};
+  for(const r of rows||[]){
+    if(!r) continue;
+    const key = searchTermKey(r);
+    if(!map[key]) map[key] = {...r, id:`naver:search:${Buffer.from(key).toString('base64').replace(/=+$/,'')}`, cost:0, imp:0, click:0, conv:0, revenue:0, purchaseCcnt:0, purchaseConvAmt:0};
+    const m = map[key];
+    m.cost += n(r.cost); m.imp += n(r.imp); m.click += n(r.click); m.conv += n(r.conv); m.revenue += n(r.revenue);
+    m.purchaseCcnt += n(r.purchaseCcnt); m.purchaseConvAmt += n(r.purchaseConvAmt);
+  }
+  return Object.values(map).map(r=>calc(r));
+}
+async function naverFetchOneStatReport(cid, lic, sec, reportTp, statDt){
+  const {reportJobId} = await naverCreateStatReport(cid,lic,sec,reportTp,statDt);
+  const {downloadUrl} = await naverWaitStatReport(cid,lic,sec,reportJobId);
+  const text = await naverDownloadStatReport(downloadUrl);
+  // 생성된 임시 리포트는 보관 부담을 줄이기 위해 삭제를 시도하되 실패해도 조회 결과에는 영향 주지 않습니다.
+  naverReq(cid,lic,sec,'DELETE',`/stat-reports/${encodeURIComponent(reportJobId)}`).catch(()=>{});
+  return parseDelimitedReport(text).map(row=>normalizeSearchTermStatRow(row,reportTp,statDt)).filter(Boolean);
+}
+async function naverFetchSearchTermRange(cid, lic, sec, start, end, reportTypes, errors){
+  const days = naverDateList(start,end,45);
+  const rows=[];
+  for(const statDt of days){
+    for(const reportTp of reportTypes){
+      try{
+        const part = await naverFetchOneStatReport(cid,lic,sec,reportTp,statDt);
+        rows.push(...part);
+      }catch(e){
+        // 광고 유형이 없거나 해당 리포트 제공기간 밖인 경우 전체 조회 실패로 처리하지 않습니다.
+        errors.push({platform:'naver', stage:'stat-report', reportTp, statDt, message:e.message || String(e)});
+      }
+    }
+  }
+  return aggregateSearchTerms(rows);
+}
+async function naverFetchSearchTerms(cid, lic, sec, body){
+  const cfg = body.naver || {};
+  const start = isoToYmd(body.startDate), end = isoToYmd(body.endDate);
+  const [prevStart, prevEnd] = prevRange(start,end);
+  const reportTypes = Array.isArray(cfg.searchTermReportTypes) && cfg.searchTermReportTypes.length ? cfg.searchTermReportTypes :
+    Array.isArray(body.searchTermReportTypes) && body.searchTermReportTypes.length ? body.searchTermReportTypes : NAVER_SEARCH_REPORT_TYPES;
+  const errors=[];
+  const [cur, prev] = await Promise.all([
+    naverFetchSearchTermRange(cid,lic,sec,start,end,reportTypes,errors),
+    naverFetchSearchTermRange(cid,lic,sec,prevStart,prevEnd,reportTypes,errors)
+  ]);
+  const prevMap={}; prev.forEach(r=>prevMap[searchTermKey(r)] = r);
+  const rows = cur.filter(r=>n(r.imp)>0).map(r=>({...r, _prev: prevMap[searchTermKey(r)] || {}}));
+  return {searchTerms:rows, errors};
+}
 function naverTypeLabel(tp){ const s=String(tp||''); return ({'1':'파워링크','2':'쇼핑검색','3':'파워컨텐츠','4':'브랜드검색광고','5':'플레이스','WEB_SITE':'파워링크','SHOPPING':'쇼핑검색','POWER_CONTENTS':'파워컨텐츠','BRAND_SEARCH':'브랜드검색광고','PLACE':'플레이스','PLACE_SEARCH':'플레이스','LOCAL':'플레이스'})[s] || s || '기타'; }
 async function fetchNaver(body){
   const cfg = body.naver || {};
@@ -188,7 +421,18 @@ async function fetchNaver(body){
     return {platform:'naver', source:'naver', id:`naver:${rawId}`, rawId, groupId:rawId, adgroupId:rawId, adgroupName:name, campaignId:campId, campaignKey:`naver:${campId}`, campaignName:campNameById[campId]||campId, status:g.status||g.userLock||g.adgroupStatus, effectiveStatus:g.status||g.adgroupStatus, type:campTypeById[campId]||'기타', saleType:campSaleById[campId]||'all', ...metricWithPrev(curByGroup[rawId]||{}, prevByGroup[rawId]||{})};
   });
   const recentDays = naverAggByDay(dailyRows).map(r=>({...r, source:'naver'}));
-  return {allCamps, allGroups, recentDays, creatives:[]};
+  let searchTerms = [], searchTermErrors = [];
+  const includeSearchTerms = body.includeSearchTerms === true || cfg.includeSearchTerms === true;
+  if(includeSearchTerms){
+    try{
+      const st = await naverFetchSearchTerms(cid, lic, sec, body);
+      searchTerms = st.searchTerms || [];
+      searchTermErrors = st.errors || [];
+    }catch(e){
+      searchTermErrors = [{platform:'naver', stage:'search-terms', message:e.message || String(e)}];
+    }
+  }
+  return {allCamps, allGroups, recentDays, creatives:[], searchTerms, searchTermErrors};
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -932,7 +1176,7 @@ async function fetchGoogle(body){
 }
 
 function mergePayload(parts){
-  const out={allCamps:[], allGroups:[], recentDays:[], creatives:[], errors:[], skipped:[], debug:{meta:{accounts:[], rows:[], dailyRows:[], errors:[]}, google:{accounts:[], errors:[], requestedCustomerIds:[], discoveredCustomerIds:[]}}};
+  const out={allCamps:[], allGroups:[], recentDays:[], creatives:[], searchTerms:[], searchTermErrors:[], errors:[], skipped:[], debug:{meta:{accounts:[], rows:[], dailyRows:[], errors:[]}, google:{accounts:[], errors:[], requestedCustomerIds:[], discoveredCustomerIds:[]}}};
   for(const p of parts){
     if(!p) continue;
     if(p.skipped){
@@ -950,6 +1194,8 @@ function mergePayload(parts){
     out.allGroups.push(...(p.allGroups||[]));
     out.recentDays.push(...(p.recentDays||[]));
     out.creatives.push(...(p.creatives||[]));
+    out.searchTerms.push(...(p.searchTerms||[]));
+    out.searchTermErrors.push(...(p.searchTermErrors||[]));
     out.errors.push(...(p.errors||[]));
     if(p.debug?.meta){
       out.debug.meta.conversionConfig = p.debug.meta.conversionConfig || out.debug.meta.conversionConfig;
