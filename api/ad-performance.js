@@ -332,6 +332,86 @@ function parseDelimitedReport(text){
   }
   return rows;
 }
+function parseDelimitedLines(text){
+  const clean = String(text || '').replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const lines = clean.split('\n').filter(l=>l.trim() !== '');
+  if(!lines.length) return {lines:[], delim:'\t'};
+  const sample = lines.find(l=>l.includes('\t')) || lines[0] || '';
+  const delim = (sample.match(/\t/g)||[]).length >= (sample.match(/,/g)||[]).length ? '\t' : ',';
+  return {lines, delim};
+}
+function isProbablyHeader(vals){
+  const joined = vals.join(' ').toLowerCase();
+  return /검색어|search|campaign|캠페인|노출|impression|click|cost|conversion|customer/.test(joined);
+}
+function isDateCell(v){ return /^\d{4}-?\d{2}-?\d{2}(t.*)?$/i.test(String(v||'').trim()); }
+function isMetricLike(v){
+  const s=String(v??'').trim();
+  if(!s || isDateCell(s)) return false;
+  return /^-?\(?[\d,]+(\.\d+)?\)?%?$/.test(s.replace(/[원₩\s]/g,''));
+}
+function looksLikeId(v, prefix){ return new RegExp('^'+prefix+'[-_]', 'i').test(String(v||'').trim()); }
+function headerlessObject(vals, reportTp, statDt){
+  const row={};
+  const up=String(reportTp||'').toUpperCase();
+  row.date = vals.find(isDateCell) || statDt || '';
+  row.campaignId = vals.find(v=>looksLikeId(v,'cmp')) || '';
+  row.adgroupId = vals.find(v=>looksLikeId(v,'grp')) || '';
+  row.keywordId = vals.find(v=>looksLikeId(v,'kwd')) || vals.find(v=>looksLikeId(v,'nkw')) || '';
+
+  if(up === 'EXPKEYWORD'){
+    row.keyword = vals[4] || '';
+    row.searchTerm = vals[4] || '';
+    row.mediaCode = vals[5] || '';
+    row.pcMobileType = vals[6] || '';
+    row.searchKeywordType = vals[7] || '';
+    row.impression = vals[8] || 0;
+    row.click = vals[9] || 0;
+    row.cost = vals[10] || 0;
+    row.viewCount = vals[11] || 0;
+    return row;
+  }
+
+  // SHOPPINGKEYWORD 계열은 정의서/계정별 리포트 버전에 따라 ID/비즈채널 컬럼이 추가될 수 있어
+  // 위치 고정 대신 ID와 뒤쪽 지표 컬럼을 기준으로 최대한 안전하게 해석합니다.
+  const afterGroup = Math.max(vals.findIndex(v=>String(v)===row.adgroupId), 3) + 1;
+  const metricIdxs = vals.map((v,i)=>isMetricLike(v)?i:-1).filter(i=>i>=0);
+  const tailStart = metricIdxs.length ? Math.max(0, metricIdxs[0]-1) : vals.length;
+  const textCandidates = vals.slice(afterGroup, Math.max(afterGroup, tailStart))
+    .map(v=>String(v||'').trim())
+    .filter(v=>v && !isDateCell(v) && !looksLikeId(v,'cmp') && !looksLikeId(v,'grp') && !looksLikeId(v,'ad') && !looksLikeId(v,'chn') && !isMetricLike(v));
+  row.keyword = textCandidates[0] || vals[4] || '';
+  row.searchTerm = textCandidates[0] || vals[4] || '';
+
+  const nums = metricIdxs.map(i=>({i, v:vals[i]}));
+  if(/CONVERSION/.test(up)){
+    // 마지막 2개 숫자 컬럼은 전환수/전환매출로 처리합니다.
+    const last = nums.slice(-2);
+    row.conversionCount = last[0]?.v || 0;
+    row.salesByConversion = last[1]?.v || 0;
+  }else{
+    // 마지막 4개 숫자 컬럼은 노출/클릭/비용/조회수인 경우가 많습니다.
+    // 조회수가 없는 버전도 있어 최소 마지막 3개를 노출/클릭/비용으로 처리합니다.
+    const last = nums.slice(-4);
+    const perf = last.length >= 4 ? last.slice(0,3) : nums.slice(-3);
+    row.impression = perf[0]?.v || 0;
+    row.click = perf[1]?.v || 0;
+    row.cost = perf[2]?.v || 0;
+    row.viewCount = last.length >= 4 ? last[3]?.v || 0 : 0;
+  }
+  return row;
+}
+function parseNaverStatReportRows(text, reportTp, statDt){
+  const {lines, delim} = parseDelimitedLines(text);
+  if(!lines.length) return [];
+  const firstVals = splitDelimitedLine(lines[0],delim);
+  // 네이버 대용량 StatReport 다운로드 파일은 헤더 없이 데이터 행만 내려오는 경우가 있습니다.
+  // 기존 header 기반 파서는 이 경우 첫 행을 헤더로 오인해 검색어/지표를 모두 놓치므로 reportTp별 fallback을 둡니다.
+  if(!isProbablyHeader(firstVals)){
+    return lines.map(line=>splitDelimitedLine(line,delim)).filter(vals=>vals.some(Boolean)).map(vals=>headerlessObject(vals, reportTp, statDt));
+  }
+  return parseDelimitedReport(text);
+}
 function normHeader(k){ return String(k||'').toLowerCase().replace(/^\uFEFF/,'').replace(/[\s_\-./\\()[\]{}%:,·+|]/g,''); }
 function normMap(row){ const m={}; for(const [k,v] of Object.entries(row||{})) m[normHeader(k)] = v; return m; }
 function pick(row, aliases){
@@ -419,7 +499,7 @@ async function naverFetchOneStatReport(cid, lic, sec, reportTp, statDt){
   const text = await naverDownloadStatReport(downloadUrl, cid, lic, sec);
   // 생성된 임시 리포트는 보관 부담을 줄이기 위해 삭제를 시도하되 실패해도 조회 결과에는 영향 주지 않습니다.
   naverReq(cid,lic,sec,'DELETE',`/stat-reports/${encodeURIComponent(reportJobId)}`).catch(()=>{});
-  return parseDelimitedReport(text).map(row=>normalizeSearchTermStatRow(row,reportTp,statDt)).filter(Boolean);
+  return parseNaverStatReportRows(text,reportTp,statDt).map(row=>normalizeSearchTermStatRow(row,reportTp,statDt)).filter(Boolean);
 }
 async function naverFetchSearchTermRange(cid, lic, sec, start, end, reportTypes, errors){
   const days = naverDateList(start,end,45);
