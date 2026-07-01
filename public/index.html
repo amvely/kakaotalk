@@ -390,6 +390,9 @@
 .side-advertiser-button{width:100%;min-height:38px;border:1px solid #334155;background:#0b1220;color:#fff;border-radius:12px;padding:9px 11px;font-size:13px;font-weight:950;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .side-advertiser-button:hover,.side-advertiser-dropdown.open .side-advertiser-button{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.12)}
 .side-advertiser-button .placeholder{color:#94a3b8}
+.side-advertiser-label-row{display:flex;align-items:center;gap:8px;overflow:hidden;flex:1 1 auto}
+.side-advertiser-media{display:inline-flex;align-items:center;flex:0 0 auto}
+.side-advertiser-media .media-boxes{margin-top:0}
 .side-advertiser-caret{font-size:10px;color:#94a3b8;transition:transform .16s ease}
 .side-advertiser-dropdown.open .side-advertiser-caret{transform:rotate(180deg);color:#e2e8f0}
 .side-advertiser-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#0b1220;border:1px solid #334155;border-radius:14px;padding:7px;box-shadow:0 18px 42px rgba(0,0,0,.34);z-index:80;display:none;max-height:230px;overflow:auto;scrollbar-width:thin;scrollbar-color:#475569 #111827}
@@ -494,7 +497,7 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <div class="side-section-label">ADVERTISER</div>
 <input autocomplete="off" class="sidebar-advertiser-search" id="advertiserSearch" onclick="event.stopPropagation()" onfocus="document.getElementById('advertiserDropdown')?.classList.add('open')" oninput="renderAdvertiserSelect();document.getElementById('advertiserDropdown')?.classList.add('open')" placeholder="광고주 검색" type="search"/>
 <div class="side-advertiser-dropdown" id="advertiserDropdown">
-<button class="side-advertiser-button" onclick="toggleAdvertiserDropdown(event)" type="button"><span class="placeholder" id="advertiserDropdownLabel">광고주 선택…</span><span class="side-advertiser-caret">▼</span></button>
+<button class="side-advertiser-button" onclick="toggleAdvertiserDropdown(event)" type="button"><span class="placeholder" id="advertiserDropdownLabel">광고주 선택…</span><span class="side-advertiser-media" id="advertiserDropdownMedia"></span><span class="side-advertiser-caret">▼</span></button>
 <div class="side-advertiser-menu" id="advertiserList"></div>
 </div>
 <div class="side-advertiser-actions">
@@ -519,7 +522,7 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <main>
 <div class="topbar">
 <div class="headline"><h1 id="dashboardTitle">광고 성과 통합 대시보드</h1><p class="date-line" id="dashboardSubtitle">API 설정 후 데이터 불러오기를 눌러주세요.</p></div>
-<div class="actions"><button class="btn api-action-btn" onclick="openSettings()">API 설정</button><button class="btn report-schedule-action-btn" onclick="openReportScheduleModal()" type="button">리포트 예약</button><button class="btn report-action-btn" onclick="downloadReportHtml()" type="button">리포트 생성</button><button class="btn primary data-load-btn" onclick="loadDashboard(true)">데이터 불러오기</button></div>
+<div class="actions"><button class="btn api-action-btn" onclick="openSettings()">API 설정</button><button class="btn capture-action-btn" id="captureReportBtn" onclick="captureReportSection()" type="button">캡처</button><button class="btn report-schedule-action-btn" onclick="openReportScheduleModal()" type="button">리포트 예약</button><button class="btn report-action-btn" onclick="downloadReportHtml()" type="button">리포트 생성</button><button class="btn primary data-load-btn" onclick="loadDashboard(true)">데이터 불러오기</button></div>
 </div>
 <section class="filter-card">
 <div class="filter-grid">
@@ -539,6 +542,7 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <div class="report-table-wrap">
 <table class="report-table"><thead><tr><th>지표</th><th>이전기간</th><th>조회기간</th><th>증감률</th><th>증감</th></tr></thead><tbody id="summaryBody"></tbody></table>
 </div>
+<div class="report-copy-row"><button class="report-copy-btn" id="reportCopyBtn" onclick="copyPerformanceReport()" type="button">텍스트 복사</button></div>
 </div>
 <div class="report-card report-right-card">
 <div class="report-head compact">
@@ -639,6 +643,16 @@ act_9876543210" spellcheck="false"></textarea><div class="mini">일반 광고계
 /* === v6: instant metric share hover tooltip === */
 .metric-share-tooltip{position:fixed;z-index:999999;display:none;pointer-events:none;background:#111827;color:#fff;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:950;line-height:1;box-shadow:0 12px 28px rgba(15,23,42,.22);white-space:nowrap;transform:translate(12px,12px)}
 .metric-share-seg[data-tooltip-value]{cursor:default}
+
+/* === v27: capture button + performance data copy button === */
+.capture-action-btn{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#0e7490,#06b6d4);color:#fff!important;border-color:#0891b2!important;box-shadow:0 8px 18px rgba(6,182,212,.18)}
+.capture-action-btn:hover{filter:brightness(1.04);transform:translateY(-1px)}
+.capture-action-btn:disabled{opacity:.6;cursor:default;transform:none}
+.report-copy-row{padding:10px 20px 16px;min-height:44px;display:flex;justify-content:flex-end;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease;pointer-events:none}
+.report-left-card:hover .report-copy-row{opacity:1;transform:translateY(0);pointer-events:auto}
+.report-copy-btn{background:#1d2839;color:#eaf1fb;border:1px solid #33445c;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:900;cursor:pointer}
+.report-copy-btn:hover{background:#26344a}
+.report-copy-btn.copied{background:#166534;border-color:#166534;color:#fff}
 </style>
 
 <!-- === HOTFIX: optional meta custom field guard for API settings buttons === -->
@@ -779,7 +793,15 @@ function getContributionRows(items,metric,level='campaign'){let rows;if(level===
 function renderContribution(camps){const metric=document.getElementById('contribMetric').value;const rows=getContributionRows(camps,metric,'campaign');const totalDiff=rows.reduce((s,r)=>s+r.diff,0);const top=rows.slice(0,8);document.getElementById('contribBody').innerHTML=top.map(r=>{const share=totalDiff?Math.abs(r.diff)/Math.abs(totalDiff)*100:0;return`<tr><td>${badge(r.platform)} ${r.name}</td><td>${metricFmt(metric,r.prev)}</td><td>${metricFmt(metric,r.cur)}</td><td class="${r.diff>=0?'diff up':'diff down'}">${r.diff>=0?'+':''}${metricFmt(metric,r.diff)}</td><td>${share.toFixed(1)}%</td></tr>`}).join('')||'<tr><td colspan="5" class="empty">표시할 데이터가 없습니다.</td></tr>'}
 function syncMetricAndRender(v){const el=document.getElementById('waterfallMetric');if(el)el.value=v;renderDashboard()}function adjustWaterfallTopN(delta){waterfallTopN=Math.max(1,Math.min(50,n(waterfallTopN)+n(delta)));const el=document.getElementById('waterfallTopN'),lab=document.getElementById('waterfallTopNLabel');if(el)el.value=String(waterfallTopN);if(lab)lab.textContent=waterfallTopN+'개';renderDashboard()}
 function campaignTypeOf(c){let s=String(c.type||c.campaignType||c.objectiveLabel||c.objective||c.advertisingChannelType||c.channelType||'').trim();const u=s.toUpperCase();const map={'브랜드검색':'브랜드검색광고','브랜드검색광고':'브랜드검색광고','쇼핑광고':'쇼핑검색','SHOPPING':'쇼핑검색','WEB_SITE':'파워링크','POWER_LINK':'파워링크','POWER_CONTENTS':'파워컨텐츠','BRAND_SEARCH':'브랜드검색광고','PLACE':'플레이스','LOCAL':'플레이스','OUTCOME_SALES':'판매 목표','OUTCOME_LEADS':'잠재 고객 목표','OUTCOME_TRAFFIC':'트래픽 목표','OUTCOME_ENGAGEMENT':'참여 목표','OUTCOME_AWARENESS':'인지도 목표','OUTCOME_APP_PROMOTION':'앱 홍보 목표','PRODUCT_CATALOG_SALES':'카탈로그 판매','CONVERSIONS':'전환','LINK_CLICKS':'트래픽','REACH':'도달','BRAND_AWARENESS':'브랜드 인지도','VIDEO_VIEWS':'동영상 조회','LEAD_GENERATION':'잠재 고객','MESSAGES':'메시지','POST_ENGAGEMENT':'게시물 참여','APP_INSTALLS':'앱 설치','EVENT_RESPONSES':'이벤트 응답','STORE_VISITS':'매장 방문'};return map[s]||map[u]||s||'기타'}
-function refreshWaterfallFilters(camps){const typeEl=document.getElementById('waterfallSaleType'),campEl=document.getElementById('waterfallCampaign');if(!typeEl||!campEl)return;const keepType=typeEl.value||'all',keepCamp=campEl.value||'all';const types=[...new Set(camps.map(campaignTypeOf).filter(Boolean))].sort();typeEl.innerHTML='<option value="all">전체 캠페인 유형</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');typeEl.value=types.includes(keepType)?keepType:'all';const filtered=camps.filter(c=>typeEl.value==='all'||campaignTypeOf(c)===typeEl.value);campEl.innerHTML='<option value="all">전체 캠페인</option>'+filtered.map(c=>`<option value="${c.id||c.platform+':'+c.campaignId}">${c.campaignName||c.name}</option>`).join('');campEl.value=[...campEl.options].some(o=>o.value===keepCamp)?keepCamp:'all'}
+/* === v28: 캠페인 유형/캠페인 드롭다운 - 가나다순 정렬 + [매체] 표시 === */
+function platformTagOptionsHtml(items,allLabel){
+  const seen=new Set();
+  const uniq=[];
+  (items||[]).forEach(it=>{if(!it||!it.value||seen.has(it.value))return;seen.add(it.value);uniq.push(it)});
+  uniq.sort((a,b)=>String(a.label||'').localeCompare(String(b.label||''),'ko'));
+  return `<option value="all">${allLabel}</option>`+uniq.map(it=>`<option value="${escapeHtml(it.value)}">[${escapeHtml(platformName(it.platform))}] ${escapeHtml(it.label)}</option>`).join('');
+}
+function refreshWaterfallFilters(camps){const typeEl=document.getElementById('waterfallSaleType'),campEl=document.getElementById('waterfallCampaign');if(!typeEl||!campEl)return;const keepType=typeEl.value||'all',keepCamp=campEl.value||'all';const typeSeen=new Set();const typeItems=[];camps.forEach(c=>{const t=campaignTypeOf(c);if(!t||typeSeen.has(t))return;typeSeen.add(t);typeItems.push({value:t,label:t,platform:c.platform})});typeEl.innerHTML=platformTagOptionsHtml(typeItems,'전체 캠페인 유형');typeEl.value=typeItems.some(t=>t.value===keepType)?keepType:'all';const filtered=camps.filter(c=>typeEl.value==='all'||campaignTypeOf(c)===typeEl.value);const campItems=filtered.map(c=>({value:c.id||c.platform+':'+c.campaignId,label:c.campaignName||c.name,platform:c.platform}));campEl.innerHTML=platformTagOptionsHtml(campItems,'전체 캠페인');campEl.value=[...campEl.options].some(o=>o.value===keepCamp)?keepCamp:'all'}
 
 function bindWaterfallTooltip(canvas){
   if(!canvas)return;
@@ -871,7 +893,7 @@ function tableTotalCells(row,prev){return campaignTableMetrics().map(k=>`<td>${m
 function clearCampaignFilters(){['campFilterPlatform','campFilterType','textFilterTarget','textFilterMode','textFilterValue','numFilterMetric','numFilterOp','numFilterValue'].forEach(id=>{const el=document.getElementById(id);if(!el)return;if(id==='campFilterPlatform'||id==='campFilterType')el.value='all';else if(id==='textFilterTarget')el.value='campaign';else if(id==='textFilterMode')el.value='contains';else if(id==='numFilterMetric')el.value='cost';else if(id==='numFilterOp')el.value='gte';else el.value=''});renderDashboard()}
 function textMatch(value,keyword,mode){const v=String(value||'').toLowerCase(),k=String(keyword||'').trim().toLowerCase();if(!k)return true;if(mode==='exact')return v===k;if(mode==='exclude')return !v.includes(k);return v.includes(k)}
 function numberMatch(value,op,target){if(target===''||target===null||target===undefined)return true;const v=n(value),t=n(target);if(op==='gt')return v>t;if(op==='lt')return v<t;if(op==='lte')return v<=t;if(op==='eq')return v===t;return v>=t}
-function refreshCampaignTypeFilter(camps){const el=document.getElementById('campFilterType');if(!el)return;const keep=el.value||'all';const types=[...new Set(camps.map(campaignTypeOf).filter(Boolean))].sort();el.innerHTML='<option value="all">전체 캠페인 유형</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');el.value=types.includes(keep)?keep:'all'}function campaignKeys(c){return [...new Set([c.id,`${c.platform}:${c.campaignId}`,c.campaignKey].filter(Boolean).map(String))]}function applyCampaignFilters(camps,groups){const platform=document.getElementById('campFilterPlatform')?.value||'all';let platformCamps=camps.filter(c=>platform==='all'||c.platform===platform),platformGroups=groups.filter(g=>platform==='all'||g.platform===platform);refreshCampaignTypeFilter(platformCamps);const type=document.getElementById('campFilterType')?.value||'all',target=document.getElementById('textFilterTarget')?.value||'campaign',mode=document.getElementById('textFilterMode')?.value||'contains',kw=document.getElementById('textFilterValue')?.value||'',metric=document.getElementById('numFilterMetric')?.value||'cost',op=document.getElementById('numFilterOp')?.value||'gte',numVal=document.getElementById('numFilterValue')?.value||'';const groupByCamp={};platformGroups.forEach(g=>{campaignKeys(g).forEach(k=>{(groupByCamp[k]||(groupByCamp[k]=[])).push(g)})});const filtered=platformCamps.filter(c=>{if(type!=='all'&&campaignTypeOf(c)!==type)return false;if(!numberMatch(c[metric],op,numVal))return false;const cKeys=campaignKeys(c);if(target==='campaign')return textMatch(c.campaignName||c.name,kw,mode);return cKeys.some(k=>(groupByCamp[k]||[]).some(g=>textMatch(g.adgroupName||g.name,kw,mode)))});const ids=new Set(filtered.flatMap(c=>campaignKeys(c)));let finalGroups=platformGroups.filter(g=>campaignKeys(g).some(k=>ids.has(k)));if(target!=='campaign'&&String(kw||'').trim())finalGroups=finalGroups.filter(g=>textMatch(g.adgroupName||g.name,kw,mode));return {campaigns:filtered,groups:finalGroups}}
+function refreshCampaignTypeFilter(camps){const el=document.getElementById('campFilterType');if(!el)return;const keep=el.value||'all';const seen=new Set();const typeItems=[];camps.forEach(c=>{const t=campaignTypeOf(c);if(!t||seen.has(t))return;seen.add(t);typeItems.push({value:t,label:t,platform:c.platform})});el.innerHTML=platformTagOptionsHtml(typeItems,'전체 캠페인 유형');el.value=typeItems.some(t=>t.value===keep)?keep:'all'}function campaignKeys(c){return [...new Set([c.id,`${c.platform}:${c.campaignId}`,c.campaignKey].filter(Boolean).map(String))]}function applyCampaignFilters(camps,groups){const platform=document.getElementById('campFilterPlatform')?.value||'all';let platformCamps=camps.filter(c=>platform==='all'||c.platform===platform),platformGroups=groups.filter(g=>platform==='all'||g.platform===platform);refreshCampaignTypeFilter(platformCamps);const type=document.getElementById('campFilterType')?.value||'all',target=document.getElementById('textFilterTarget')?.value||'campaign',mode=document.getElementById('textFilterMode')?.value||'contains',kw=document.getElementById('textFilterValue')?.value||'',metric=document.getElementById('numFilterMetric')?.value||'cost',op=document.getElementById('numFilterOp')?.value||'gte',numVal=document.getElementById('numFilterValue')?.value||'';const groupByCamp={};platformGroups.forEach(g=>{campaignKeys(g).forEach(k=>{(groupByCamp[k]||(groupByCamp[k]=[])).push(g)})});const filtered=platformCamps.filter(c=>{if(type!=='all'&&campaignTypeOf(c)!==type)return false;if(!numberMatch(c[metric],op,numVal))return false;const cKeys=campaignKeys(c);if(target==='campaign')return textMatch(c.campaignName||c.name,kw,mode);return cKeys.some(k=>(groupByCamp[k]||[]).some(g=>textMatch(g.adgroupName||g.name,kw,mode)))});const ids=new Set(filtered.flatMap(c=>campaignKeys(c)));let finalGroups=platformGroups.filter(g=>campaignKeys(g).some(k=>ids.has(k)));if(target!=='campaign'&&String(kw||'').trim())finalGroups=finalGroups.filter(g=>textMatch(g.adgroupName||g.name,kw,mode));return {campaigns:filtered,groups:finalGroups}}
 function renderTable(camps,groups){const fg=applyCampaignFilters(camps,groups);camps=fg.campaigns;groups=fg.groups;const forceGroupOpen=(document.getElementById('textFilterTarget')?.value||'adgroup')==='adgroup'&&String(document.getElementById('textFilterValue')?.value||'').trim();const rows=[];const table=document.getElementById('campaignBody').closest('table');table.querySelector('thead').innerHTML=campaignHeaderHtml();sortRows(camps).forEach(c=>{const key=c.id||`${c.platform}:${c.campaignId}`,open=!!forceGroupOpen||expandedCampaigns.has(key);rows.push(`<tr class="campaign-row ${open?'open':''}" data-key="${key}">${rowCells(c)}</tr>`);if(open){const child=groups.filter(g=>g.campaignKey===key||String(g.campaignId)===String(c.campaignId)&&g.platform===c.platform);if(child.length)sortRows(child).forEach(g=>rows.push(`<tr class="group-row">${rowCells(g,true)}</tr>`));else rows.push(`<tr class="group-row"><td></td><td colspan="${2+campaignTableMetrics().length*2}" style="text-align:left;color:#64748b">연결된 광고그룹 데이터가 없습니다.</td></tr>`)}});const t=aggregate(camps);const tp=aggregate(camps.map(c=>c._prev||{}));rows.push(`<tr class="total-row"><td>TOTAL</td><td>현재 필터 기준 합계</td><td>-</td>${tableTotalCells(t,tp)}</tr>`);['naver','meta','google'].forEach(pf=>{const pfRows=camps.filter(c=>c.platform===pf);if(!pfRows.length)return;const pt=aggregate(pfRows),pp=aggregate(pfRows.map(c=>c._prev||{}));rows.push(`<tr class="total-row platform-total-row"><td>${badge(pf)}</td><td>${platformName(pf)} TOTAL</td><td>-</td>${tableTotalCells(pt,pp)}</tr>`)});document.getElementById('campaignBody').innerHTML=rows.join('')||`<tr><td colspan="${3+campaignTableMetrics().length*2}" style="text-align:center;color:#98a2b3">노출이 발생한 캠페인이 없습니다.</td></tr>`;document.querySelectorAll('.campaign-row').forEach(tr=>tr.addEventListener('click',()=>{const k=tr.dataset.key;expandedCampaigns.has(k)?expandedCampaigns.delete(k):expandedCampaigns.add(k);renderDashboard()}))}
 
 function reportExportHasMetaCreativeData(){
@@ -952,14 +974,16 @@ function refreshMetricShareFilters(camps=[]){
   platformEl.innerHTML=platformOptions.map(p=>`<option value="${p}">${platformLabels[p]||p}</option>`).join('');
   platformEl.value=platformOptions.includes(keepPlatform)?keepPlatform:'all';
   const byPlatform=(camps||[]).filter(c=>platformEl.value==='all'||c.platform===platformEl.value);
-  const types=[...new Set(byPlatform.map(campaignTypeOf).filter(Boolean))].sort();
-  typeEl.innerHTML='<option value="all">전체 캠페인 유형</option>'+types.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-  typeEl.value=types.includes(keepType)?keepType:'all';
+  const typeSeen=new Set();
+  const typeItems=[];
+  byPlatform.forEach(c=>{const t=campaignTypeOf(c);if(!t||typeSeen.has(t))return;typeSeen.add(t);typeItems.push({value:t,label:t,platform:c.platform})});
+  typeEl.innerHTML=platformTagOptionsHtml(typeItems,'전체 캠페인 유형');
+  typeEl.value=typeItems.some(t=>t.value===keepType)?keepType:'all';
   const byType=byPlatform.filter(c=>typeEl.value==='all'||campaignTypeOf(c)===typeEl.value);
   const seen=new Set();
   const campaignOptions=[];
   byType.forEach(c=>{const value=metricShareOptionValue(c);if(!value||seen.has(value))return;seen.add(value);campaignOptions.push({value,label:c.campaignName||c.name||value,platform:c.platform})});
-  campEl.innerHTML='<option value="all">전체 캠페인</option>'+campaignOptions.map(c=>`<option value="${escapeHtml(c.value)}">${escapeHtml(c.label)}</option>`).join('');
+  campEl.innerHTML=platformTagOptionsHtml(campaignOptions,'전체 캠페인');
   campEl.value=campaignOptions.some(c=>c.value===keepCamp)?keepCamp:'all';
   return {platform:platformEl.value,type:typeEl.value,campaign:campEl.value};
 }
@@ -1140,6 +1164,8 @@ async function downloadReportHtml(){
     style.textContent=`
       body.report-export-mode{background:#f5f7fb!important;color:#101828!important;}
       body.report-export-mode .api-action-btn,
+      body.report-export-mode .capture-action-btn,
+      body.report-export-mode .report-copy-row,
       body.report-export-mode .report-schedule-action-btn,
       body.report-export-mode .report-action-btn,
       body.report-export-mode .data-load-btn{display:none!important;}
@@ -1169,6 +1195,123 @@ async function downloadReportHtml(){
   }catch(e){
     console.error(e);
     alert('리포트 생성에 실패했습니다: '+(e?.message||e));
+  }
+}
+
+/* === v27: 캡처 버튼 - 광고 성과 데이터 + 일간 추이차트 이미지 캡처 === */
+let __html2canvasLoading=null;
+function ensureHtml2Canvas(){
+  if(window.html2canvas)return Promise.resolve();
+  if(__html2canvasLoading)return __html2canvasLoading;
+  __html2canvasLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=()=>resolve();
+    s.onerror=()=>{__html2canvasLoading=null;reject(new Error('캡처 라이브러리를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.'))};
+    document.head.appendChild(s);
+  });
+  return __html2canvasLoading;
+}
+async function captureReportSection(){
+  const target=document.querySelector('.report-duo');
+  if(!target){alert('캡처할 영역을 찾을 수 없습니다.');return}
+  const btn=document.getElementById('captureReportBtn');
+  const prevLabel=btn?btn.textContent:'';
+  try{
+    if(btn){btn.disabled=true;btn.textContent='캡처 중…'}
+    await ensureHtml2Canvas();
+    const canvas=await html2canvas(target,{backgroundColor:'#f5f7fb',scale:2,useCORS:true});
+    await new Promise((resolve)=>{
+      canvas.toBlob(blob=>{
+        if(!blob){alert('캡처에 실패했습니다.');resolve();return}
+        const advName=(typeof selectedAdvertiser==='function'?selectedAdvertiser()?.name:'')||'광고주';
+        const platform=selectedPlatform==='all'?'전체':platformName(selectedPlatform);
+        const start=document.getElementById('startDate')?.value||'';
+        const end=document.getElementById('endDate')?.value||'';
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=`광고성과캡처_${reportSafeFileName(advName)}_${reportSafeFileName(platform)}_${reportSafeFileName(start)}_${reportSafeFileName(end)}.png`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{URL.revokeObjectURL(url);a.remove();resolve()},0);
+      },'image/png');
+    });
+  }catch(e){
+    console.error(e);
+    alert('캡처에 실패했습니다: '+(e?.message||e));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=prevLabel||'캡처'}
+  }
+}
+
+/* === v27: 광고 성과 데이터 텍스트 복사 === */
+function prevRangeClient(startDate,endDate){
+  if(!startDate||!endDate)return [startDate||'',endDate||''];
+  const s=new Date(startDate+'T00:00:00Z'), e=new Date(endDate+'T00:00:00Z');
+  const pe=new Date(s); pe.setUTCDate(pe.getUTCDate()-1);
+  const span=Math.round((e-s)/86400000);
+  const ps=new Date(pe); ps.setUTCDate(ps.getUTCDate()-span);
+  return [ps.toISOString().slice(0,10), pe.toISOString().slice(0,10)];
+}
+function performanceReportLines(){
+  const {campaigns}=currentRows();
+  const t=aggregate(campaigns), p=aggregate(campaigns.map(c=>c._prev||{}));
+  const won=v=>Math.round(n(v)).toLocaleString('ko-KR')+'원';
+  const cnt=(v,unit)=>Math.round(n(v)).toLocaleString('ko-KR')+unit;
+  const rateDiff=(cur,prev,d)=>{const diff=n(cur)-n(prev);return `${diff>=0?'+':''}${diff.toFixed(d)}%`};
+  const rows=[
+    ['cost','광고비',won,false,1],
+    ['imp','노출수',v=>cnt(v,'회'),false,1],
+    ['click','클릭수',v=>cnt(v,'회'),false,1],
+    ['conv','전환수',v=>cnt(v,'건'),false,1],
+    ['revenue','매출액',won,false,1],
+    ['cart','장바구니',v=>cnt(v,'건'),false,1],
+    ['cpc','평균클릭비용(CPC)',won,false,1],
+    ['ctr','클릭율(CTR)',v=>n(v).toFixed(2)+'%',true,2],
+    ['cvr','전환율(CVR)',v=>n(v).toFixed(2)+'%',true,2],
+    ['roas','광고수익률(ROAS)',v=>n(v).toFixed(0)+'%',true,0],
+    ['cpa','전환당비용(CPA)',won,false,1],
+    ['aov','객단가',won,false,1],
+  ];
+  return rows.map(([k,label,fmt,isRate,decimals])=>{
+    const cur=t[k], prev=p[k];
+    const diffText=isRate?rateDiff(cur,prev,decimals):diffPct(cur,prev).text;
+    return `- ${label}: ${fmt(cur)} (${diffText})`;
+  });
+}
+function buildPerformanceReportText(){
+  const advName=(typeof selectedAdvertiser==='function'?selectedAdvertiser()?.name:'')||'광고주';
+  const enabled=dashboardData?.meta?.enabled||getEnabledFromSettings();
+  const connected=['naver','meta','google'].filter(p=>enabled?.[p]).map(platformName);
+  const connectedLabel=connected.length?connected.join('/'):'연결된 매체 없음';
+  const start=document.getElementById('startDate')?.value||'';
+  const end=document.getElementById('endDate')?.value||'';
+  const [prevStart,prevEnd]=prevRangeClient(start,end);
+  const dotDate=s=>String(s||'').replace(/-/g,'.');
+  const lines=[];
+  lines.push(`${advName} 광고 성과 보고`);
+  lines.push(`(${connectedLabel} 연결된 매체만 표시)`);
+  lines.push('');
+  lines.push(`■ 주요 성과 (${dotDate(prevStart)} ~ ${dotDate(prevEnd)} → ${dotDate(start)} ~ ${dotDate(end)})`);
+  lines.push(...performanceReportLines());
+  return lines.join('\n');
+}
+async function copyPerformanceReport(){
+  if(!dashboardData){alert('먼저 데이터 불러오기를 실행해주세요.');return}
+  const btn=document.getElementById('reportCopyBtn');
+  try{
+    const text=buildPerformanceReportText();
+    await navigator.clipboard.writeText(text);
+    if(btn){
+      const prev=btn.textContent;
+      btn.textContent='복사됨 ✓';
+      btn.classList.add('copied');
+      setTimeout(()=>{btn.textContent=prev;btn.classList.remove('copied')},1500);
+    }
+  }catch(e){
+    console.error(e);
+    alert('복사에 실패했습니다: '+(e?.message||e));
   }
 }
 
@@ -1413,7 +1556,10 @@ function clearSettings(){updateSelectedSettings({naver:{},meta:{},google:{}});cl
       listEl.innerHTML=list.length?(filtered.length?filtered.map(a=>`<button type="button" class="side-adv-item ${a.id===sel?'active':''}" onclick='changeAdvertiser(${JSON.stringify(String(a.id))})'><span class="side-adv-name">${escapeHtml(a.name||'광고주')}</span>${advertiserMediaBoxes(a.settings||{})}</button>`).join(''):'<div class="side-adv-empty">검색 결과가 없습니다.</div>'):'<div class="side-adv-empty">등록된 광고주가 없습니다.<br>아래 추가 버튼으로 등록하세요.</div>';
     }
     const label=document.getElementById('advertiserDropdownLabel');
-    if(label){const cur=selectedAdvertiser();label.textContent=cur?(cur.name||'광고주'):'광고주 선택…';label.classList.toggle('placeholder',!cur)}
+    const cur=selectedAdvertiser();
+    if(label){label.textContent=cur?(cur.name||'광고주'):'광고주 선택…';label.classList.toggle('placeholder',!cur)}
+    const mediaEl=document.getElementById('advertiserDropdownMedia');
+    if(mediaEl)mediaEl.innerHTML=cur?advertiserMediaBoxes(cur.settings||{}):'';
     try{syncMetaConversionControls('settings')}catch(e){}
     try{updateHeader()}catch(e){}
     try{updateGoogleCommonStatusUI()}catch(e){}
