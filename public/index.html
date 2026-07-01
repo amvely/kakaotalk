@@ -1254,8 +1254,7 @@ function prevRangeClient(startDate,endDate){
   const ps=new Date(pe); ps.setUTCDate(ps.getUTCDate()-span);
   return [ps.toISOString().slice(0,10), pe.toISOString().slice(0,10)];
 }
-function performanceReportLines(){
-  const {campaigns}=currentRows();
+function performanceReportLines(campaigns){
   const t=aggregate(campaigns), p=aggregate(campaigns.map(c=>c._prev||{}));
   const won=v=>Math.round(n(v)).toLocaleString('ko-KR')+'원';
   const cnt=(v,unit)=>Math.round(n(v)).toLocaleString('ko-KR')+unit;
@@ -1280,21 +1279,31 @@ function performanceReportLines(){
     return `- ${label}: ${fmt(cur)} (${diffText})`;
   });
 }
+// 실제 데이터(0원이 아닌 지표)가 있는 매체만 골라 네이버/메타/구글 순으로 반환
+function platformsWithData(campaigns){
+  const metricKeys=['cost','imp','click','conv','revenue','cart'];
+  return ['naver','meta','google'].filter(pf=>{
+    const rows=campaigns.filter(c=>c.platform===pf);
+    if(!rows.length)return false;
+    const t=aggregate(rows);
+    return metricKeys.some(k=>n(t[k])>0);
+  });
+}
 function buildPerformanceReportText(){
   const advName=(typeof selectedAdvertiser==='function'?selectedAdvertiser()?.name:'')||'광고주';
-  const enabled=dashboardData?.meta?.enabled||getEnabledFromSettings();
-  const connected=['naver','meta','google'].filter(p=>enabled?.[p]).map(platformName);
-  const connectedLabel=connected.length?connected.join('/'):'연결된 매체 없음';
+  const {campaigns}=currentRows();
+  const activePlatforms=platformsWithData(campaigns).map(platformName);
+  const mediaLabel=activePlatforms.length?`(${activePlatforms.join('/')} 기준)`:'(데이터 있는 매체 없음)';
   const start=document.getElementById('startDate')?.value||'';
   const end=document.getElementById('endDate')?.value||'';
   const [prevStart,prevEnd]=prevRangeClient(start,end);
   const dotDate=s=>String(s||'').replace(/-/g,'.');
   const lines=[];
   lines.push(`${advName} 광고 성과 보고`);
-  lines.push(`(${connectedLabel} 연결된 매체만 표시)`);
+  lines.push(mediaLabel);
   lines.push('');
   lines.push(`■ 주요 성과 (${dotDate(prevStart)} ~ ${dotDate(prevEnd)} → ${dotDate(start)} ~ ${dotDate(end)})`);
-  lines.push(...performanceReportLines());
+  lines.push(...performanceReportLines(campaigns));
   return lines.join('\n');
 }
 async function copyPerformanceReport(){
