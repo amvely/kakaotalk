@@ -501,6 +501,24 @@ function metaConversionParts(row, config){
     normalConvAmt: metaActionValue(row.action_values, config)
   };
 }
+// 장바구니(add_to_cart)는 마케터가 선택한 전환 기준(conversionBasis)과 무관하게 항상 별도로 계산합니다.
+// 일반 AD 계정 → 일반 장바구니(actions 기준), 협력광고 AD 계정 → 공유 장바구니(catalog_segment_actions 기준)만 사용하고,
+// 두 계정이 모두 있으면 각 계정에서 계산된 값이 캠페인 배열에 합쳐지면서 자연스럽게 합산됩니다.
+const META_CART_CONFIG = (()=>{
+  const preset = META_CONVERSION_PRESETS.add_to_cart;
+  return {
+    basis:'add_to_cart', label:preset.label,
+    actionTypes:[...preset.actionTypes], suffixes:preset.suffixes||[], dedupeAliases:true,
+    sharedActionTypes:[...(preset.sharedActionTypes||preset.actionTypes)], sharedSuffixes:preset.sharedSuffixes||preset.suffixes||[]
+  };
+})();
+function metaCartCcnt(row, mode='auto'){
+  const p = metaConversionParts(row, META_CART_CONFIG);
+  if(mode==='normal') return p.normalCcnt;
+  if(mode==='shared') return p.sharedCcnt;
+  const hasSharedMetric = p.sharedCcnt > 0 || p.sharedConvAmt > 0;
+  return hasSharedMetric ? p.sharedCcnt : p.normalCcnt;
+}
 function metaObjectiveLabel(value){
   const raw = String(value || '').trim();
   const s = raw.toUpperCase();
@@ -587,7 +605,8 @@ function metaMetric(row, mode='auto', conversionConfig=metaConversionConfig({}))
     conv:selectedCcnt,
     revenue:selectedConvAmt,
     purchaseCcnt:selectedCcnt,
-    purchaseConvAmt:selectedConvAmt
+    purchaseConvAmt:selectedConvAmt,
+    cart:metaCartCcnt(row, mode)
   });
   out.selectedConversionCcnt = selectedCcnt;
   out.selectedConversionValue = selectedConvAmt;
@@ -607,9 +626,12 @@ function metaMetricMode(accountId, body){
     body.metaCollaborativeAccountIds || body.metaCollabAccountIds || body.metaSharedAccountIds || body.metaCatalogAccountIds ||
     process.env.META_COLLABORATIVE_ACCOUNT_IDS || process.env.META_COLLAB_ACCOUNT_IDS || process.env.META_SHARED_ACCOUNT_IDS || process.env.META_CATALOG_ACCOUNT_IDS
   );
+  // 일반 AD 계정은 실제 설정 필드인 accountIds(협력광고와 분리된 일반 광고계정 목록)를 기준으로 판단합니다.
+  // standardAccountIds/normalAccountIds는 이전에 실제로 채워지지 않는 필드라 매칭이 안 됐던 문제를 함께 고칩니다.
   const normalIds = parseMetaAccountIds(
-    cfg.standardAccountIds || cfg.normalAccountIds || body.metaStandardAccountIds || body.metaNormalAccountIds ||
-    process.env.META_STANDARD_ACCOUNT_IDS || process.env.META_NORMAL_ACCOUNT_IDS
+    cfg.accountIds || cfg.accountId || cfg.standardAccountIds || cfg.normalAccountIds ||
+    body.metaAccountIds || body.metaAccountId || body.metaStandardAccountIds || body.metaNormalAccountIds ||
+    process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || process.env.META_STANDARD_ACCOUNT_IDS || process.env.META_NORMAL_ACCOUNT_IDS
   );
   const id = cleanMetaAccountId(accountId);
   if(sharedIds.includes(id)) return 'shared';
