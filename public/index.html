@@ -542,7 +542,7 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <div class="report-table-wrap">
 <table class="report-table"><thead><tr><th>지표</th><th>이전기간</th><th>조회기간</th><th>증감률</th><th>증감</th></tr></thead><tbody id="summaryBody"></tbody></table>
 </div>
-<div class="report-copy-row"><button class="report-copy-btn" id="reportCopyBtn" onclick="copyPerformanceReport()" type="button">텍스트 복사</button></div>
+<div class="report-copy-row"><span class="report-copy-hint">※ 마우스를 올리면 메신저용 텍스트 복사가 가능합니다.</span><button class="report-copy-btn" id="reportCopyBtn" onclick="copyPerformanceReport()" type="button">텍스트 복사</button></div>
 </div>
 <div class="report-card report-right-card">
 <div class="report-head compact">
@@ -648,9 +648,11 @@ act_9876543210" spellcheck="false"></textarea><div class="mini">일반 광고계
 .capture-action-btn{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#0e7490,#06b6d4);color:#fff!important;border-color:#0891b2!important;box-shadow:0 8px 18px rgba(6,182,212,.18)}
 .capture-action-btn:hover{filter:brightness(1.04);transform:translateY(-1px)}
 .capture-action-btn:disabled{opacity:.6;cursor:default;transform:none}
-.report-copy-row{padding:10px 20px 16px;min-height:44px;display:flex;justify-content:flex-end;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease;pointer-events:none}
-.report-left-card:hover .report-copy-row{opacity:1;transform:translateY(0);pointer-events:auto}
-.report-copy-btn{background:#1d2839;color:#eaf1fb;border:1px solid #33445c;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:900;cursor:pointer}
+.report-copy-row{padding:10px 20px 16px;min-height:44px;display:flex;justify-content:center;align-items:center}
+.report-copy-hint{color:#7c8ba3;font-size:11.5px;font-weight:800;letter-spacing:-.01em}
+.report-copy-btn{display:none;background:#1d2839;color:#eaf1fb;border:1px solid #33445c;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:900;cursor:pointer}
+.report-left-card:hover .report-copy-hint{display:none}
+.report-left-card:hover .report-copy-btn{display:inline-flex}
 .report-copy-btn:hover{background:#26344a}
 .report-copy-btn.copied{background:#166534;border-color:#166534;color:#fff}
 </style>
