@@ -534,13 +534,14 @@ body.report-export-mode .api-action-btn,body.report-export-mode .report-schedule
 <section class="tab-panel active" id="tab-dashboard">
 <section class="ai-comment-box" id="aiCommentBox">
 <div class="ai-comment-left">
-<div class="ai-comment-label">🤖 마케터 코멘트</div>
+<div class="ai-comment-label">🤖 프롬프트 입력</div>
 <textarea class="ai-comment-input" id="aiCommentQuestion" spellcheck="false"></textarea>
-<button class="btn ai-analysis-btn" id="aiAnalysisBtn" onclick="runAiAnalysis()" type="button">분석하기</button>
+<div class="ai-comment-btn-row"><button class="btn ai-analysis-btn" id="aiAnalysisBtn" onclick="runAiAnalysis()" type="button">분석하기</button></div>
 </div>
 <div class="ai-comment-right">
-<div class="ai-comment-right-label">마케터 코멘트</div>
+<div class="ai-comment-right-head"><span class="ai-comment-right-label">마케터 코멘트</span><button class="ai-comment-edit-btn" id="aiCommentEditBtn" onclick="toggleAiCommentEdit()" type="button">수정</button></div>
 <div class="ai-comment-answer" id="aiAnalysisBody">왼쪽에 질문(또는 기본 프롬프트)을 확인하고 분석하기를 눌러주세요.</div>
+<textarea class="ai-comment-answer-edit" id="aiAnalysisEdit" spellcheck="false" style="display:none"></textarea>
 </div>
 </section>
 <section class="report-duo">
@@ -682,13 +683,23 @@ act_9876543210" spellcheck="false"></textarea><div class="mini">일반 광고계
 .ai-comment-left{padding:18px 20px;display:flex;flex-direction:column;gap:10px;border-right:1px solid rgba(199,210,254,.18)}
 .ai-comment-right{padding:18px 20px;display:flex;flex-direction:column}
 .ai-comment-label{font-size:12px;font-weight:950;letter-spacing:.04em;color:#c7d2fe}
-.ai-comment-right-label{display:none;font-size:12px;font-weight:950;letter-spacing:.04em;color:#c7d2fe;margin-bottom:8px}
+.ai-comment-right-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ai-comment-right-label{font-size:12px;font-weight:950;letter-spacing:.04em;color:#c7d2fe}
+.ai-comment-edit-btn{background:#151233;color:#c7d2fe;border:1px solid #4338ca;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:900;cursor:pointer}
+.ai-comment-edit-btn:hover{background:#211d4d}
+.ai-comment-edit-btn.active{background:#4338ca;color:#fff}
 .ai-comment-input{flex:1;min-height:130px;resize:vertical;background:#151233;border:1px solid #4338ca;border-radius:12px;padding:12px 13px;font-size:13px;line-height:1.6;color:#eef2ff;outline:none}
 .ai-comment-input:focus{border-color:#818cf8;box-shadow:0 0 0 3px rgba(129,140,248,.22)}
-.ai-comment-box .ai-analysis-btn{align-self:flex-start}
-.ai-comment-answer{flex:1;font-size:13px;line-height:1.75;color:#eef2ff;white-space:pre-wrap}
+.ai-comment-btn-row{display:flex;justify-content:center}
+.ai-comment-btn-row .ai-analysis-btn{transform:translateX(16px)}
+.ai-comment-answer{flex:1;font-size:14.5px;line-height:1.9;color:#eef2ff;white-space:pre-wrap;word-break:keep-all}
 .ai-comment-answer.loading{color:#a5b4fc}
 .ai-comment-answer.error{color:#fca5a5}
+.ai-comment-answer-edit{flex:1;min-height:180px;resize:vertical;background:#151233;border:1px solid #4338ca;border-radius:12px;padding:12px 13px;font-size:14px;line-height:1.8;color:#eef2ff;outline:none}
+.ai-comment-section{margin-bottom:14px}
+.ai-comment-section:last-child{margin-bottom:0}
+.ai-comment-section-title{font-size:12.5px;font-weight:950;color:#a5b4fc;margin-bottom:4px}
+.ai-comment-section-text{font-size:14.5px;line-height:1.9;color:#eef2ff;white-space:pre-wrap;word-break:keep-all}
 @media(max-width:900px){.ai-comment-box{grid-template-columns:1fr}.ai-comment-left{border-right:0;border-bottom:1px solid rgba(199,210,254,.18)}}
 </style>
 
@@ -702,7 +713,7 @@ act_9876543210" spellcheck="false"></textarea><div class="mini">일반 광고계
 const API_ENDPOINT="/api/ad-performance";let selectedPlatform="all",selectedSaleType="sales",dashboardData=null,expandedCampaigns=new Set(),conversionExpandedCampaigns=new Set(),allExpanded=false,diffMode="rate",waterfallTopN=10,metricShareHighlightedKey=null,campaignSort={key:'revenue',dir:'desc'},creativeSort={key:'cost',dir:'desc'};const defaultMetricVisibility={cost:true,imp:true,click:true,conv:true,revenue:true,purchaseCcnt:true,purchaseConvAmt:true,cart:true,cartRevenue:true,ctr:true,cpc:true,cvr:true,cpa:true,roas:true,aov:true};let metricVisibility={...defaultMetricVisibility},recentMetricVisibility={...defaultMetricVisibility};const colors=['c0','c1','c2','c3','c4','c5'];
 function n(v){const x=Number(v);return Number.isFinite(x)?x:0}function fmtWon(v){return '₩'+Math.round(n(v)).toLocaleString('ko-KR')}function fmtNum(v){return Math.round(n(v)).toLocaleString('ko-KR')}function fmtPct(v,d=1){return n(v).toFixed(d)+'%'}function ymd(date){return `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`}function isoFromYmd(s){s=String(s).replace(/-/g,'');return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`}function ymdFromISO(s){return String(s||'').replace(/-/g,'').slice(0,8)}
 function platformName(p){return({naver:'네이버',meta:'메타',google:'구글'})[p]||p||'기타'}function isOff(row){const v=String(row?.status||row?.effectiveStatus||row?.campaignStatus||row?.configuredStatus||row?.servingStatus||'').toUpperCase();return ['OFF','PAUSED','REMOVED','DISABLED','ENDED','ARCHIVED'].some(x=>v.includes(x))||row?.enabled===false||row?.isActive===false}function badge(p,off=false){return `<span class="badge ${p} ${off?'off':''}"><span class="dot ${p}"></span>${platformName(p)}</span>`}function metaConversionLabel(){const basis=getMetaConversionBasis();const el=document.getElementById('metaConversionBasis');const txt=el?.selectedOptions?.[0]?.textContent||({purchase:'구매',lead:'리드',add_to_cart:'장바구니',link_click:'링크 클릭',landing_page_view:'랜딩페이지 조회',custom:'커스텀'})[basis]||'구매';return basis==='custom'?'커스텀':txt}function metricLabel(k){const selectedLabel=metaConversionLabel();return({cost:'광고비',imp:'노출수',click:'클릭수',conv:'전환수',purchaseCcnt:`${selectedLabel}전환`,revenue:'매출액',purchaseConvAmt:`${selectedLabel}전환값`,cart:'장바구니',cartRevenue:'장바구니 전환값',roas:'ROAS',ctr:'CTR',cvr:'CVR',cpc:'CPC',cpa:'CPA',aov:'객단가'})[k]||k}function metricFmt(k,v){return ['cost','revenue','purchaseConvAmt','cartRevenue','cpc','cpa','aov'].includes(k)?fmtWon(v):k==='roas'?fmtPct(v,0):['ctr','cvr'].includes(k)?fmtPct(v,2):fmtNum(v)}
-function showNaverCartValue(){return selectedPlatform==='naver'}function activeMetricKeys(){const base=selectedSaleType==='nonsales'?['cost','imp','click','conv']:['cost','imp','click','conv','revenue'];return showNaverCartValue()&&selectedSaleType!=='nonsales'?base.concat(['cart']):base}function hasRevenueMetric(){return activeMetricKeys().includes('revenue')}function refreshMetricControls(){const keys=activeMetricKeys();['contribMetric','waterfallMetric'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const keep=keys.includes(el.value)?el.value:keys[0];el.innerHTML=keys.map(k=>`<option value="${k}">${metricLabel(k)}</option>`).join('');el.value=keep})}
+function showNaverCartValue(){return selectedPlatform!=='google'}function activeMetricKeys(){const base=selectedSaleType==='nonsales'?['cost','imp','click','conv']:['cost','imp','click','conv','revenue'];return showNaverCartValue()&&selectedSaleType!=='nonsales'?base.concat(['cart']):base}function hasRevenueMetric(){return activeMetricKeys().includes('revenue')}function refreshMetricControls(){const keys=activeMetricKeys();['contribMetric','waterfallMetric'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const keep=keys.includes(el.value)?el.value:keys[0];el.innerHTML=keys.map(k=>`<option value="${k}">${metricLabel(k)}</option>`).join('');el.value=keep})}
 function calcMetric(v){v={...v};v.cost=n(v.cost??v.salesAmt??v.spend);v.imp=n(v.imp??v.impCnt??v.impressions);v.click=n(v.click??v.clkCnt??v.clicks);v.conv=n(v.conv??v.ccnt??v.conversions);v.revenue=n(v.revenue??v.convAmt??v.conversionsValue);v.purchaseCcnt=n(v.purchaseCcnt??v.purchaseConversions??v.purchaseCnt);v.purchaseConvAmt=n(v.purchaseConvAmt??v.purchaseRevenue??v.purchaseValue);v.cart=n(v.cart??v.cartCcnt??v.cartCnt??v.cartConversions??v.addToCart??v.addToCartCcnt??Math.max(0,v.conv-v.purchaseCcnt));v.cartRevenue=n(v.cartRevenue??v.cartConvAmt??v.cartConvValue??v.addToCartConvAmt??v.addToCartValue);v.ctr=v.imp?v.click/v.imp*100:0;v.cvr=v.click?v.conv/v.click*100:0;v.cpc=v.click?v.cost/v.click:0;v.cpa=v.conv?v.cost/v.conv:0;v.roas=v.cost?v.revenue/v.cost*100:0;v.aov=v.conv?v.revenue/v.conv:0;return v}function calcRow(row){const out=calcMetric(row);out._prev=row._prev?calcMetric(row._prev):calcMetric({});return Object.assign(out,row,{_prev:out._prev})}function aggregate(rows){const out={cost:0,imp:0,click:0,conv:0,revenue:0,purchaseCcnt:0,purchaseConvAmt:0,cart:0,cartRevenue:0};rows.forEach(r=>{out.cost+=n(r.cost);out.imp+=n(r.imp);out.click+=n(r.click);out.conv+=n(r.conv);out.revenue+=n(r.revenue);out.purchaseCcnt+=n(r.purchaseCcnt);out.purchaseConvAmt+=n(r.purchaseConvAmt);out.cart+=n(r.cart??Math.max(0,n(r.conv)-n(r.purchaseCcnt)));out.cartRevenue+=n(r.cartRevenue??r.cartConvAmt??r.cartConvValue??0)});return calcMetric(out)}
 function inferSaleType(row){if(row.saleType)return row.saleType;const t=`${row.type||''} ${row.campaignName||row.name||''}`.toLowerCase();if(t.includes('비판매')||t.includes('brand')||t.includes('인지'))return'nonsales';if(t.includes('판매')||t.includes('shopping')||t.includes('전환'))return'sales';return'all'}
 function applyPurchaseBasis(row){const original=calcMetric(row);const prevOriginal=calcMetric(row._prev||{});const r={...row,_prev:{...(row._prev||{})}};r.cost=original.cost;r.imp=original.imp;r.click=original.click;r.purchaseCcnt=original.purchaseCcnt;r.purchaseConvAmt=original.purchaseConvAmt;r.cart=n(row.cart??Math.max(0,original.conv-original.purchaseCcnt));r.cartRevenue=n(row.cartRevenue??row.cartConvAmt??row.cartConvValue??0);r._prev.cost=prevOriginal.cost;r._prev.imp=prevOriginal.imp;r._prev.click=prevOriginal.click;r._prev.purchaseCcnt=prevOriginal.purchaseCcnt;r._prev.purchaseConvAmt=prevOriginal.purchaseConvAmt;r._prev.cart=n(r._prev.cart??Math.max(0,prevOriginal.conv-prevOriginal.purchaseCcnt));r._prev.cartRevenue=n(r._prev.cartRevenue??r._prev.cartConvAmt??r._prev.cartConvValue??0);if(selectedSaleType==='sales'&&r.platform==='naver'){r.conv=original.purchaseCcnt;r.revenue=original.purchaseConvAmt;r._prev.conv=prevOriginal.purchaseCcnt;r._prev.revenue=prevOriginal.purchaseConvAmt}else{r.conv=original.conv;r.revenue=original.revenue;r._prev.conv=prevOriginal.conv;r._prev.revenue=prevOriginal.revenue}return calcRow(r)}
@@ -1236,6 +1247,9 @@ async function downloadReportHtml(){
       body.report-export-mode .ai-comment-left{display:none!important;}
       body.report-export-mode .ai-comment-box{grid-template-columns:1fr!important;}
       body.report-export-mode .ai-comment-right-label{display:block!important;}
+      body.report-export-mode .ai-comment-edit-btn{display:none!important;}
+      body.report-export-mode .ai-comment-answer{display:block!important;}
+      body.report-export-mode .ai-comment-answer-edit{display:none!important;}
       body.report-export-mode #sidebarAdvertiserCard{display:none!important;}
       body.report-export-mode .side-advertiser-menu,body.report-export-mode .side-advertiser-dropdown,body.report-export-mode .side-advertiser-io,body.report-export-mode .side-advertiser-actions{display:none!important;}
       body.report-export-mode .filter-card{display:block!important;}
@@ -1419,6 +1433,77 @@ async function callGeminiAnalysis(userPrompt,dataText){
   }
   throw lastErr||new Error('사용 가능한 Gemini 모델을 찾지 못했습니다.');
 }
+function buildAiDataText(campaigns,sectionPlatforms){
+  const start=document.getElementById('startDate')?.value||'';
+  const end=document.getElementById('endDate')?.value||'';
+  const lines=[`기간: ${start} ~ ${end}`,'','[전체 합산]',...performanceReportLines(campaigns)];
+  if(sectionPlatforms.length>1){
+    sectionPlatforms.forEach(p=>{
+      const rows=campaigns.filter(c=>c.platform===p);
+      lines.push('',`[${platformName(p)}]`,...performanceReportLines(rows));
+    });
+  }
+  return lines.join('\n');
+}
+function buildGeminiInstruction(userPrompt,sectionPlatforms){
+  const base=userPrompt||GEMINI_DEFAULT_PROMPT;
+  if(sectionPlatforms.length<=1){
+    return `${base}\n\n[출력 형식]\n- 문장마다 줄바꿈해서 읽기 좋게 작성\n- 마크다운 기호(#, *, - 등) 사용 금지`;
+  }
+  const heads=['전체 코멘트',...sectionPlatforms.map(p=>platformName(p))];
+  return `${base}\n\n[출력 형식]\n아래 섹션 구성을 반드시 지켜서 작성하세요.\n- 각 섹션 제목은 대괄호로 표시: ${heads.map(h=>`[${h}]`).join(', ')}\n- 섹션 제목 다음 줄부터 코멘트 작성, 문장마다 줄바꿈\n- 섹션 사이는 빈 줄 하나로 구분\n- 마크다운 기호(#, *, - 등) 사용 금지\n\n${heads.map(h=>`[${h}]\n(여기에 코멘트)`).join('\n\n')}`;
+}
+function parseAiSections(text){
+  const lines=String(text||'').split('\n');
+  const sections=[];
+  let cur=null;
+  lines.forEach(line=>{
+    const m=line.match(/^\s*\[([^\[\]]{1,20})\]\s*$/);
+    if(m){cur={title:m[1].trim(),body:''};sections.push(cur)}
+    else if(cur){cur.body+=(cur.body?'\n':'')+line}
+  });
+  return sections.map(s=>({title:s.title,body:s.body.trim()})).filter(s=>s.body);
+}
+function renderAiCommentBody(rawText){
+  const body=document.getElementById('aiAnalysisBody');
+  if(!body)return;
+  body.dataset.raw=rawText;
+  body.classList.remove('loading','error');
+  const sections=parseAiSections(rawText);
+  body.innerHTML='';
+  if(sections.length>1){
+    sections.forEach(sec=>{
+      const wrap=document.createElement('div');wrap.className='ai-comment-section';
+      const title=document.createElement('div');title.className='ai-comment-section-title';title.textContent=sec.title;
+      const text=document.createElement('div');text.className='ai-comment-section-text';text.textContent=sec.body;
+      wrap.appendChild(title);wrap.appendChild(text);
+      body.appendChild(wrap);
+    });
+  }else{
+    body.textContent=rawText;
+  }
+}
+function toggleAiCommentEdit(){
+  const body=document.getElementById('aiAnalysisBody');
+  const edit=document.getElementById('aiAnalysisEdit');
+  const btn=document.getElementById('aiCommentEditBtn');
+  if(!body||!edit||!btn)return;
+  const editing=edit.style.display!=='none';
+  if(editing){
+    renderAiCommentBody(edit.value);
+    edit.style.display='none';
+    body.style.display='';
+    btn.textContent='수정';
+    btn.classList.remove('active');
+  }else{
+    edit.value=body.dataset.raw||body.textContent||'';
+    body.style.display='none';
+    edit.style.display='block';
+    edit.focus();
+    btn.textContent='완료';
+    btn.classList.add('active');
+  }
+}
 async function runAiAnalysis(){
   if(!dashboardData){alert('먼저 데이터 불러오기를 실행해주세요.');return}
   if(!geminiCommonReady()){
@@ -1430,19 +1515,18 @@ async function runAiAnalysis(){
   const prevLabel=btn?btn.textContent:'';
   try{
     if(btn){btn.disabled=true;btn.textContent='분석 중…'}
-    if(body){body.textContent='Gemini가 성과 데이터를 분석하고 있습니다…';body.classList.add('loading');body.classList.remove('error')}
+    if(body){body.innerHTML='';body.textContent='Gemini가 성과 데이터를 분석하고 있습니다…';body.classList.add('loading');body.classList.remove('error');delete body.dataset.raw}
     const {campaigns}=currentRows();
-    const dataText=[
-      `기간: ${document.getElementById('startDate')?.value||''} ~ ${document.getElementById('endDate')?.value||''}`,
-      ...performanceReportLines(campaigns)
-    ].join('\n');
+    const sectionPlatforms=selectedPlatform==='all'?platformsWithData(campaigns):platformsWithData(campaigns).filter(p=>p===selectedPlatform);
+    const dataText=buildAiDataText(campaigns,sectionPlatforms);
     const questionEl=document.getElementById('aiCommentQuestion');
-    const prompt=(questionEl?.value||'').trim()||loadGeminiCommonSettings().prompt||GEMINI_DEFAULT_PROMPT;
-    const result=await callGeminiAnalysis(prompt,dataText);
-    if(body){body.textContent=result;body.classList.remove('loading');body.classList.remove('error')}
+    const userPrompt=(questionEl?.value||'').trim()||loadGeminiCommonSettings().prompt||GEMINI_DEFAULT_PROMPT;
+    const instruction=buildGeminiInstruction(userPrompt,sectionPlatforms);
+    const result=await callGeminiAnalysis(instruction,dataText);
+    renderAiCommentBody(result);
   }catch(e){
     console.error(e);
-    if(body){body.textContent='분석에 실패했습니다: '+(e?.message||e);body.classList.remove('loading');body.classList.add('error')}
+    if(body){body.innerHTML='';body.textContent='분석에 실패했습니다: '+(e?.message||e);body.classList.remove('loading');body.classList.add('error');delete body.dataset.raw}
   }finally{
     if(btn){btn.disabled=false;btn.textContent=prevLabel||'분석하기'}
   }
@@ -1568,7 +1652,14 @@ async function runScheduledReports(){
 function renderEmptyDashboard(){updateHeader();document.getElementById('kpiCards').innerHTML='<div class="blank-state" style="grid-column:1/-1"><strong>데이터 불러오기 전입니다.</strong>API 설정을 저장한 뒤 데이터 불러오기를 눌러주세요.</div>';document.getElementById('summaryBody').innerHTML='<tr><td colspan="5" style="text-align:center;color:#98a2b3">조회 전입니다.</td></tr>';document.getElementById('dailyTrendGrid').innerHTML='<div class="blank-state" style="grid-column:1/-1"><strong>일간 추이차트</strong>API 데이터를 불러오면 표시됩니다.</div>';document.getElementById('wfSummary').innerHTML='<div class="wf-card" style="grid-column:1/-1"><div class="wf-label">대기</div><div class="wf-val">데이터 불러오기 전</div></div>';document.getElementById('metricShareBody')&&(document.getElementById('metricShareBody').innerHTML='<div class="metric-share-empty">데이터 불러오기 전입니다.</div>');const c=document.getElementById('waterfallChart');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);document.getElementById('recentHead').innerHTML='';document.getElementById('recentBody').innerHTML='<tr><td style="text-align:center;color:#98a2b3">조회 전입니다.</td></tr>';document.getElementById('campaignBody').innerHTML='<tr><td colspan="18" style="text-align:center;color:#98a2b3">API 설정 후 데이터 불러오기를 눌러주세요.</td></tr>';document.getElementById('creativeKpis').innerHTML='';document.getElementById('creativeGrid').innerHTML='';document.getElementById('creativeBody').innerHTML='';document.getElementById('conversionCards')&&(document.getElementById('conversionCards').innerHTML='');document.getElementById('funnelBox')&&(document.getElementById('funnelBox').innerHTML='');document.getElementById('conversionShare')&&(document.getElementById('conversionShare').innerHTML='');document.getElementById('conversionBody')&&(document.getElementById('conversionBody').innerHTML='')}
 function renderDashboard(){updateHeader();refreshMetricControls();if(!dashboardData){renderEmptyDashboard();renderApiStatus(null,'데이터 불러오기를 눌러 조회하세요.');return}renderApiStatus(dashboardData,dashboardData?undefined:'데이터 불러오기를 눌러 조회하세요.');const{campaigns,groups}=currentRows();renderKpis(campaigns);renderDailyTrendGrid();drawWaterfall(campaigns,groups);renderMetricSharePanel(campaigns,groups);renderRecentTable();renderRecentMetricMenu();renderTable(campaigns,groups);renderCreative()}
 async function loadDashboard(){setLoading(true);try{dashboardData=normalizeApiPayload(await fetchDashboard());hideAiAnalysisBox();renderDashboard()}catch(e){console.error(e);dashboardData=null;hideAiAnalysisBox();renderEmptyDashboard();renderApiStatus({errors:[{platform:'naver',message:e.message},{platform:'meta',message:e.message},{platform:'google',message:e.message}]},'API 호출 실패: '+e.message)}finally{setLoading(false)}}
-function hideAiAnalysisBox(){const body=document.getElementById('aiAnalysisBody');if(body){body.textContent='왼쪽에 질문(또는 기본 프롬프트)을 확인하고 분석하기를 눌러주세요.';body.classList.remove('loading','error')}}
+function hideAiAnalysisBox(){
+  const body=document.getElementById('aiAnalysisBody');
+  const edit=document.getElementById('aiAnalysisEdit');
+  const editBtn=document.getElementById('aiCommentEditBtn');
+  if(body){body.innerHTML='';body.textContent='왼쪽에 질문(또는 기본 프롬프트)을 확인하고 분석하기를 눌러주세요.';body.classList.remove('loading','error');body.style.display='';delete body.dataset.raw}
+  if(edit){edit.value='';edit.style.display='none'}
+  if(editBtn){editBtn.textContent='수정';editBtn.classList.remove('active')}
+}
 
 /* === v25: restore sidebar advertiser list while keeping Google MCC common settings === */
 function normalizeAdvertiserList(list){
